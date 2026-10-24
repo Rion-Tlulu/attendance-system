@@ -1,0 +1,47 @@
+
+{% extends "base.html" %}
+
+{% block title %}
+管理者ホーム | 勤怠管理
+{% endblock %}
+
+{% block screen_label %}
+管理者画面
+{% endblock %}
+
+{% block content %}
+
+<section class="dashboard">
+
+    <div class="page-heading">
+        <h1>管理者ホーム</h1>
+        <p>
+            勤怠記録と申請の管理を行います。
+        </p>
+    </div>
+
+    <div class="content-card">
+
+        <h2>管理者権限を確認しました</h2>
+
+        <p>
+            {{ request.user.display_name }} さんは、
+            業務管理者としてログインしています。
+        </p>
+
+        <div class="notice info">
+            勤怠一覧・修正申請の承認・社員管理・
+            月次確定・CSV出力は、
+            後のフェーズで実装します。
+        </div>
+
+        <a class="btn btn-outline"
+           href="{% url 'attendance:home' %}">
+            社員画面へ戻る
+        </a>
+
+    </div>
+
+</section>
+
+{% endblock %}

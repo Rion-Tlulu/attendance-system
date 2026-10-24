@@ -1,0 +1,31 @@
+
+{% extends "base.html" %}
+
+{% block title %}
+アクセスできません | 勤怠管理
+{% endblock %}
+
+{% block content %}
+
+<section class="auth-layout">
+
+    <div class="auth-card">
+
+        <h1>この画面にはアクセスできません</h1>
+
+        <p>
+            表示するための権限がありません。
+            権限が必要な場合は、
+            社内の管理担当者にお問い合わせください。
+        </p>
+
+        <a class="btn btn-primary btn-block"
+           href="{% url 'attendance:home' %}">
+            社員ホームへ戻る
+        </a>
+
+    </div>
+
+</section>
+
+{% endblock %}

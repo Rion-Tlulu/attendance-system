@@ -1,0 +1,116 @@
+
+{% load static %}
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1">
+
+    <title>
+        {% block title %}勤怠管理システム{% endblock %}
+    </title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect"
+          href="https://fonts.googleapis.com">
+
+    <link rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossorigin>
+
+    <link
+        href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap"
+        rel="stylesheet"
+    >
+
+    <!-- Font Awesome Free -->
+    <link
+        rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.3.1/css/all.min.css"
+    >
+
+    <!-- 共通CSS -->
+    <link
+        rel="stylesheet"
+        href="{% static 'css/auth.css' %}"
+    >
+</head>
+
+<body>
+
+<a class="skip-link" href="#main-content">
+    本文へ移動
+</a>
+
+{% if request.user.is_authenticated %}
+<header class="topbar">
+    <div class="topbar-inner">
+
+        <a class="brand"
+           href="{% url 'attendance:home' %}">
+            <i class="fa-solid fa-calendar-days"
+               aria-hidden="true"></i>
+            <span>勤怠管理</span>
+        </a>
+
+        <span class="role-label">
+            {% block screen_label %}
+                社員画面
+            {% endblock %}
+        </span>
+
+        <div class="header-user">
+            {{ request.user.display_name }}
+            |
+            {{ request.user.employee_number }}
+        </div>
+
+        <nav class="header-links"
+             aria-label="画面切替">
+
+            <a href="{% url 'attendance:home' %}">
+                社員画面
+            </a>
+
+            {% if request.user.is_business_admin %}
+            <a href="{% url 'management:home' %}">
+                管理者画面
+            </a>
+            {% endif %}
+        </nav>
+
+        <form method="post"
+              action="{% url 'accounts:logout' %}"
+              class="logout-form">
+            {% csrf_token %}
+
+            <button type="submit">
+                ログアウト
+            </button>
+        </form>
+
+    </div>
+</header>
+{% endif %}
+
+<main id="main-content" class="main-container">
+
+    {% for message in messages %}
+    <div class="notice success"
+         role="status">
+        {{ message }}
+    </div>
+    {% endfor %}
+
+    {% block content %}{% endblock %}
+
+</main>
+
+<script
+    src="{% static 'js/auth.js' %}"
+    defer>
+</script>
+
+</body>
+</html>

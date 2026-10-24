@@ -1,0 +1,97 @@
+
+{% extends "base.html" %}
+
+{% block title %}
+ログイン | 勤怠管理
+{% endblock %}
+
+{% block content %}
+
+<section class="auth-layout"
+         aria-labelledby="login-title">
+
+    <div class="auth-card">
+
+        <div class="auth-heading">
+            <i class="fa-solid fa-calendar-days"
+               aria-hidden="true"></i>
+
+            <h1 id="login-title">
+                勤怠管理システム
+            </h1>
+
+            <p>社員番号とパスワードでログイン</p>
+        </div>
+
+        {% if form.non_field_errors %}
+        <div class="notice error"
+             role="alert">
+            {% for error in form.non_field_errors %}
+                <p>{{ error }}</p>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <form method="post" class="auth-form">
+            {% csrf_token %}
+
+            {% if next %}
+            <input type="hidden"
+                   name="next"
+                   value="{{ next }}">
+            {% endif %}
+
+            <div class="form-group">
+                {{ form.username.label_tag }}
+                {{ form.username }}
+
+                {% for error in form.username.errors %}
+                <p class="field-error">
+                    {{ error }}
+                </p>
+                {% endfor %}
+            </div>
+
+            <div class="form-group">
+                {{ form.password.label_tag }}
+
+                <div class="password-control">
+                    {{ form.password }}
+
+                    <button
+                        type="button"
+                        class="password-toggle"
+                        data-toggle-password="id_password"
+                        aria-pressed="false"
+                        aria-controls="id_password">
+                        表示
+                    </button>
+                </div>
+
+                {% for error in form.password.errors %}
+                <p class="field-error">
+                    {{ error }}
+                </p>
+                {% endfor %}
+            </div>
+
+            <button type="submit"
+                    class="btn btn-primary btn-block">
+                <i class="fa-solid fa-right-to-bracket"
+                   aria-hidden="true"></i>
+                ログイン
+            </button>
+
+        </form>
+
+        <div class="auth-help">
+            <p>
+                パスワードを忘れた場合は、
+                社内の管理担当者にお問い合わせください。
+            </p>
+        </div>
+
+    </div>
+</section>
+
+{% endblock %}

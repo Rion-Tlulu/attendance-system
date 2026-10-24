@@ -1,0 +1,48 @@
+
+{% extends "base.html" %}
+
+{% block title %}
+社員ホーム | 勤怠管理
+{% endblock %}
+
+{% block content %}
+
+<section class="dashboard">
+
+    <div class="page-heading">
+        <h1>打刻ホーム</h1>
+        <p>
+            {{ request.user.display_name }} さんの
+            勤怠管理画面
+        </p>
+    </div>
+
+    <div class="content-card">
+
+        <h2>ログインしました</h2>
+
+        <p>
+            社員番号：
+            {{ request.user.employee_number }}
+        </p>
+
+        <p>
+            所属部署：
+            {{ request.user.department }}
+        </p>
+
+        <div class="notice info">
+            出勤・退勤・休憩の打刻機能は、
+            Phase 5で実装します。
+        </div>
+
+        <a class="btn btn-outline"
+           href="{% url 'accounts:password_change' %}">
+            パスワード変更
+        </a>
+
+    </div>
+
+</section>
+
+{% endblock %}
