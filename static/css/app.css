@@ -1,0 +1,661 @@
+/* =====================================
+   1. デザイントークン
+===================================== */
+
+:root {
+  --app-navy: #19345b;
+  --app-blue: #075ed8;
+  --app-blue-hover: #0047af;
+
+  --app-bg: #f5f7fb;
+  --app-surface: #ffffff;
+
+  --app-text: #142541;
+  --app-muted: #46556c;
+  --app-border: #c8d2e0;
+
+  --app-focus: #e58c00;
+
+  --app-radius: 12px;
+  --app-space: 24px;
+
+  --sidebar-width: 248px;
+
+  --app-shadow: 0 3px 16px rgb(20 37 65 / 5%);
+}
+
+/* =====================================
+   2. 基本設定
+===================================== */
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--app-bg);
+  color: var(--app-text);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+:focus-visible {
+  outline: 3px solid var(--app-focus);
+  outline-offset: 3px;
+}
+
+.skip-link {
+  position: absolute;
+  top: -100px;
+  left: 12px;
+  z-index: 1000;
+
+  padding: 12px 16px;
+  background: white;
+  color: var(--app-text);
+  border-radius: 8px;
+}
+
+.skip-link:focus {
+  top: 12px;
+}
+
+/* =====================================
+   3. 共通ヘッダー
+===================================== */
+
+.site-header {
+  background: var(--app-navy);
+  color: white;
+}
+
+.site-header__inner {
+  max-width: 1600px;
+  margin: 0 auto;
+
+  min-height: 72px;
+  padding: 12px 24px;
+
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+}
+
+.site-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+
+  color: white;
+  text-decoration: none;
+
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.site-brand:hover {
+  color: white;
+  text-decoration: underline;
+}
+
+.screen-chip {
+  display: inline-flex;
+  align-items: center;
+
+  padding: 5px 12px;
+  border-radius: 6px;
+
+  background: #ffffff;
+  color: var(--app-navy);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.screen-switch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.screen-switch a {
+  color: white;
+  text-underline-offset: 4px;
+}
+
+.header-user {
+  margin-left: auto;
+  font-weight: 700;
+
+  display: flex;
+  flex-direction: column;
+  line-height: 1.4;
+}
+
+.header-user small {
+  font-size: 0.8rem;
+  font-weight: 400;
+}
+
+.header-hint {
+  color: white;
+  font-size: 0.9rem;
+}
+
+.header-logout button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  min-height: 44px;
+  padding: 8px 14px;
+
+  border: 1px solid white;
+  border-radius: 7px;
+
+  color: white;
+  background: transparent;
+
+  cursor: pointer;
+}
+
+.header-logout button:hover {
+  background: rgb(255 255 255 / 15%);
+}
+
+/* =====================================
+   4. PC用レイアウト
+===================================== */
+
+.app-shell {
+  display: grid;
+
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+
+  max-width: 1600px;
+  margin: 0 auto;
+  min-height: calc(100vh - 72px);
+}
+
+.app-sidebar {
+  min-width: 0;
+  padding: 24px 12px;
+
+  background: var(--app-surface);
+  border-right: 1px solid var(--app-border);
+}
+
+.app-main {
+  min-width: 0;
+  width: 100%;
+
+  padding: 32px;
+}
+
+.auth-main {
+  padding: 24px;
+}
+
+/* =====================================
+   5. サイドバーメニュー
+===================================== */
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.sidebar-heading {
+  margin: 0 0 12px;
+  padding: 0 12px;
+
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--app-muted);
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  min-height: 48px;
+  padding: 12px;
+
+  border-radius: 8px;
+
+  color: var(--app-text);
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.nav-item i {
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+a.nav-item:hover {
+  background: #e9f0fb;
+  color: var(--app-navy);
+}
+
+.nav-item--active {
+  background: #deebff;
+  color: #124b92;
+  border-left: 4px solid var(--app-blue);
+  padding-left: 8px;
+}
+
+.nav-item--planned {
+  color: var(--app-muted);
+  font-weight: 400;
+  cursor: default;
+}
+
+.nav-item--planned span {
+  display: flex;
+  flex-direction: column;
+}
+
+.nav-item--planned small {
+  font-size: 0.72rem;
+  color: var(--app-muted);
+}
+
+.sidebar-divider {
+  height: 1px;
+  margin: 16px 8px;
+  background: var(--app-border);
+}
+
+/* =====================================
+   6. 見出し
+===================================== */
+
+.page-heading {
+  margin-bottom: 24px;
+}
+
+.page-heading h1 {
+  margin: 0 0 8px;
+
+  font-size: clamp(1.45rem, 2vw, 1.9rem);
+  line-height: 1.5;
+}
+
+.page-heading p {
+  margin: 0;
+  color: var(--app-muted);
+}
+
+/* =====================================
+   7. カード・グリッド
+===================================== */
+
+.ui-card {
+  background: var(--app-surface);
+
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius);
+
+  padding: 24px;
+
+  box-shadow: var(--app-shadow);
+  min-width: 0;
+}
+
+.ui-card h2 {
+  margin-top: 0;
+  font-size: 1.2rem;
+}
+
+.ui-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+
+  gap: 20px;
+}
+
+.ui-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.ui-muted {
+  color: var(--app-muted);
+}
+
+/* =====================================
+   8. 共通ボタン
+===================================== */
+
+.ui-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  min-height: 48px;
+  padding: 12px 20px;
+
+  border-radius: 8px;
+  border: 1px solid transparent;
+
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.ui-button--primary {
+  background: var(--app-blue);
+  color: white;
+}
+
+.ui-button--primary:hover {
+  background: var(--app-blue-hover);
+  color: white;
+}
+
+.ui-button--secondary {
+  background: white;
+  color: var(--app-blue);
+  border-color: var(--app-blue);
+}
+
+.ui-button--secondary:hover {
+  background: #eef5ff;
+}
+
+.ui-button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+/* =====================================
+   9. ステータス表示
+===================================== */
+
+.status {
+  display: inline-flex;
+  align-items: center;
+
+  border-radius: 999px;
+  padding: 5px 12px;
+
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.status--neutral {
+  background: #e6ebf1;
+  color: #35465a;
+}
+
+.status--pending {
+  background: #fff1cf;
+  color: #704600;
+}
+
+.status--approved {
+  background: #dff3e6;
+  color: #155b32;
+}
+
+.status--returned {
+  background: #ffe5e5;
+  color: #8b1d24;
+}
+
+.status--finalized {
+  background: #dfeafe;
+  color: #174c96;
+}
+
+/* =====================================
+   10. テーブル
+===================================== */
+
+.table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--app-border);
+  border-radius: 8px;
+}
+
+.ui-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+}
+
+.ui-table th,
+.ui-table td {
+  padding: 14px;
+  border-bottom: 1px solid var(--app-border);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.ui-table th {
+  background: #edf2f8;
+  font-weight: 700;
+}
+
+.ui-table tr:last-child td {
+  border-bottom: 0;
+}
+
+/* =====================================
+   11. 共通メッセージ
+===================================== */
+
+.flash-messages {
+  margin-bottom: 20px;
+}
+
+.flash {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+
+  padding: 14px 16px;
+  margin-bottom: 10px;
+
+  border: 1px solid var(--app-border);
+  border-radius: 8px;
+
+  background: white;
+}
+
+.flash--success {
+  background: #eaf7ee;
+  color: #155b32;
+}
+
+.flash--error {
+  background: #fff0f0;
+  color: #8b1d24;
+}
+
+.flash--warning {
+  background: #fff7e5;
+  color: #704600;
+}
+
+.flash--info {
+  background: #eef5ff;
+  color: #174c96;
+}
+
+/* =====================================
+   12. スマートフォン用下部ナビ
+===================================== */
+
+.mobile-nav {
+  display: none;
+}
+
+/* =====================================
+   13. タブレット・スマートフォン
+===================================== */
+
+@media (max-width: 900px) {
+  .app-shell {
+    display: block;
+  }
+
+  .app-sidebar {
+    display: none;
+  }
+
+  .app-main {
+    padding: 20px 16px;
+
+    /* 下部ナビで内容を隠さない */
+    padding-bottom: calc(100px + env(safe-area-inset-bottom));
+  }
+
+  .site-header__inner {
+    padding: 12px 16px;
+  }
+
+  .header-user {
+    margin-left: 0;
+  }
+
+  .screen-switch {
+    display: none;
+  }
+
+  .mobile-nav {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+
+    z-index: 100;
+
+    display: flex;
+    justify-content: space-around;
+
+    min-height: 64px;
+    padding-bottom: env(safe-area-inset-bottom);
+
+    background: white;
+    border-top: 1px solid var(--app-border);
+    box-shadow: 0 -3px 12px rgb(0 0 0 / 6%);
+  }
+
+  .mobile-nav__item {
+    display: flex;
+    flex: 1 1 0;
+    min-width: 0;
+
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+
+    min-height: 64px;
+    padding: 8px 4px;
+
+    color: var(--app-muted);
+    text-decoration: none;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
+  .mobile-nav__item i {
+    font-size: 1.25rem;
+  }
+
+  .mobile-nav__item--active {
+    color: #124b92;
+    background: #e6f0ff;
+    border-top: 3px solid var(--app-blue);
+  }
+}
+
+/* =====================================
+   14. 小型スマートフォン
+===================================== */
+
+@media (max-width: 480px) {
+  .site-header__inner {
+    gap: 10px;
+  }
+
+  .site-brand {
+    font-size: 1rem;
+  }
+
+  .header-user {
+    width: 100%;
+    order: 3;
+  }
+
+  .header-logout {
+    margin-left: auto;
+  }
+
+  .ui-card {
+    padding: 18px 14px;
+  }
+
+  .ui-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .page-heading h1 {
+    font-size: 1.45rem;
+  }
+
+  .auth-main {
+    padding: 14px;
+  }
+}
+
+/* =====================================
+   15. 動きを減らす
+===================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

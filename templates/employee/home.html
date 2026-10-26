@@ -2,24 +2,91 @@
 {% extends "base.html" %}
 
 {% block title %}
-社員ホーム | 勤怠管理
+打刻ホーム | 勤怠管理
+{% endblock %}
+
+{% block screen_label %}
+社員画面
 {% endblock %}
 
 {% block content %}
 
-<section class="dashboard">
+<div class="page-heading">
+    <h1>打刻ホーム</h1>
 
-    <div class="page-heading">
-        <h1>打刻ホーム</h1>
-        <p>
-            {{ request.user.display_name }} さんの
-            勤怠管理画面
+    <p>
+        {{ request.user.display_name }} さんの
+        勤怠管理画面
+    </p>
+</div>
+
+<div class="ui-stack">
+
+    <section class="ui-card"
+             aria-labelledby="work-title">
+
+        <h2 id="work-title">今日の勤務</h2>
+
+        <p class="ui-muted">
+            現在の勤務状態と打刻操作を
+            この領域に表示します。
         </p>
+
+        <p>
+            <span class="status status--neutral">
+                打刻機能は準備中
+            </span>
+        </p>
+
+        <p class="ui-muted">
+            Phase 5で出勤・退勤・休憩開始・
+            休憩終了の機能を実装します。
+        </p>
+
+    </section>
+
+    <div class="ui-grid">
+
+        <section class="ui-card"
+                 aria-labelledby="record-title">
+
+            <h2 id="record-title">今日の記録</h2>
+
+            <p class="ui-muted">
+                打刻時刻と休憩記録を
+                このカードに表示します。
+            </p>
+
+            <span class="status status--neutral">
+                準備中
+            </span>
+
+        </section>
+
+        <section class="ui-card"
+                 aria-labelledby="monthly-title">
+
+            <h2 id="monthly-title">自分の勤怠</h2>
+
+            <p class="ui-muted">
+                月次勤怠一覧と日別詳細は、
+                Phase 6で実装します。
+            </p>
+
+            <span class="status status--neutral">
+                準備中
+            </span>
+
+        </section>
+
     </div>
 
-    <div class="content-card">
+    <section class="ui-card"
+             aria-labelledby="account-title">
 
-        <h2>ログインしました</h2>
+        <h2 id="account-title">
+            アカウント
+        </h2>
 
         <p>
             社員番号：
@@ -28,21 +95,20 @@
 
         <p>
             所属部署：
-            {{ request.user.department }}
+            {{ request.user.department|default:"未設定" }}
         </p>
 
-        <div class="notice info">
-            出勤・退勤・休憩の打刻機能は、
-            Phase 5で実装します。
-        </div>
+        <a href="{% url 'accounts:password_change' %}"
+           class="ui-button ui-button--secondary">
 
-        <a class="btn btn-outline"
-           href="{% url 'accounts:password_change' %}">
-            パスワード変更
+            <i class="fa-solid fa-key"
+               aria-hidden="true"></i>
+
+            パスワードを変更する
         </a>
 
-    </div>
+    </section>
 
-</section>
+</div>
 
 {% endblock %}

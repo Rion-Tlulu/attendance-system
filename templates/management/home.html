@@ -11,37 +11,125 @@
 
 {% block content %}
 
-<section class="dashboard">
+<div class="page-heading">
 
-    <div class="page-heading">
-        <h1>管理者ホーム</h1>
-        <p>
-            勤怠記録と申請の管理を行います。
-        </p>
+    <h1>管理者ホーム</h1>
+
+    <p>
+        社員の勤怠状況と申請処理を
+        管理する画面です。
+    </p>
+
+</div>
+
+<div class="ui-stack">
+
+    <div class="ui-grid">
+
+        <section class="ui-card"
+                 aria-labelledby="request-title">
+
+            <h2 id="request-title">
+                修正申請
+            </h2>
+
+            <p class="ui-muted">
+                審査中の修正申請件数を
+                この領域に表示します。
+            </p>
+
+            <span class="status status--neutral">
+                集計機能は準備中
+            </span>
+
+        </section>
+
+        <section class="ui-card"
+                 aria-labelledby="incomplete-title">
+
+            <h2 id="incomplete-title">
+                未完了の勤務
+            </h2>
+
+            <p class="ui-muted">
+                出退勤や休憩の記録が未完了の
+                勤務を表示します。
+            </p>
+
+            <span class="status status--neutral">
+                集計機能は準備中
+            </span>
+
+        </section>
+
     </div>
 
-    <div class="content-card">
+    <section class="ui-card"
+             aria-labelledby="list-title">
 
-        <h2>管理者権限を確認しました</h2>
+        <h2 id="list-title">
+            勤怠一覧
+        </h2>
 
-        <p>
-            {{ request.user.display_name }} さんは、
-            業務管理者としてログインしています。
+        <p class="ui-muted">
+            社員別の勤怠情報を一覧表示します。
+            検索・絞り込み・詳細表示は
+            後のフェーズで実装します。
         </p>
 
-        <div class="notice info">
-            勤怠一覧・修正申請の承認・社員管理・
-            月次確定・CSV出力は、
-            後のフェーズで実装します。
+        <div class="table-scroll"
+             role="region"
+             aria-label="勤怠一覧の表示領域"
+             tabindex="0">
+
+            <table class="ui-table">
+
+                <thead>
+                    <tr>
+                        <th scope="col">社員番号</th>
+                        <th scope="col">社員名</th>
+                        <th scope="col">勤務状況</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    <tr>
+                        <td colspan="3">
+                            勤怠一覧は準備中です。
+                        </td>
+                    </tr>
+                </tbody>
+
+            </table>
+
         </div>
 
-        <a class="btn btn-outline"
-           href="{% url 'attendance:home' %}">
+    </section>
+
+    <section class="ui-card"
+             aria-labelledby="other-title">
+
+        <h2 id="other-title">
+            管理機能
+        </h2>
+
+        <p class="ui-muted">
+            社員管理・月次確定・CSV出力・
+            操作履歴などは、
+            後のフェーズで実装します。
+        </p>
+
+        <a href="{% url 'attendance:home' %}"
+           class="ui-button ui-button--secondary">
+
+            <i class="fa-solid fa-arrow-left"
+               aria-hidden="true"></i>
+
             社員画面へ戻る
         </a>
 
-    </div>
+    </section>
 
-</section>
+</div>
 
 {% endblock %}

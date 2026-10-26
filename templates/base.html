@@ -4,6 +4,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
+
     <meta name="viewport"
           content="width=device-width, initial-scale=1">
 
@@ -30,11 +31,15 @@
         href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.3.1/css/all.min.css"
     >
 
-    <!-- 共通CSS -->
-    <link
-        rel="stylesheet"
-        href="{% static 'css/auth.css' %}"
-    >
+    <!-- Phase 3の認証用CSS -->
+    <link rel="stylesheet"
+          href="{% static 'css/auth.css' %}">
+
+    <!-- Phase 4の共通CSS -->
+    <link rel="stylesheet"
+          href="{% static 'css/app.css' %}">
+
+    {% block extra_css %}{% endblock %}
 </head>
 
 <body>
@@ -44,29 +49,42 @@
 </a>
 
 {% if request.user.is_authenticated %}
-<header class="topbar">
-    <div class="topbar-inner">
 
-        <a class="brand"
-           href="{% url 'attendance:home' %}">
+<header class="site-header">
+    <div class="site-header__inner">
+
+        {% if request.user.must_change_password %}
+        <span class="site-brand">
             <i class="fa-solid fa-calendar-days"
                aria-hidden="true"></i>
-            <span>勤怠管理</span>
+            勤怠管理
+        </span>
+        {% else %}
+        <a href="{% url 'attendance:home' %}"
+           class="site-brand">
+            <i class="fa-solid fa-calendar-days"
+               aria-hidden="true"></i>
+            勤怠管理
         </a>
+        {% endif %}
 
-        <span class="role-label">
+        <span class="screen-chip">
             {% block screen_label %}
-                社員画面
+                {% if request.resolver_match.namespace == "management" %}
+                    管理者画面
+                {% else %}
+                    社員画面
+                {% endif %}
             {% endblock %}
         </span>
 
-        <div class="header-user">
-            {{ request.user.display_name }}
-            |
-            {{ request.user.employee_number }}
-        </div>
+        {% if request.user.must_change_password %}
+        <span class="header-hint">
+            パスワード変更が必要です
+        </span>
+        {% else %}
 
-        <nav class="header-links"
+        <nav class="screen-switch"
              aria-label="画面切替">
 
             <a href="{% url 'attendance:home' %}">
@@ -78,39 +96,76 @@
                 管理者画面
             </a>
             {% endif %}
+
         </nav>
+
+        {% endif %}
+
+        <span class="header-user">
+            {{ request.user.display_name }}
+            <small>
+                {{ request.user.employee_number }}
+            </small>
+        </span>
 
         <form method="post"
               action="{% url 'accounts:logout' %}"
-              class="logout-form">
+              class="header-logout">
             {% csrf_token %}
 
             <button type="submit">
+                <i class="fa-solid fa-right-from-bracket"
+                   aria-hidden="true"></i>
                 ログアウト
             </button>
         </form>
 
     </div>
 </header>
+
 {% endif %}
 
-<main id="main-content" class="main-container">
 
-    {% for message in messages %}
-    <div class="notice success"
-         role="status">
-        {{ message }}
-    </div>
-    {% endfor %}
+{% if request.user.is_authenticated and not request.user.must_change_password %}
 
-    {% block content %}{% endblock %}
+<div class="app-shell">
 
-</main>
+    <aside class="app-sidebar"
+           aria-label="サイドメニュー">
 
-<script
-    src="{% static 'js/auth.js' %}"
-    defer>
-</script>
+        {% include "components/sidebar.html" %}
+
+    </aside>
+
+    <main id="main-content" class="app-main">
+
+{% else %}
+
+    <main id="main-content" class="auth-main">
+
+{% endif %}
+
+        {% include "components/messages.html" %}
+
+        {% block content %}{% endblock %}
+
+    </main>
+
+
+{% if request.user.is_authenticated and not request.user.must_change_password %}
+
+</div>
+
+{% include "components/bottom_nav.html" %}
+
+{% endif %}
+
+
+
+<script src="{% static 'js/auth.js' %}"
+        defer></script>
+
+{% block extra_js %}{% endblock %}
 
 </body>
 </html>

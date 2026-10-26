@@ -1,0 +1,22 @@
+
+{% if messages %}
+
+<div class="flash-messages">
+
+    {% for message in messages %}
+
+    <div class="flash flash--{{ message.level_tag }}"
+         role="{% if message.level_tag == 'error' %}alert{% else %}status{% endif %}">
+
+        <i class="fa-solid fa-circle-info"
+           aria-hidden="true"></i>
+
+        <span>{{ message }}</span>
+
+    </div>
+
+    {% endfor %}
+
+</div>
+
+{% endif %}
