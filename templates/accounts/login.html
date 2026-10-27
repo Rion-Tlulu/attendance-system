@@ -1,5 +1,7 @@
 
+
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}
 ログイン | 勤怠管理
@@ -13,8 +15,7 @@
     <div class="auth-card">
 
         <div class="auth-heading">
-            <i class="fa-solid fa-calendar-days"
-               aria-hidden="true"></i>
+             <img src="{% static 'img/attendance-icon.png' %}" alt="勤怠チェックのカレンダーアイコン">
 
             <h1 id="login-title">
                 勤怠管理システム

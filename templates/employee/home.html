@@ -1,114 +1,155 @@
-
 {% extends "base.html" %}
+{% load static %}
 
-{% block title %}
-打刻ホーム | 勤怠管理
-{% endblock %}
+{% block title %}打刻ホーム | 勤怠管理{% endblock %}
+{% block screen_label %}社員画面{% endblock %}
 
-{% block screen_label %}
-社員画面
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/attendance.css' %}">
 {% endblock %}
 
 {% block content %}
+<div class="clock-dashboard {% if buttons %}clock-dashboard--has-actions{% endif %}">
 
-<div class="page-heading">
-    <h1>打刻ホーム</h1>
+  <div class="clock-page-heading">
+    <h1><i class="fa-solid fa-clock" aria-hidden="true"></i> 打刻ホーム</h1>
+    <p>{{ request.user.display_name }} さんの勤怠記録</p>
+  </div>
 
-    <p>
-        {{ request.user.display_name }} さんの
-        勤怠管理画面
-    </p>
-</div>
+  <div class="clock-top-grid">
+    <!-- 最重要：出勤・休憩・退勤の操作。DOMでも最初に置く -->
+    <section class="ui-card clock-primary" aria-labelledby="clock-action-title">
+      <div class="clock-panel-heading">
+        <h2 id="clock-action-title">打刻操作</h2>
+        {% if session %}
+          {% if session.status == 'working' %}
+            <span class="clock-state clock-state--working">勤務中</span>
+          {% elif session.status == 'on_break' %}
+            <span class="clock-state clock-state--break">休憩中</span>
+          {% elif session.status == 'completed' %}
+            <span class="clock-state clock-state--done">退勤済み</span>
+          {% else %}
+            <span class="clock-state">記録なし</span>
+          {% endif %}
+        {% else %}
+          <span class="clock-state">未出勤</span>
+        {% endif %}
+      </div>
 
-<div class="ui-stack">
-
-    <section class="ui-card"
-             aria-labelledby="work-title">
-
-        <h2 id="work-title">今日の勤務</h2>
-
-        <p class="ui-muted">
-            現在の勤務状態と打刻操作を
-            この領域に表示します。
+      {% if buttons %}
+        <div class="clock-buttons">
+          {% for button in buttons %}
+            <form class="clock-form" method="post" action="{% url 'attendance:clock_action' %}">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="{{ button.kind }}">
+              <input type="hidden" name="operation_id" value="{{ button.operation_id }}">
+              <button type="submit" class="clock-button clock-button--{{ button.kind }}"
+                      aria-label="{{ button.label }}を記録する">
+                {% if button.kind == 'clock_in' %}
+                  <i class="fa-solid fa-right-to-bracket" aria-hidden="true"></i>
+                {% elif button.kind == 'clock_out' %}
+                  <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
+                {% else %}
+                  <i class="fa-solid fa-mug-saucer" aria-hidden="true"></i>
+                {% endif %}
+                <span>{{ button.label }}</span>
+              </button>
+            </form>
+          {% endfor %}
+        </div>
+        <p class="clock-primary-note">確認画面なしで記録します。記録時刻はサーバー時刻です。</p>
+      {% else %}
+        <p class="clock-unavailable">
+          {% if pending_request %}
+            修正申請の審査中のため、追加打刻できません。
+          {% elif is_finalized %}
+            確定済みの勤務月のため、打刻できません。
+          {% elif session and session.status == 'completed' %}
+            この勤務は退勤済みです。
+          {% elif session and session.status == 'no_record' %}
+            修正申請が必要な勤務です（申請機能はPhase 7で実装します）。
+          {% else %}
+            現在操作できる打刻はありません。
+          {% endif %}
         </p>
-
-        <p>
-            <span class="status status--neutral">
-                打刻機能は準備中
-            </span>
-        </p>
-
-        <p class="ui-muted">
-            Phase 5で出勤・退勤・休憩開始・
-            休憩終了の機能を実装します。
-        </p>
-
+      {% endif %}
     </section>
 
-    <div class="ui-grid">
+    <!-- 状態は打刻ボタンと同じ画面内ですぐ見える位置 -->
+    <section class="ui-card clock-overview" aria-labelledby="clock-overview-title">
+      <div class="clock-panel-heading">
+        <h2 id="clock-overview-title">現在の勤務</h2>
+        <span class="clock-overview-label">日本時間</span>
+      </div>
+      <p class="clock-date" id="current-date">{{ now|date:'Y年n月j日（D）' }}</p>
+      <p class="clock-time" id="current-clock">{{ now|date:'H:i:s' }}</p>
+      {% if session %}
+        <p class="clock-work-date">対象勤務日：{{ session.work_date|date:'Y/m/d' }}</p>
+      {% else %}
+        <p class="clock-work-date">本日の勤務はまだ始まっていません。</p>
+      {% endif %}
+      {% if is_overnight %}
+        <p class="clock-alert">前日以前に開始した勤務です。退勤忘れの場合は修正申請が必要です。</p>
+      {% endif %}
+      <p class="clock-time-hint">時計は目安です。実際の打刻はサーバー時刻で記録します。</p>
+    </section>
+  </div>
 
-        <section class="ui-card"
-                 aria-labelledby="record-title">
-
-            <h2 id="record-title">今日の記録</h2>
-
-            <p class="ui-muted">
-                打刻時刻と休憩記録を
-                このカードに表示します。
-            </p>
-
-            <span class="status status--neutral">
-                準備中
-            </span>
-
-        </section>
-
-        <section class="ui-card"
-                 aria-labelledby="monthly-title">
-
-            <h2 id="monthly-title">自分の勤怠</h2>
-
-            <p class="ui-muted">
-                月次勤怠一覧と日別詳細は、
-                Phase 6で実装します。
-            </p>
-
-            <span class="status status--neutral">
-                準備中
-            </span>
-
-        </section>
-
-    </div>
-
-    <section class="ui-card"
-             aria-labelledby="account-title">
-
-        <h2 id="account-title">
-            アカウント
-        </h2>
-
-        <p>
-            社員番号：
-            {{ request.user.employee_number }}
-        </p>
-
-        <p>
-            所属部署：
-            {{ request.user.department|default:"未設定" }}
-        </p>
-
-        <a href="{% url 'accounts:password_change' %}"
-           class="ui-button ui-button--secondary">
-
-            <i class="fa-solid fa-key"
-               aria-hidden="true"></i>
-
-            パスワードを変更する
-        </a>
-
+  <!-- 以下は参照用。打刻操作にはスクロール不要 -->
+  <div class="clock-details-grid">
+    <section class="ui-card clock-record" aria-labelledby="clock-record-title">
+      <h2 id="clock-record-title">勤務記録</h2>
+      {% if session %}
+        <dl class="clock-record-list">
+          <div>
+            <dt>出勤</dt>
+            <dd>{% if session.clock_in_at %}{{ session.clock_in_at|date:'Y/m/d H:i:s' }}{% else %}未記録{% endif %}</dd>
+          </div>
+          <div>
+            <dt>退勤</dt>
+            <dd>{% if session.clock_out_at %}{{ session.clock_out_at|date:'Y/m/d H:i:s' }}{% else %}未記録{% endif %}</dd>
+          </div>
+          <div><dt>休憩回数</dt><dd>{{ breaks|length }}回</dd></div>
+          {% if break_duration %}<div><dt>休憩合計</dt><dd>{{ break_duration }}</dd></div>{% endif %}
+          {% if work_duration %}<div><dt>実働時間</dt><dd><strong>{{ work_duration }}</strong></dd></div>{% endif %}
+        </dl>
+      {% else %}
+        <p class="clock-subtle">勤務記録はありません。</p>
+      {% endif %}
     </section>
 
-</div>
+    <section class="ui-card clock-history" aria-labelledby="clock-history-title">
+      <h2 id="clock-history-title">休憩・最後の打刻</h2>
+      {% if last_event %}
+        <p class="clock-last-event">
+          最後の打刻：<strong>{{ last_event.get_kind_display }}</strong>
+          <span>{{ last_event.recorded_at|date:'Y/m/d H:i:s' }}</span>
+        </p>
+      {% else %}
+        <p class="clock-subtle">まだ打刻はありません。</p>
+      {% endif %}
 
+      {% if breaks %}
+        <ol class="clock-break-list">
+          {% for item in breaks %}
+            <li>
+              <span>開始 {{ item.started_at|date:'m/d H:i:s' }}</span>
+              <span>終了 {% if item.ended_at %}{{ item.ended_at|date:'m/d H:i:s' }}{% else %}休憩中{% endif %}</span>
+            </li>
+          {% endfor %}
+        </ol>
+      {% endif %}
+    </section>
+  </div>
+
+  <section class="ui-card clock-account" aria-labelledby="clock-account-title">
+    <h2 id="clock-account-title">アカウント</h2>
+    <p>社員番号：{{ request.user.employee_number }}　所属部署：{{ request.user.department|default:'未設定' }}</p>
+    <a class="ui-button ui-button--secondary" href="{% url 'accounts:password_change' %}">パスワード変更</a>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/clock.js' %}" defer></script>
 {% endblock %}

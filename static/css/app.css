@@ -116,6 +116,12 @@ a {
   font-weight: 700;
 }
 
+.site-brand {
+  width: 44px;
+  height: auto;
+  border-radius: 50%;
+}
+
 .site-brand:hover {
   color: white;
   text-decoration: underline;
