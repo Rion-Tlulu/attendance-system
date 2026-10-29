@@ -40,44 +40,68 @@ class CommonLayoutTests(TestCase):
         )
 
     def test_employee_page_has_sidebar(self):
-        """社員ホームに共通レイアウトを表示する。"""
+        """社員ホームに最新版の共通レイアウトを表示する。"""
 
         self.client.force_login(self.employee)
 
         response = self.client.get(reverse("attendance:home"))
 
-        self.assertContains(
-            response,
-            'class="app-shell"',
+        self.assertEqual(
+            response.status_code,
+            200,
         )
 
+        # 最新版の共通レイアウト
         self.assertContains(
             response,
-            "打刻ホーム",
+            'class="app-frame"',
+        )
+
+        # PC用サイドバー
+        self.assertContains(
+            response,
+            'class="app-side"',
+        )
+
+        # 社員用メニュー
+        self.assertContains(
+            response,
+            'aria-label="社員メニュー"',
+        )
+
+        # 打刻画面へのリンク
+        self.assertContains(
+            response,
+            'href="/employee/"',
         )
 
     def test_employee_has_no_admin_link(self):
-        """一般社員には管理者画面へのリンクを表示しない。"""
+        """一般社員に管理者画面へのリンクを表示しない。"""
 
         self.client.force_login(self.employee)
 
         response = self.client.get(reverse("attendance:home"))
 
+        self.assertEqual(response.status_code, 200)
+
+        # 一般社員には管理画面へのリンクを表示しない
         self.assertNotContains(
             response,
-            'href="/management/"',
+            f'href="{reverse("management:home")}"',
         )
 
     def test_manager_can_see_admin_link(self):
-        """管理者には管理画面へのリンクを表示する。"""
+        """管理者に管理者画面へのリンクを表示する。"""
 
         self.client.force_login(self.manager)
 
         response = self.client.get(reverse("attendance:home"))
 
+        self.assertEqual(response.status_code, 200)
+
         self.assertContains(
             response,
-            'href="/management/"',
+            f'href="{reverse("management:home")}"',
         )
 
     def test_management_page(self):
@@ -87,14 +111,24 @@ class CommonLayoutTests(TestCase):
 
         response = self.client.get(reverse("management:home"))
 
+        self.assertEqual(response.status_code, 200)
+
+        # 最新デザインのPC用サイドバー
+        self.assertContains(
+            response,
+            'class="app-side"',
+        )
+
+        # 管理者用のナビゲーション
+        self.assertContains(
+            response,
+            'aria-label="管理者メニュー"',
+        )
+
+        # 管理者ホーム
         self.assertContains(
             response,
             "管理者ホーム",
-        )
-
-        self.assertContains(
-            response,
-            "管理メニュー",
         )
 
     def test_employee_cannot_open_management(self):

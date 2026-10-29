@@ -1,112 +1,214 @@
+
 {% load static %}
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <title>{% block title %}勤怠管理システム{% endblock %}</title>
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1">
 
-    <link rel="icon" href="{% static 'img/attendance-icon.png' %}" type="image/png">
-    <link rel="apple-touch-icon" href="{% static 'img/attendance-icon.png' %}">
+    <title>
+        {% block title %}
+        勤怠管理システム
+        {% endblock %}
+    </title>
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap"
-          rel="stylesheet">
+    <link rel="icon"
+          type="image/png"
+          href="{% static 'img/attendance-icon.png' %}">
 
+    <link rel="apple-touch-icon"
+          href="{% static 'img/attendance-icon.png' %}">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect"
+          href="https://fonts.googleapis.com">
+
+    <link rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossorigin>
+
+    <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
+
+    <!-- Font Awesome Free -->
     <link rel="stylesheet"
           href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.3.1/css/all.min.css">
 
-    <link rel="stylesheet" href="{% static 'css/auth.css' %}">
-    <link rel="stylesheet" href="{% static 'css/app.css' %}">
-    <link rel="stylesheet" href="{% static 'css/compact.css' %}">
-    <link rel="stylesheet" href="{% static 'css/header.css' %}">
+    <!-- Phase 3〜5の既存CSS -->
+    <link rel="stylesheet"
+          href="{% static 'css/auth.css' %}">
+
+    <link rel="stylesheet"
+          href="{% static 'css/app.css' %}">
+
+    <link rel="stylesheet"
+          href="{% static 'css/compact.css' %}">
+
+    <link rel="stylesheet"
+          href="{% static 'css/header.css' %}">
+
+    <!-- 今回の最新共通CSS -->
+    <link rel="stylesheet"
+          href="{% static 'css/latest-layout.css' %}">
 
     {% block extra_css %}{% endblock %}
 </head>
-<body>
-<a class="skip-link" href="#main-content">本文へ移動</a>
 
-{% if request.user.is_authenticated %}
-<header class="site-header">
-    <div class="site-header__inner">
-        {% if request.user.must_change_password %}
-            <span class="site-brand">
-                <img src="{% static 'img/attendance-icon.png' %}"
-                     alt="" width="36" height="36">
-                <span class="site-brand__text">勤怠管理</span>
-            </span>
-        {% else %}
-            <a href="{% url 'attendance:home' %}" class="site-brand">
-                <img src="{% static 'img/attendance-icon.png' %}"
-                     alt="" width="36" height="36">
-                <span class="site-brand__text">勤怠管理</span>
-            </a>
-        {% endif %}
+<body class="app-v6">
 
-        <span class="screen-chip">
-            {% block screen_label %}
-                {% if request.resolver_match.namespace == "management" %}
+<a class="skip-link" href="#main-content">
+    本文へ移動
+</a>
+
+
+{% if request.user.is_authenticated and not request.user.must_change_password %}
+
+<div class="app-frame">
+
+    <!-- PC用左サイドバー -->
+    <aside class="app-side"
+           aria-label="アプリのメニュー">
+
+        {% include "components/sidebar.html" %}
+
+    </aside>
+
+    <div class="app-frame__content">
+
+        <!-- 白い上部ヘッダー -->
+        <header class="app-topbar">
+
+            <div class="app-topbar__title">
+                {% block screen_label %}
+                    {% if request.resolver_match.namespace == "management" %}
                     管理者画面
-                {% else %}
-                    社員画面
-                {% endif %}
-            {% endblock %}
-        </span>
+                    {% elif request.resolver_match.view_name == "attendance:home" %}
+                    打刻
+                    {% else %}
+                    自分の勤怠
+                    {% endif %}
+                {% endblock %}
+            </div>
 
-        {% if request.user.must_change_password %}
-            <span class="header-hint">パスワード変更が必要です</span>
-        {% else %}
-            <nav class="screen-switch" aria-label="画面切替">
-                <a href="{% url 'attendance:home' %}"
-                   {% if request.resolver_match.namespace == "attendance" %}aria-current="page"{% endif %}>
-                    社員画面
-                </a>
-                {% if request.user.is_business_admin %}
-                    <a href="{% url 'management:home' %}"
-                       {% if request.resolver_match.namespace == "management" %}aria-current="page"{% endif %}>
-                        管理者画面
-                    </a>
-                {% endif %}
-            </nav>
-        {% endif %}
+            <div class="app-topbar__user">
 
-        <span class="header-user">
-            <span class="header-user__name">{{ request.user.display_name }}</span>
-            <small class="header-user__number">社員番号 {{ request.user.employee_number }}</small>
-        </span>
+                <i class="fa-solid fa-user"
+                   aria-hidden="true"></i>
 
-        <form method="post" action="{% url 'accounts:logout' %}" class="header-logout">
-            {% csrf_token %}
-            <button type="submit" aria-label="ログアウト" title="ログアウト">
-                <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
-                <span class="header-logout__text">ログアウト</span>
-            </button>
-        </form>
-    </div>
-</header>
-{% endif %}
+                <span class="app-user-number">
+                    {{ request.user.employee_number }}
+                </span>
 
-{% if request.user.is_authenticated and not request.user.must_change_password %}
-    <div class="app-shell">
-        <aside class="app-sidebar" aria-label="サイドメニュー">
-            {% include "components/sidebar.html" %}
-        </aside>
-        <main id="main-content" class="app-main">
+                <span class="app-user-name">
+                    {{ request.user.display_name }}
+                </span>
+
+                <details class="app-account-menu">
+
+                    <summary aria-label="アカウントメニューを開く">
+                        <i class="fa-solid fa-chevron-down"
+                           aria-hidden="true"></i>
+                    </summary>
+
+                    <div class="app-account-panel">
+
+                        <a href="{% url 'accounts:password_change' %}">
+                            パスワード変更
+                        </a>
+
+                        {% if request.user.is_business_admin %}
+
+                        <a href="{% url 'management:home' %}">
+                            管理者画面へ
+                        </a>
+
+                        <a href="{% url 'attendance:home' %}">
+                            社員画面へ
+                        </a>
+
+                        <a href="{% url 'accounts:overview' %}">
+    アカウントと使い方
+</a>
+
+<a href="{% url 'accounts:guide' %}">
+    使い方ガイド
+</a>
+
+                        {% endif %}
+
+                        <form method="post"
+                              action="{% url 'accounts:logout' %}">
+
+                            {% csrf_token %}
+
+                            <button type="submit">
+                                ログアウト
+                            </button>
+
+                        </form>
+
+                    </div>
+
+                </details>
+
+            </div>
+
+        </header>
+
+        <main id="main-content"
+              class="app-content">
+
 {% else %}
-        <main id="main-content" class="auth-main">
+
+<div class="auth-frame">
+
+    <header class="auth-site-header">
+
+        <span class="auth-site-brand">
+
+            <img src="{% static 'img/attendance-icon.png' %}"
+                 alt="">
+
+            勤怠管理
+
+        </span>
+
+    </header>
+
+    <main id="main-content"
+          class="auth-main">
+
 {% endif %}
-            {% include "components/messages.html" %}
-            {% block content %}{% endblock %}
-        </main>
+
+        {% include "components/messages.html" %}
+
+        {% block content %}{% endblock %}
+
+    </main>
+
 
 {% if request.user.is_authenticated and not request.user.must_change_password %}
+
     </div>
-    {% include "components/bottom_nav.html" %}
+</div>
+
+{% include "components/bottom_nav.html" %}
+
+{% else %}
+
+</div>
+
 {% endif %}
 
-<script src="{% static 'js/auth.js' %}" defer></script>
+
+<script src="{% static 'js/auth.js' %}"
+        defer></script>
+
 {% block extra_js %}{% endblock %}
+
 </body>
 </html>

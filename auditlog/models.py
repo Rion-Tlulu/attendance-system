@@ -1,4 +1,3 @@
-
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
@@ -33,6 +32,15 @@ class AuditLog(models.Model):
             "employee_disable",
             "社員利用無効化",
         )
+        CORRECTION_SUBMIT = (
+            "correction_submit",
+            "修正申請の提出",
+        )
+        CORRECTION_WITHDRAW = (
+            "correction_withdraw",
+            "修正申請の取下げ",
+        )
+
         CSV_EXPORT = "csv_export", "CSV出力"
         ROLE_CHANGE = "role_change", "権限変更"
         AUTH_FAILURE = "auth_failure", "認証失敗"
@@ -116,7 +124,4 @@ class AuditLog(models.Model):
         ]
 
     def __str__(self):
-        return (
-            f"{self.get_action_display()}"
-            f" / {self.occurred_at}"
-        )
+        return f"{self.get_action_display()}" f" / {self.occurred_at}"

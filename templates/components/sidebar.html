@@ -1,143 +1,194 @@
 
-{% if request.resolver_match.namespace == "management" %}
+{% load static %}
 
-<nav class="sidebar-nav"
-     aria-label="管理者メニュー">
-
-    <p class="sidebar-heading">管理メニュー</p>
-
-    <a href="{% url 'management:home' %}"
-       class="nav-item nav-item--active"
-       aria-current="page">
-
-        <i class="fa-solid fa-house"
-           aria-hidden="true"></i>
-
-        <span>管理者ホーム</span>
-    </a>
-
-    <span class="nav-item nav-item--planned">
-        <i class="fa-solid fa-calendar-check"
-           aria-hidden="true"></i>
-        <span>
-            勤怠一覧
-            <small>準備中</small>
-        </span>
-    </span>
-
-    <span class="nav-item nav-item--planned">
-        <i class="fa-solid fa-clipboard-list"
-           aria-hidden="true"></i>
-        <span>
-            修正申請
-            <small>準備中</small>
-        </span>
-    </span>
-
-    <span class="nav-item nav-item--planned">
-        <i class="fa-solid fa-users"
-           aria-hidden="true"></i>
-        <span>
-            社員管理
-            <small>準備中</small>
-        </span>
-    </span>
-
-    <span class="nav-item nav-item--planned">
-        <i class="fa-solid fa-file-csv"
-           aria-hidden="true"></i>
-        <span>
-            月次確定・CSV
-            <small>準備中</small>
-        </span>
-    </span>
-
-    <span class="nav-item nav-item--planned">
-        <i class="fa-solid fa-clock-rotate-left"
-           aria-hidden="true"></i>
-        <span>
-            操作履歴
-            <small>準備中</small>
-        </span>
-    </span>
-
-    <div class="sidebar-divider"></div>
+<nav class="side-navigation"
+     aria-label="{% if request.resolver_match.namespace == 'management' %}管理者メニュー{% else %}社員メニュー{% endif %}">
 
     <a href="{% url 'attendance:home' %}"
-       class="nav-item">
+       class="side-brand">
 
-        <i class="fa-solid fa-arrow-left"
-           aria-hidden="true"></i>
+        <img src="{% static 'img/attendance-icon.png' %}"
+             alt="">
 
-        <span>社員画面へ戻る</span>
+        <span>勤怠管理</span>
     </a>
 
-</nav>
+    {% if request.resolver_match.namespace == "management" %}
+
+        <a href="{% url 'management:home' %}"
+           class="side-link side-link--current"
+           aria-current="page">
+            <i class="fa-solid fa-list"
+               aria-hidden="true"></i>
+            <span>管理者ホーム</span>
+        </a>
+
+        <span class="side-link side-link--planned">
+            <i class="fa-solid fa-file-lines"
+               aria-hidden="true"></i>
+            <span>修正申請（準備中）</span>
+        </span>
+
+        <span class="side-link side-link--planned">
+            <i class="fa-solid fa-users"
+               aria-hidden="true"></i>
+            <span>社員管理（準備中）</span>
+        </span>
+
+        <span class="side-link side-link--planned">
+            <i class="fa-solid fa-file-csv"
+               aria-hidden="true"></i>
+            <span>月次確定・出力（準備中）</span>
+        </span>
+
+        <span class="side-link side-link--planned">
+            <i class="fa-solid fa-clock-rotate-left"
+               aria-hidden="true"></i>
+            <span>操作履歴（準備中）</span>
+        </span>
+
+        <div class="side-separator"></div>
+
+        <a href="{% url 'attendance:home' %}"
+           class="side-link">
+            <i class="fa-solid fa-arrow-left"
+               aria-hidden="true"></i>
+            <span>社員画面へ</span>
+        </a>
+
+    {% else %}
+
+        {% if request.resolver_match.view_name == "attendance:home" %}
+
+        <a href="{% url 'attendance:home' %}"
+           class="side-link side-link--current"
+           aria-current="page">
+            <i class="fa-regular fa-clock"
+               aria-hidden="true"></i>
+            <span>打刻</span>
+        </a>
+
+        {% else %}
+
+        <a href="{% url 'attendance:home' %}"
+           class="side-link">
+            <i class="fa-regular fa-clock"
+               aria-hidden="true"></i>
+            <span>打刻</span>
+        </a>
+
+        {% endif %}
+
+
+        {% if request.resolver_match.view_name == "attendance:monthly" or request.resolver_match.view_name == "attendance:daily" %}
+
+        <a href="{% url 'attendance:monthly' %}"
+           class="side-link side-link--current"
+           aria-current="page">
+            <i class="fa-solid fa-file-lines"
+               aria-hidden="true"></i>
+            <span>自分の勤怠</span>
+        </a>
+
+        {% else %}
+
+        <a href="{% url 'attendance:monthly' %}"
+           class="side-link">
+            <i class="fa-solid fa-file-lines"
+               aria-hidden="true"></i>
+            <span>自分の勤怠</span>
+        </a>
+
+        {% endif %}
+
+
+        {% if request.resolver_match.view_name == "accounts:password_change" %}
+
+        <a href="{% url 'accounts:password_change' %}"
+           class="side-link side-link--current"
+           aria-current="page">
+            <i class="fa-solid fa-key"
+               aria-hidden="true"></i>
+            <span>パスワード変更</span>
+        </a>
+
+        {% else %}
+
+        <a href="{% url 'accounts:password_change' %}"
+           class="side-link">
+            <i class="fa-solid fa-key"
+               aria-hidden="true"></i>
+            <span>パスワード変更</span>
+        </a>
+
+        {% endif %}
+
+        
+{% if request.resolver_match.view_name == "accounts:overview" %}
+
+<a href="{% url 'accounts:overview' %}"
+   class="side-link side-link--current"
+   aria-current="page">
+
+    <i class="fa-solid fa-user-gear"
+       aria-hidden="true"></i>
+
+    <span>アカウントと使い方</span>
+</a>
 
 {% else %}
 
-<nav class="sidebar-nav"
-     aria-label="社員メニュー">
+<a href="{% url 'accounts:overview' %}"
+   class="side-link">
 
-    <p class="sidebar-heading">社員メニュー</p>
+    <i class="fa-solid fa-user-gear"
+       aria-hidden="true"></i>
 
-    <a href="{% url 'attendance:home' %}"
-       class="nav-item {% if request.resolver_match.view_name == 'attendance:home' %}nav-item--active{% endif %}"
-       {% if request.resolver_match.view_name == 'attendance:home' %}
-       aria-current="page"
-       {% endif %}>
+    <span>アカウントと使い方</span>
+</a>
 
-        <i class="fa-solid fa-clock"
-           aria-hidden="true"></i>
+{% endif %}
 
-        <span>打刻ホーム</span>
-    </a>
 
-    <span class="nav-item nav-item--planned">
-        <i class="fa-solid fa-calendar-days"
-           aria-hidden="true"></i>
-        <span>
-            自分の勤怠
-            <small>準備中</small>
-        </span>
-    </span>
+{% if request.resolver_match.view_name == "accounts:guide" %}
 
-    <span class="nav-item nav-item--planned">
-        <i class="fa-solid fa-pen-to-square"
-           aria-hidden="true"></i>
-        <span>
-            修正申請
-            <small>準備中</small>
-        </span>
-    </span>
+<a href="{% url 'accounts:guide' %}"
+   class="side-link side-link--current"
+   aria-current="page">
 
-    <a href="{% url 'accounts:password_change' %}"
-       class="nav-item {% if request.resolver_match.view_name == 'accounts:password_change' %}nav-item--active{% endif %}"
-       {% if request.resolver_match.view_name == 'accounts:password_change' %}
-       aria-current="page"
-       {% endif %}>
+    <i class="fa-solid fa-book-open"
+       aria-hidden="true"></i>
 
-        <i class="fa-solid fa-user-gear"
-           aria-hidden="true"></i>
+    <span>使い方ガイド</span>
+</a>
 
-        <span>パスワード変更</span>
-    </a>
+{% else %}
 
-    {% if request.user.is_business_admin %}
+<a href="{% url 'accounts:guide' %}"
+   class="side-link">
 
-    <div class="sidebar-divider"></div>
+    <i class="fa-solid fa-book-open"
+       aria-hidden="true"></i>
 
-    <a href="{% url 'management:home' %}"
-       class="nav-item">
+    <span>使い方ガイド</span>
+</a>
 
-        <i class="fa-solid fa-shield-halved"
-           aria-hidden="true"></i>
+{% endif %}
 
-        <span>管理者画面へ</span>
-    </a>
+
+        {% if request.user.is_business_admin %}
+
+        <div class="side-separator"></div>
+
+        <a href="{% url 'management:home' %}"
+           class="side-link">
+            <i class="fa-solid fa-shield-halved"
+               aria-hidden="true"></i>
+            <span>管理者画面へ</span>
+        </a>
+
+        {% endif %}
 
     {% endif %}
 
 </nav>
-
-{% endif %}

@@ -133,12 +133,67 @@ def record_clock_action(
                 "必要な場合は修正申請を行ってください。"
             )
 
-        session = WorkSession.objects.create(
-            employee=employee,
-            work_date=today,
-            clock_in_at=now,
-            status=WorkSession.Status.WORKING,
+        existing_today = (
+            WorkSession.objects
+            .select_for_update()
+            .filter(
+                employee=employee,
+                work_date=today,
+            )
+            .first()
         )
+
+        if existing_today is not None:
+
+            # 修正申請の審査中は出勤できない
+            if CorrectionRequest.objects.filter(
+                work_session=existing_today,
+                status=CorrectionRequest.Status.PENDING,
+            ).exists():
+                raise ClockActionError(
+                    "修正申請の審査中は打刻できません。"
+                )
+
+            # 原打刻がなく、勤務値もない仮レコード
+            reusable = (
+                existing_today.status
+                == WorkSession.Status.NO_RECORD
+                and existing_today.clock_in_at is None
+                and existing_today.clock_out_at is None
+                and not ClockEvent.objects.filter(
+                    work_session=existing_today
+                ).exists()
+                and not BreakInterval.objects.filter(
+                    work_session=existing_today
+                ).exists()
+            )
+
+            if not reusable:
+                raise ClockActionError(
+                    "この勤務日の記録は既に存在します。"
+                )
+
+            session = existing_today
+            session.clock_in_at = now
+            session.status = WorkSession.Status.WORKING
+            session.version += 1
+
+            session.save(
+                update_fields=[
+                    "clock_in_at",
+                    "status",
+                    "version",
+                    "updated_at",
+                ]
+            )
+
+        else:
+            session = WorkSession.objects.create(
+                employee=employee,
+                work_date=today,
+                clock_in_at=now,
+                status=WorkSession.Status.WORKING,
+            )
 
     else:
 

@@ -1,8 +1,6 @@
-
 from django.contrib import admin
 from django.urls import include, path
 from django.views.generic import RedirectView
-
 
 urlpatterns = [
     path(
@@ -24,6 +22,10 @@ urlpatterns = [
     path(
         "management/",
         include("management.urls"),
+    ),
+    path(
+        "employee/corrections/",
+        include("corrections.urls"),
     ),
     path(
         "admin/",

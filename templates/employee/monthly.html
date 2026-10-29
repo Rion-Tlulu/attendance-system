@@ -1,0 +1,339 @@
+
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}自分の勤怠 | 勤怠管理{% endblock %}
+{% block screen_label %}自分の勤怠{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet"
+      href="{% static 'css/monthly.css' %}">
+{% endblock %}
+
+{% block content %}
+
+<section class="monthly-page">
+
+    <div class="monthly-toolbar">
+
+        <form method="get"
+              action="{% url 'attendance:monthly' %}"
+              class="monthly-month-form">
+
+            <div class="monthly-month-picker">
+
+                {% if report and report.previous_month %}
+                <a href="?month={{ report.previous_month }}"
+                   class="monthly-arrow"
+                   aria-label="前月へ">
+                    <i class="fa-solid fa-chevron-left"
+                       aria-hidden="true"></i>
+                </a>
+                {% endif %}
+
+                <label for="{{ form.month.id_for_label }}"
+                       class="visually-hidden">
+                    対象年月
+                </label>
+
+                {{ form.month }}
+
+                {% if report and report.next_month %}
+                <a href="?month={{ report.next_month }}"
+                   class="monthly-arrow"
+                   aria-label="翌月へ">
+                    <i class="fa-solid fa-chevron-right"
+                       aria-hidden="true"></i>
+                </a>
+                {% endif %}
+
+            </div>
+
+            <button type="submit"
+                    class="ui-button ui-button--secondary">
+                表示
+            </button>
+
+        </form>
+
+        {% if report %}
+        <div class="monthly-toolbar-meta">
+
+            <span>月次状態：</span>
+
+            <span class="attendance-label attendance-label--{% if report.is_finalized %}finalized{% else %}open{% endif %}">
+                {{ report.closing_label }}
+            </span>
+
+        </div>
+        {% endif %}
+
+        <span class="monthly-future-link">
+            <a href="{% url 'corrections:list' %}"
+   class="ui-button ui-button--secondary">
+    <i class="fa-solid fa-file-lines"
+       aria-hidden="true"></i>
+    申請履歴を見る
+</a>
+        </span>
+
+    </div>
+
+    {% for error in form.month.errors %}
+    <p class="field-error" role="alert">
+        {{ error }}
+    </p>
+    {% endfor %}
+
+
+    {% if report %}
+
+    <!-- 月次サマリー -->
+    <div class="monthly-summary">
+
+        <section class="monthly-summary-card">
+            <h2>
+                <i class="fa-regular fa-clock"
+                   aria-hidden="true"></i>
+                実働合計
+            </h2>
+            <strong>{{ report.work_display }}</strong>
+        </section>
+
+        <section class="monthly-summary-card">
+            <h2>
+                <i class="fa-solid fa-mug-saucer"
+                   aria-hidden="true"></i>
+                休憩合計
+            </h2>
+            <strong>{{ report.break_display }}</strong>
+        </section>
+
+        <section class="monthly-summary-card">
+            <h2>
+                <i class="fa-solid fa-file-lines"
+                   aria-hidden="true"></i>
+                未完了
+            </h2>
+            <strong>{{ report.incomplete_count }}件</strong>
+        </section>
+
+        <section class="monthly-summary-card">
+            <h2>
+                <i class="fa-solid fa-hourglass-half"
+                   aria-hidden="true"></i>
+                審査中
+            </h2>
+            <strong>{{ report.pending_count }}件</strong>
+        </section>
+
+    </div>
+
+    <p class="monthly-note">
+        <i class="fa-solid fa-circle-info"
+           aria-hidden="true"></i>
+        完了した勤務のみ集計しています。
+        未完了の勤務は合計に含みません。
+    </p>
+
+
+    <!-- 日別一覧 -->
+    <section class="monthly-list"
+             aria-labelledby="monthly-list-title">
+
+        <h2 id="monthly-list-title"
+            class="visually-hidden">
+            日別勤怠一覧
+        </h2>
+
+        <!-- PC -->
+        <div class="monthly-desktop">
+
+            <div class="table-scroll"
+                 role="region"
+                 aria-label="日別勤怠一覧表"
+                 tabindex="0">
+
+                <table class="ui-table monthly-table">
+
+                    <thead>
+                        <tr>
+                            <th scope="col">日付</th>
+                            <th scope="col">出勤</th>
+                            <th scope="col">退勤</th>
+                            <th scope="col">休憩</th>
+                            <th scope="col">実働</th>
+                            <th scope="col">記録状態</th>
+                            <th scope="col">修正状態</th>
+                            <th scope="col">確定状態</th>
+                            <th scope="col">詳細</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+
+                    {% for row in page_obj %}
+
+                        <tr>
+
+                            <th scope="row">
+                                {{ row.day_label }}
+                            </th>
+
+                            <td>{{ row.clock_in }}</td>
+                            <td>{{ row.clock_out }}</td>
+                            <td>{{ row.break_display }}</td>
+                            <td>{{ row.work_display }}</td>
+
+                            <td>
+                                <span class="attendance-label attendance-label--{{ row.record_key }}">
+                                    {{ row.record_label }}
+                                </span>
+                            </td>
+
+                            <td>
+                                <span class="attendance-label attendance-label--{{ row.correction_key }}">
+                                    {{ row.correction_label }}
+                                </span>
+                            </td>
+
+                            <td>
+                                <span class="attendance-label attendance-label--{{ row.closing_key }}">
+                                    {{ row.closing_label }}
+                                </span>
+                            </td>
+
+                            <td>
+                                <a class="monthly-detail-link"
+                                   href="{% url 'attendance:daily' row.day.year row.day.month row.day.day %}?page={{ page_obj.number }}">
+                                    詳細
+                                    <i class="fa-solid fa-chevron-right"
+                                       aria-hidden="true"></i>
+                                </a>
+                            </td>
+
+                        </tr>
+
+                    {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </div>
+
+
+        <!-- スマートフォン -->
+        <div class="monthly-mobile">
+
+            {% for row in page_obj %}
+
+            <article class="monthly-day-card">
+
+                <div class="monthly-day-heading">
+
+                    <h3>{{ row.day_label }}</h3>
+
+                    <span class="attendance-label attendance-label--{{ row.record_key }}">
+                        {{ row.record_label }}
+                    </span>
+
+                </div>
+
+                <dl class="monthly-day-data">
+
+                    <div>
+                        <dt>出勤</dt>
+                        <dd>{{ row.clock_in }}</dd>
+                    </div>
+
+                    <div>
+                        <dt>退勤</dt>
+                        <dd>{{ row.clock_out }}</dd>
+                    </div>
+
+                    <div>
+                        <dt>休憩</dt>
+                        <dd>{{ row.break_display }}</dd>
+                    </div>
+
+                    <div>
+                        <dt>実働</dt>
+                        <dd>{{ row.work_display }}</dd>
+                    </div>
+
+                    <div>
+                        <dt>修正状態</dt>
+                        <dd>{{ row.correction_label }}</dd>
+                    </div>
+
+                    <div>
+                        <dt>確定状態</dt>
+                        <dd>{{ row.closing_label }}</dd>
+                    </div>
+
+                </dl>
+
+                <a href="{% url 'attendance:daily' row.day.year row.day.month row.day.day %}?page={{ page_obj.number }}"
+                   class="ui-button ui-button--secondary monthly-day-action">
+                    この日の詳細を見る
+                </a>
+
+            </article>
+
+            {% endfor %}
+
+        </div>
+
+
+        <!-- 7日単位のページ切替 -->
+        <nav class="monthly-pagination"
+             aria-label="日別一覧のページ切替">
+
+            <p>
+                表示中：
+                {{ page_obj.start_index }}〜{{ page_obj.end_index }}
+                / {{ page_obj.paginator.count }}日
+            </p>
+
+            <div class="monthly-pagination-actions">
+
+                {% if page_obj.has_next %}
+                <a href="?month={{ report.month_query }}&amp;page={{ page_obj.next_page_number }}"
+                   class="ui-button ui-button--secondary">
+                    <i class="fa-solid fa-chevron-left"
+                       aria-hidden="true"></i>
+                    前の7日
+                </a>
+                {% endif %}
+
+                {% if page_obj.has_previous %}
+                <a href="?month={{ report.month_query }}&amp;page={{ page_obj.previous_page_number }}"
+                   class="ui-button ui-button--secondary">
+                    次の7日
+                    <i class="fa-solid fa-chevron-right"
+                       aria-hidden="true"></i>
+                </a>
+                {% endif %}
+
+            </div>
+
+        </nav>
+
+    </section>
+
+    <p class="monthly-note">
+        月合計は月全体を対象としており、
+        表示中の7日間だけの合計ではありません。
+        記録なしは欠勤を意味しません。
+        秒単位で合算するため、日別表示の合計と
+        異なる場合があります。
+    </p>
+
+    {% endif %}
+
+</section>
+
+{% endblock %}

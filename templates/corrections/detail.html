@@ -1,0 +1,133 @@
+
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}申請詳細 | 勤怠管理{% endblock %}
+{% block screen_label %}申請詳細{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet"
+      href="{% static 'css/corrections.css' %}">
+{% endblock %}
+
+{% block content %}
+
+<div class="correction-page">
+
+    <div class="page-heading">
+        <h1>修正申請の詳細</h1>
+        <p>
+            対象勤務日：
+            {{ correction.work_session.work_date|date:"Y年n月j日" }}
+        </p>
+    </div>
+
+    <section class="ui-card correction-section">
+
+        <div class="correction-section-heading">
+            <h2>申請情報</h2>
+
+            <span class="correction-status correction-status--{{ correction.status }}">
+                {{ correction.get_status_display }}
+            </span>
+        </div>
+
+        <dl class="correction-review-list">
+            <div>
+                <dt>申請番号</dt>
+                <dd>{{ correction.pk }}</dd>
+            </div>
+            <div>
+                <dt>申請日時</dt>
+                <dd>
+                    {{ correction.created_at|date:"Y/m/d H:i:s" }}
+                </dd>
+            </div>
+            <div>
+                <dt>申請元データ版</dt>
+                <dd>{{ correction.original_version }}</dd>
+            </div>
+        </dl>
+
+    </section>
+
+    <section class="ui-card correction-section">
+        <h2>申請した修正内容</h2>
+
+        <dl class="correction-review-list">
+            <div>
+                <dt>出勤</dt>
+                <dd>{{ proposal_display.clock_in }}</dd>
+            </div>
+            <div>
+                <dt>退勤</dt>
+                <dd>{{ proposal_display.clock_out }}</dd>
+            </div>
+        </dl>
+
+        <h3>休憩</h3>
+
+        {% for item in proposal_display.breaks %}
+        <p>
+            休憩{{ item.number }}：
+            {{ item.start }} 〜 {{ item.end }}
+        </p>
+        {% empty %}
+        <p>休憩なし</p>
+        {% endfor %}
+    </section>
+
+    <section class="ui-card correction-section">
+        <h2>申請理由</h2>
+        <p>{{ correction.reason|linebreaksbr }}</p>
+
+        {% if correction.return_reason %}
+        <div class="correction-return-reason">
+            <h3>差戻し理由</h3>
+            <p>{{ correction.return_reason }}</p>
+        </div>
+        {% endif %}
+
+        {% if correction.reviewed_at %}
+        <p class="ui-muted">
+            処理日時：
+            {{ correction.reviewed_at|date:"Y/m/d H:i" }}
+        </p>
+        {% endif %}
+    </section>
+
+    <div class="correction-actions">
+
+        <a href="{% url 'corrections:list' %}"
+           class="ui-button ui-button--secondary">
+            申請履歴へ戻る
+        </a>
+
+        {% if correction.status == "pending" %}
+
+        <form method="post"
+              action="{% url 'corrections:withdraw' correction.pk %}"
+              onsubmit="return confirm('この修正申請を取り下げますか？');">
+
+            {% csrf_token %}
+
+            <button type="submit"
+                    class="ui-button correction-danger">
+                申請を取り下げる
+            </button>
+        </form>
+
+        {% elif correction.status == "returned" or correction.status == "withdrawn" %}
+
+        <a href="{% url 'corrections:create' correction.work_session.work_date.year correction.work_session.work_date.month correction.work_session.work_date.day %}"
+           class="ui-button ui-button--primary">
+            新しく申請する
+        </a>
+
+        {% endif %}
+
+    </div>
+
+</div>
+
+{% endblock %}

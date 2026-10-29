@@ -1,0 +1,528 @@
+/* =====================================
+   Phase 6：自分の勤怠・日別詳細
+===================================== */
+
+.monthly-page,
+.daily-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* 月選択 */
+
+.monthly-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 18px;
+
+  padding: 16px 20px;
+  background: white;
+
+  border: 1px solid var(--app-border);
+  border-radius: 10px;
+}
+
+.monthly-month-form {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.monthly-month-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.monthly-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 44px;
+  height: 44px;
+
+  border: 1px solid var(--app-border);
+  border-radius: 7px;
+
+  color: var(--app-blue);
+  text-decoration: none;
+}
+
+.month-input {
+  width: 175px;
+  min-height: 44px;
+
+  padding: 8px 10px;
+
+  border: 1px solid var(--app-border);
+  border-radius: 7px;
+
+  color: var(--app-text);
+  background: white;
+  font-weight: 700;
+}
+
+.monthly-toolbar-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.monthly-future-link {
+  margin-left: auto;
+  color: var(--app-muted);
+  font-size: 0.84rem;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* 月次サマリー */
+
+.monthly-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.monthly-summary-card {
+  min-width: 0;
+  padding: 18px 16px;
+
+  background: white;
+  border: 1px solid var(--app-border);
+  border-radius: 10px;
+}
+
+.monthly-summary-card h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  margin: 0 0 10px;
+
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.monthly-summary-card h2 i {
+  font-size: 1.25rem;
+  color: #19345b;
+}
+
+.monthly-summary-card strong {
+  display: block;
+  font-size: clamp(1.15rem, 2vw, 1.8rem);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.monthly-note {
+  margin: 0;
+  padding: 12px 16px;
+
+  color: #40516b;
+  background: #f2f7fd;
+  border-radius: 8px;
+
+  font-size: 0.87rem;
+}
+
+/* 日別一覧 */
+
+.monthly-list {
+  min-width: 0;
+  padding: 16px;
+
+  background: white;
+  border: 1px solid var(--app-border);
+  border-radius: 10px;
+}
+
+.monthly-table {
+  width: 100%;
+  min-width: 950px;
+}
+
+.monthly-table th,
+.monthly-table td {
+  padding: 12px 9px;
+  text-align: center;
+
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
+
+.monthly-detail-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+
+  min-height: 44px;
+
+  color: #075ed8;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.monthly-detail-link:hover {
+  text-decoration: underline;
+}
+
+/* 状態ラベル */
+
+.attendance-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  min-width: 72px;
+  padding: 5px 10px;
+
+  border-radius: 7px;
+
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.attendance-label--recorded,
+.attendance-label--approved,
+.attendance-label--finalized {
+  color: #0958ba;
+  background: #e0edff;
+}
+
+.attendance-label--pending,
+.attendance-label--returned {
+  color: #744900;
+  background: #ffedc8;
+}
+
+.attendance-label--incomplete {
+  color: #9a283a;
+  background: #fde5e9;
+}
+
+.attendance-label--none,
+.attendance-label--withdrawn,
+.attendance-label--no_record {
+  color: #475467;
+  background: #edf0f4;
+}
+
+.attendance-label--open {
+  color: #0958ba;
+  background: #e0edff;
+}
+
+/* ページ切替 */
+
+.monthly-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+
+  margin-top: 16px;
+}
+
+.monthly-pagination p {
+  margin: 0;
+  font-weight: 700;
+  font-size: 0.88rem;
+}
+
+.monthly-pagination-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.monthly-pagination-actions a {
+  min-height: 44px;
+}
+
+/* スマホの日別カード */
+
+.monthly-mobile {
+  display: none;
+}
+
+.monthly-day-card {
+  padding: 14px;
+
+  border: 1px solid var(--app-border);
+  border-radius: 9px;
+
+  background: white;
+}
+
+.monthly-day-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.monthly-day-heading h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.monthly-day-data {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+
+  gap: 12px;
+  margin: 14px 0;
+}
+
+.monthly-day-data div {
+  min-width: 0;
+}
+
+.monthly-day-data dt {
+  color: var(--app-muted);
+  font-size: 0.8rem;
+}
+
+.monthly-day-data dd {
+  margin: 4px 0 0;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.monthly-day-action {
+  width: 100%;
+}
+
+/* 日別詳細 */
+
+.daily-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  font-size: 0.9rem;
+}
+
+.daily-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.daily-title-row h1 {
+  margin: 0;
+  font-size: clamp(1.35rem, 2.5vw, 1.9rem);
+}
+
+.daily-title-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.daily-planned-action {
+  color: var(--app-muted);
+  font-size: 0.83rem;
+}
+
+.daily-status-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+
+  padding: 14px;
+
+  background: white;
+  border: 1px solid var(--app-border);
+  border-radius: 9px;
+}
+
+.daily-status-row > div {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.daily-section {
+  padding: 20px;
+}
+
+.daily-section h2 {
+  margin: 0 0 14px;
+  font-size: 1.15rem;
+}
+
+.daily-comparison {
+  min-width: 580px;
+}
+
+.daily-comparison th,
+.daily-comparison td {
+  padding: 12px;
+}
+
+/* 休憩・実働のサマリー */
+
+.daily-totals {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+
+  gap: 12px;
+  margin-top: 16px;
+
+  padding: 15px;
+  background: #f2f6fb;
+  border-radius: 8px;
+}
+
+.daily-totals > div {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+}
+
+.daily-totals strong {
+  font-size: 1.2rem;
+}
+
+.daily-empty {
+  margin: 0;
+  padding: 22px 12px;
+
+  text-align: center;
+  color: var(--app-muted);
+
+  background: #f2f6fb;
+  border-radius: 8px;
+}
+
+.daily-correction-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.daily-correction-item {
+  padding: 14px;
+
+  border: 1px solid var(--app-border);
+  border-radius: 8px;
+}
+
+.daily-correction-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.daily-info {
+  padding: 12px;
+  background: #f2f7fd;
+  color: #40516b;
+  border-radius: 8px;
+}
+
+/* タブレット */
+
+@media (max-width: 1100px) {
+  .monthly-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* スマートフォン */
+
+@media (max-width: 767px) {
+  .monthly-toolbar,
+  .monthly-list,
+  .daily-section {
+    padding: 14px;
+  }
+
+  .monthly-summary {
+    gap: 8px;
+  }
+
+  .monthly-summary-card {
+    padding: 12px;
+  }
+
+  .monthly-summary-card h2 {
+    font-size: 0.83rem;
+  }
+
+  .monthly-summary-card strong {
+    font-size: 1.1rem;
+  }
+
+  .monthly-future-link {
+    margin-left: 0;
+  }
+
+  .monthly-desktop {
+    display: none;
+  }
+
+  .monthly-mobile {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .daily-status-row {
+    grid-template-columns: 1fr;
+  }
+
+  .daily-status-row > div {
+    justify-content: space-between;
+  }
+
+  .daily-totals {
+    grid-template-columns: 1fr;
+  }
+
+  .daily-totals > div {
+    justify-content: space-between;
+  }
+}
+
+/* 幅320px */
+
+@media (max-width: 360px) {
+  .month-input {
+    width: 138px;
+  }
+
+  .monthly-summary-card strong {
+    font-size: 1rem;
+  }
+}

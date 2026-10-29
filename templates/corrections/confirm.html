@@ -1,0 +1,91 @@
+
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}申請内容の確認 | 勤怠管理{% endblock %}
+{% block screen_label %}申請内容の確認{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet"
+      href="{% static 'css/corrections.css' %}">
+{% endblock %}
+
+{% block content %}
+
+<div class="correction-page">
+
+    <div class="page-heading">
+        <h1>申請内容の確認</h1>
+        <p>
+            {{ work_day|date:"Y年n月j日" }}
+            の修正内容です。
+        </p>
+    </div>
+
+    <div class="correction-notice">
+        まだ申請は送信されていません。
+        内容を確認してから確定してください。
+    </div>
+
+    <section class="ui-card correction-section">
+        <h2>修正案</h2>
+
+        <dl class="correction-review-list">
+            <div>
+                <dt>出勤日時</dt>
+                <dd>{{ proposal_display.clock_in }}</dd>
+            </div>
+
+            <div>
+                <dt>退勤日時</dt>
+                <dd>{{ proposal_display.clock_out }}</dd>
+            </div>
+        </dl>
+    </section>
+
+    <section class="ui-card correction-section">
+        <h2>休憩</h2>
+
+        {% for item in proposal_display.breaks %}
+        <div class="correction-review-break">
+            <strong>休憩{{ item.number }}</strong>
+            <span>{{ item.start }}</span>
+            <span>〜</span>
+            <span>{{ item.end }}</span>
+        </div>
+        {% empty %}
+        <p>休憩の設定はありません。</p>
+        {% endfor %}
+    </section>
+
+    <section class="ui-card correction-section">
+        <h2>申請理由</h2>
+        <p>{{ reason|linebreaksbr }}</p>
+    </section>
+
+    <form method="post"
+          action="{% url 'corrections:create' work_day.year work_day.month work_day.day %}">
+
+        {% csrf_token %}
+
+        <input type="hidden"
+               name="confirm_token"
+               value="{{ confirm_token }}">
+
+        <div class="correction-actions">
+            <a href="{% url 'corrections:create' work_day.year work_day.month work_day.day %}"
+               class="ui-button ui-button--secondary">
+                入力画面へ戻る
+            </a>
+
+            <button type="submit"
+                    class="ui-button ui-button--primary">
+                この内容で申請する
+            </button>
+        </div>
+
+    </form>
+
+</div>
+
+{% endblock %}

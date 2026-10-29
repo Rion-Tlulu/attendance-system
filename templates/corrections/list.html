@@ -1,0 +1,136 @@
+
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}申請履歴 | 勤怠管理{% endblock %}
+{% block screen_label %}申請履歴{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet"
+      href="{% static 'css/corrections.css' %}">
+{% endblock %}
+
+{% block content %}
+
+<div class="correction-page">
+
+    <div class="page-heading">
+        <h1>申請履歴</h1>
+        <p>自分の修正申請の状況を確認できます。</p>
+    </div>
+
+    <section class="ui-card correction-section">
+
+        <form method="get" class="correction-filter">
+            <label for="status-filter">
+                申請状態
+            </label>
+
+            <select name="status"
+                    id="status-filter">
+
+                <option value="all"
+                    {% if status_filter == "all" %}selected{% endif %}>
+                    すべて
+                </option>
+
+                <option value="pending"
+                    {% if status_filter == "pending" %}selected{% endif %}>
+                    審査中
+                </option>
+
+                <option value="approved"
+                    {% if status_filter == "approved" %}selected{% endif %}>
+                    承認済み
+                </option>
+
+                <option value="returned"
+                    {% if status_filter == "returned" %}selected{% endif %}>
+                    差戻し
+                </option>
+
+                <option value="withdrawn"
+                    {% if status_filter == "withdrawn" %}selected{% endif %}>
+                    取下げ済み
+                </option>
+
+            </select>
+
+            <button type="submit"
+                    class="ui-button ui-button--primary">
+                検索
+            </button>
+        </form>
+
+    </section>
+
+    <section class="ui-card correction-section">
+        <h2>申請一覧</h2>
+
+        <div class="correction-history-list">
+
+            {% for item in page_obj %}
+            <article class="correction-history-item">
+
+                <div class="correction-history-heading">
+                    <strong>
+                        {{ item.work_session.work_date|date:"Y/m/d" }}
+                    </strong>
+
+                    <span class="correction-status correction-status--{{ item.status }}">
+                        {{ item.get_status_display }}
+                    </span>
+                </div>
+
+                <p>{{ item.reason|truncatechars:100 }}</p>
+
+                <p class="ui-muted">
+                    申請日時：
+                    {{ item.created_at|date:"Y/m/d H:i" }}
+                </p>
+
+                <a href="{% url 'corrections:detail' item.pk %}"
+                   class="ui-button ui-button--secondary">
+                    申請詳細を見る
+                </a>
+
+            </article>
+
+            {% empty %}
+
+            <p class="ui-muted">
+                該当する修正申請はありません。
+            </p>
+
+            {% endfor %}
+        </div>
+
+        {% if page_obj.has_other_pages %}
+        <nav class="correction-pagination"
+             aria-label="申請履歴のページ切替">
+
+            {% if page_obj.has_previous %}
+            <a href="?status={{ status_filter }}&amp;page={{ page_obj.previous_page_number }}">
+                前へ
+            </a>
+            {% endif %}
+
+            <span>
+                {{ page_obj.number }}
+                / {{ page_obj.paginator.num_pages }}
+            </span>
+
+            {% if page_obj.has_next %}
+            <a href="?status={{ status_filter }}&amp;page={{ page_obj.next_page_number }}">
+                次へ
+            </a>
+            {% endif %}
+
+        </nav>
+        {% endif %}
+
+    </section>
+
+</div>
+
+{% endblock %}

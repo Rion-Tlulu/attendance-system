@@ -1,0 +1,194 @@
+
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}勤怠修正申請 | 勤怠管理{% endblock %}
+{% block screen_label %}勤怠修正申請{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet"
+      href="{% static 'css/corrections.css' %}">
+{% endblock %}
+
+{% block content %}
+
+<div class="correction-page">
+
+    <nav class="correction-breadcrumb"
+         aria-label="パンくずリスト">
+        <a href="{% url 'attendance:monthly' %}">
+            自分の勤怠
+        </a>
+        <span aria-hidden="true">›</span>
+        <span aria-current="page">修正申請</span>
+    </nav>
+
+    <div class="page-heading">
+        <h1>勤怠修正申請</h1>
+        <p>
+            対象日：
+            {{ work_day|date:"Y年n月j日" }}
+        </p>
+    </div>
+
+    <div class="correction-notice">
+        原打刻は変更されません。
+        申請内容は管理者の承認後に反映されます。
+    </div>
+
+    <form method="post"
+          class="correction-form"
+          id="correction-form">
+
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+        <div class="notice error" role="alert">
+            {{ form.non_field_errors }}
+        </div>
+        {% endif %}
+
+        <section class="ui-card correction-section">
+            <h2>出勤・退勤の修正</h2>
+
+            <p class="ui-muted">
+                変更しない日時はそのままにしてください。
+                取消したい日時は入力欄を空にします。
+            </p>
+
+            <div class="correction-fields">
+                <div class="correction-field">
+                    {{ form.clock_in_at.label_tag }}
+                    {{ form.clock_in_at }}
+                    {{ form.clock_in_at.errors }}
+                </div>
+
+                <div class="correction-field">
+                    {{ form.clock_out_at.label_tag }}
+                    {{ form.clock_out_at }}
+                    {{ form.clock_out_at.errors }}
+                </div>
+            </div>
+        </section>
+
+        <section class="ui-card correction-section"
+                 aria-labelledby="break-title">
+
+            <div class="correction-section-heading">
+                <h2 id="break-title">休憩の修正</h2>
+
+                <button type="button"
+                        class="ui-button ui-button--secondary"
+                        id="add-break">
+                    <i class="fa-solid fa-plus"
+                       aria-hidden="true"></i>
+                    休憩を追加
+                </button>
+            </div>
+
+            <p class="ui-muted">
+                必要な休憩をすべて入力してください。
+                取り消す休憩は「この休憩を除外」に
+                チェックを入れます。
+            </p>
+
+            {{ break_formset.management_form }}
+
+            {% if break_formset.non_form_errors %}
+            <div class="notice error" role="alert">
+                {{ break_formset.non_form_errors }}
+            </div>
+            {% endif %}
+
+            <div id="break-forms"
+                 class="correction-break-list">
+
+                {% for break_form in break_formset %}
+
+                <div class="correction-break-entry">
+
+                    <div class="correction-fields">
+                        <div class="correction-field">
+                            {{ break_form.started_at.label_tag }}
+                            {{ break_form.started_at }}
+                            {{ break_form.started_at.errors }}
+                        </div>
+
+                        <div class="correction-field">
+                            {{ break_form.ended_at.label_tag }}
+                            {{ break_form.ended_at }}
+                            {{ break_form.ended_at.errors }}
+                        </div>
+                    </div>
+
+                    <label class="correction-delete">
+                        {{ break_form.DELETE }}
+                        この休憩を除外
+                    </label>
+
+                    {{ break_form.non_field_errors }}
+
+                </div>
+
+                {% endfor %}
+
+            </div>
+
+            <template id="empty-break-template">
+                <div class="correction-break-entry">
+                    <div class="correction-fields">
+                        <div class="correction-field">
+                            {{ break_formset.empty_form.started_at.label_tag }}
+                            {{ break_formset.empty_form.started_at }}
+                        </div>
+
+                        <div class="correction-field">
+                            {{ break_formset.empty_form.ended_at.label_tag }}
+                            {{ break_formset.empty_form.ended_at }}
+                        </div>
+                    </div>
+
+                    <label class="correction-delete">
+                        {{ break_formset.empty_form.DELETE }}
+                        この休憩を除外
+                    </label>
+                </div>
+            </template>
+        </section>
+
+        <section class="ui-card correction-section">
+            <h2>修正理由</h2>
+
+            <div class="correction-field">
+                {{ form.reason.label_tag }}
+                {{ form.reason }}
+                {{ form.reason.errors }}
+            </div>
+
+            <p class="ui-muted">
+                必須・500文字以内
+            </p>
+        </section>
+
+        <div class="correction-actions">
+            <a href="{% url 'attendance:daily' work_day.year work_day.month work_day.day %}"
+               class="ui-button ui-button--secondary">
+                日別詳細へ戻る
+            </a>
+
+            <button type="submit"
+                    class="ui-button ui-button--primary">
+                申請内容を確認する
+            </button>
+        </div>
+
+    </form>
+
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/corrections.js' %}"
+        defer></script>
+{% endblock %}

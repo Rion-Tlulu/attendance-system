@@ -1,0 +1,462 @@
+/* ===========================================
+   Phase 8：アカウントと使い方
+   最新デザイン：濃紺・青・白
+=========================================== */
+
+/* 全体 */
+
+.account-page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+
+  width: 100%;
+  max-width: 1100px;
+  min-width: 0;
+  margin: 0 auto;
+
+  color: #142541;
+}
+
+/* ページ見出し */
+
+.account-page-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.account-page-heading h1 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  margin: 0;
+  font-size: clamp(1.35rem, 2.5vw, 1.9rem);
+}
+
+.account-page-heading h1 i {
+  color: #19345b;
+}
+
+.account-page-heading p {
+  margin: 0;
+  color: #46556c;
+  line-height: 1.8;
+}
+
+/* 各カード */
+
+.account-section {
+  padding: 22px 24px;
+  border-radius: 12px;
+}
+
+.account-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+
+  margin-bottom: 14px;
+}
+
+.account-section h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  margin: 0 0 14px;
+  font-size: 1.15rem;
+}
+
+.account-section-heading h2 {
+  margin: 0;
+}
+
+.account-section h2 i {
+  color: #19345b;
+}
+
+.account-section p {
+  line-height: 1.8;
+}
+
+.account-section-note {
+  color: #46556c;
+  font-size: 0.9rem;
+}
+
+/* アカウント情報 */
+
+.account-info-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 26px;
+
+  margin: 12px 0 0;
+}
+
+.account-info-list > div {
+  display: grid;
+  grid-template-columns:
+    minmax(90px, 130px)
+    minmax(0, 1fr);
+
+  gap: 12px;
+  padding: 16px 0;
+
+  border-bottom: 1px solid #d3dde8;
+}
+
+.account-info-list dt {
+  color: #46556c;
+  font-weight: 700;
+}
+
+.account-info-list dd {
+  margin: 0;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+/* アカウント状態 */
+
+.account-status {
+  display: inline-flex;
+  align-items: center;
+
+  min-height: 32px;
+  padding: 5px 12px;
+
+  border-radius: 999px;
+  font-size: 0.83rem;
+  font-weight: 700;
+}
+
+.account-status--active {
+  background: #e1f3e8;
+  color: #155b32;
+}
+
+.account-status--inactive {
+  background: #fce5e9;
+  color: #8e2036;
+}
+
+/* アクション */
+
+.account-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+
+  min-height: 48px;
+  margin-top: 10px;
+  padding: 10px 18px;
+
+  text-decoration: none;
+  font-weight: 700;
+}
+
+/* 利用上の補足 */
+
+.account-help-text {
+  padding: 12px 14px;
+
+  border-left: 4px solid #075ed8;
+  border-radius: 5px;
+
+  background: #f0f6ff;
+  color: #304b6d;
+}
+
+/* 使い方へのリンク */
+
+.account-guide-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+
+  gap: 12px;
+  margin: 18px 0;
+}
+
+.account-guide-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  min-height: 66px;
+  padding: 14px 16px;
+
+  border: 1px solid #c8d2e0;
+  border-radius: 9px;
+
+  background: #f8fafd;
+  color: #142541;
+
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.account-guide-link > i:first-child {
+  color: #075ed8;
+  font-size: 1.25rem;
+}
+
+.account-guide-link > i:last-child {
+  margin-left: auto;
+  color: #46556c;
+}
+
+.account-guide-link:hover {
+  border-color: #075ed8;
+  background: #eaf2ff;
+}
+
+/* パンくずリスト */
+
+.account-breadcrumb {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+
+  font-size: 0.9rem;
+}
+
+.account-breadcrumb a,
+.account-back-link {
+  color: #075ed8;
+  font-weight: 700;
+}
+
+/* ガイドの目次 */
+
+.guide-index {
+  padding: 20px 24px;
+}
+
+.guide-index h2 {
+  margin: 0 0 14px;
+  font-size: 1.1rem;
+}
+
+.guide-index-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.guide-index-links a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  min-height: 44px;
+  padding: 9px 15px;
+
+  border: 1px solid #9fb5d0;
+  border-radius: 8px;
+
+  background: #f4f8fd;
+  color: #0755b8;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.guide-index-links a:hover {
+  background: #e1ecfc;
+}
+
+/* ガイドの各項目 */
+
+.guide-section {
+  scroll-margin-top: 90px;
+}
+
+.guide-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+
+  margin: 18px 0;
+  padding-left: 28px;
+}
+
+.guide-steps li {
+  padding-left: 4px;
+  line-height: 1.8;
+}
+
+.guide-steps li::marker {
+  color: #075ed8;
+  font-weight: 700;
+}
+
+.guide-steps li strong {
+  font-size: 1rem;
+}
+
+.guide-steps li p {
+  margin: 5px 0 0;
+  color: #46556c;
+}
+
+.guide-information {
+  padding: 16px;
+  margin: 14px 0;
+
+  border: 1px solid #c8d8ec;
+  border-radius: 9px;
+
+  background: #f1f6fc;
+}
+
+.guide-information strong {
+  color: #19345b;
+}
+
+.guide-information p {
+  margin: 8px 0 0;
+}
+
+/* よくある質問 */
+
+.guide-faq {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.guide-faq details {
+  border: 1px solid #c8d2e0;
+  border-radius: 9px;
+  background: #ffffff;
+
+  overflow: hidden;
+}
+
+.guide-faq summary {
+  position: relative;
+  display: list-item;
+
+  min-height: 48px;
+  padding: 14px 18px;
+
+  color: #142541;
+  font-weight: 700;
+  line-height: 1.6;
+
+  cursor: pointer;
+}
+
+.guide-faq details[open] summary {
+  background: #edf4ff;
+}
+
+.guide-faq details p {
+  margin: 0;
+  padding: 14px 18px;
+
+  border-top: 1px solid #d6e0eb;
+  line-height: 1.8;
+}
+
+.account-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+
+  align-self: flex-start;
+  min-height: 44px;
+
+  text-decoration: none;
+}
+
+.account-back-link:hover {
+  text-decoration: underline;
+}
+
+/* キーボードの操作位置 */
+
+.account-page a:focus-visible,
+.account-page summary:focus-visible {
+  outline: 3px solid #e58c00;
+  outline-offset: 3px;
+}
+
+/* タブレット */
+
+@media (max-width: 900px) {
+  .account-info-list {
+    gap: 0 16px;
+  }
+
+  .account-section {
+    padding: 18px;
+  }
+}
+
+/* スマートフォン */
+
+@media (max-width: 600px) {
+  .account-page {
+    gap: 14px;
+  }
+
+  .account-section,
+  .guide-index {
+    padding: 16px;
+  }
+
+  .account-info-list {
+    grid-template-columns: 1fr;
+  }
+
+  .account-info-list > div {
+    grid-template-columns:
+      minmax(100px, 1fr)
+      minmax(0, 1.5fr);
+  }
+
+  .account-guide-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .guide-index-links {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .guide-index-links a {
+    justify-content: flex-start;
+  }
+
+  .guide-steps {
+    padding-left: 24px;
+  }
+
+  .account-action {
+    width: 100%;
+  }
+
+  .guide-section {
+    scroll-margin-top: 70px;
+  }
+}
+
+/* 小型スマートフォン */
+
+@media (max-width: 360px) {
+  .account-info-list > div {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+
+  .account-section h2 {
+    font-size: 1.05rem;
+  }
+}
