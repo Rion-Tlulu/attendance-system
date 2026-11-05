@@ -1,0 +1,101 @@
+
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}修正申請の管理 | 勤怠管理{% endblock %}
+{% block screen_label %}管理者｜修正申請{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/management-phase9.css' %}">
+{% endblock %}
+
+{% block content %}
+
+<div class="admin-page">
+
+    <header class="admin-heading">
+        <h1>修正申請</h1>
+        <p>社員から提出された申請を確認します。</p>
+    </header>
+
+    <section class="ui-card admin-section">
+
+        <form method="get" class="admin-search">
+            <div>
+                <label for="review-status">申請状態</label>
+                <select id="review-status" name="status">
+                    <option value="all"
+                      {% if status_filter == "all" %}selected{% endif %}>すべて</option>
+                    <option value="pending"
+                      {% if status_filter == "pending" %}selected{% endif %}>審査中</option>
+                    <option value="approved"
+                      {% if status_filter == "approved" %}selected{% endif %}>承認済み</option>
+                    <option value="returned"
+                      {% if status_filter == "returned" %}selected{% endif %}>差戻し</option>
+                    <option value="withdrawn"
+                      {% if status_filter == "withdrawn" %}selected{% endif %}>取下げ済み</option>
+                </select>
+            </div>
+
+            <button type="submit"
+                    class="ui-button ui-button--primary">
+                絞り込む
+            </button>
+        </form>
+
+    </section>
+
+    <section class="ui-card admin-section">
+        <h2>申請一覧</h2>
+
+        <div class="table-scroll" role="region"
+             aria-label="修正申請一覧" tabindex="0">
+            <table class="ui-table admin-table">
+                <thead>
+                    <tr>
+                        <th scope="col">申請日時</th>
+                        <th scope="col">社員番号</th>
+                        <th scope="col">氏名</th>
+                        <th scope="col">勤務日</th>
+                        <th scope="col">申請状態</th>
+                        <th scope="col">詳細</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                {% for item in page_obj %}
+                    <tr>
+                        <td>{{ item.created_at|date:"Y/m/d H:i" }}</td>
+                        <td>{{ item.requested_by.employee_number }}</td>
+                        <td>{{ item.requested_by.get_full_name }}</td>
+                        <td>{{ item.work_session.work_date|date:"Y/m/d" }}</td>
+                        <td>{{ item.get_status_display }}</td>
+                        <td>
+                            <a href="{% url 'management:correction_detail' item.pk %}">
+                                審査詳細
+                            </a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="6">該当する申請はありません。</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <nav class="admin-pagination" aria-label="ページ切替">
+            {% if page_obj.has_previous %}
+            <a href="?status={{ status_filter }}&amp;page={{ page_obj.previous_page_number }}">前へ</a>
+            {% endif %}
+            <span>{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+            {% if page_obj.has_next %}
+            <a href="?status={{ status_filter }}&amp;page={{ page_obj.next_page_number }}">次へ</a>
+            {% endif %}
+        </nav>
+    </section>
+
+</div>
+
+{% endblock %}

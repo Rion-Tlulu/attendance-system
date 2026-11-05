@@ -1,0 +1,118 @@
+
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}修正申請の審査 | 勤怠管理{% endblock %}
+{% block screen_label %}管理者｜申請審査{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/management-phase9.css' %}">
+{% endblock %}
+
+{% block content %}
+
+<div class="admin-page">
+
+    <header class="admin-heading">
+        <h1>修正申請の審査</h1>
+        <p>
+            {{ correction.requested_by.get_full_name }}
+            （{{ correction.requested_by.employee_number }}）
+            ／{{ correction.work_session.work_date|date:"Y/m/d" }}
+        </p>
+    </header>
+
+    <section class="ui-card admin-section">
+        <h2>申請情報</h2>
+
+        <dl class="admin-detail-list">
+            <div>
+                <dt>申請状態</dt>
+                <dd>{{ correction.get_status_display }}</dd>
+            </div>
+
+            <div>
+                <dt>申請理由</dt>
+                <dd>{{ correction.reason|linebreaksbr }}</dd>
+            </div>
+
+            <div>
+                <dt>勤務データ版</dt>
+                <dd>{{ correction.original_version }}</dd>
+            </div>
+        </dl>
+    </section>
+
+    <section class="ui-card admin-section">
+        <h2>申請された修正案</h2>
+
+        <dl class="admin-detail-list">
+            <div>
+                <dt>出勤</dt>
+                <dd>{{ correction.proposal.clock_in_at|default:"未設定" }}</dd>
+            </div>
+            <div>
+                <dt>退勤</dt>
+                <dd>{{ correction.proposal.clock_out_at|default:"未設定" }}</dd>
+            </div>
+        </dl>
+
+        <h3>休憩</h3>
+
+        {% for rest in correction.proposal.breaks %}
+        <p>
+            休憩{{ forloop.counter }}：
+            {{ rest.started_at }} 〜 {{ rest.ended_at }}
+        </p>
+        {% empty %}
+        <p>休憩の設定はありません。</p>
+        {% endfor %}
+    </section>
+
+    {% if can_review %}
+
+    <section class="ui-card admin-section">
+        <h2>審査操作</h2>
+
+        <p class="admin-warning">
+            承認すると勤務の有効値が変更されます。
+            原打刻は変更されません。
+        </p>
+
+        <form method="post"
+              action="{% url 'management:correction_review' correction.pk %}">
+            {% csrf_token %}
+
+            <fieldset class="admin-review-options">
+                <legend>審査結果</legend>
+                {{ form.action }}
+            </fieldset>
+
+            <div class="admin-field">
+                {{ form.return_reason.label_tag }}
+                {{ form.return_reason }}
+                <p>差戻しを選ぶ場合は理由が必須です（500文字以内）。</p>
+            </div>
+
+            <button type="submit"
+                    class="ui-button ui-button--primary">
+                審査結果を確定する
+            </button>
+        </form>
+    </section>
+
+    {% elif correction.requested_by_id == request.user.pk %}
+
+    <p class="admin-warning">
+        自分自身の修正申請は承認・差戻しできません。
+    </p>
+
+    {% endif %}
+
+    <a href="{% url 'management:corrections' %}">
+        申請一覧へ戻る
+    </a>
+
+</div>
+
+{% endblock %}

@@ -1,0 +1,109 @@
+
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}社員管理 | 勤怠管理{% endblock %}
+{% block screen_label %}管理者｜社員管理{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/management-phase9.css' %}">
+{% endblock %}
+
+{% block content %}
+
+<div class="admin-page">
+
+    <header class="admin-heading">
+        <h1>社員管理</h1>
+        <p>社員アカウントの登録情報を管理します。</p>
+    </header>
+
+    <section class="ui-card admin-section">
+
+        <div class="admin-section-heading">
+            <h2>社員一覧</h2>
+
+            <a class="ui-button ui-button--primary"
+               href="{% url 'management:employee_create' %}">
+                社員を登録
+            </a>
+        </div>
+
+        <form method="get" class="admin-search">
+            <div>
+                <label for="employee-search">
+                    社員番号・氏名
+                </label>
+                <input type="search"
+                       id="employee-search"
+                       name="q"
+                       value="{{ keyword }}"
+                       maxlength="100">
+            </div>
+
+            <button class="ui-button ui-button--secondary"
+                    type="submit">検索</button>
+        </form>
+
+        <div class="table-scroll" role="region"
+             aria-label="社員一覧" tabindex="0">
+            <table class="ui-table admin-table">
+                <thead>
+                    <tr>
+                        <th scope="col">社員番号</th>
+                        <th scope="col">氏名</th>
+                        <th scope="col">所属</th>
+                        <th scope="col">状態</th>
+                        <th scope="col">権限</th>
+                        <th scope="col">編集</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                {% for employee in page_obj %}
+                    <tr>
+                        <td>{{ employee.employee_number }}</td>
+                        <td>{{ employee.get_full_name }}</td>
+                        <td>{{ employee.department|default:"未設定" }}</td>
+                        <td>
+                            {% if employee.is_active %}
+                            利用中
+                            {% else %}
+                            利用停止
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if employee.is_business_admin %}
+                            業務管理者
+                            {% else %}
+                            一般社員
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{% url 'management:employee_edit' employee.pk %}">
+                                編集
+                            </a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="6">社員が見つかりません。</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <nav class="admin-pagination" aria-label="ページ切替">
+            {% if page_obj.has_previous %}
+            <a href="?q={{ keyword|urlencode }}&amp;page={{ page_obj.previous_page_number }}">前へ</a>
+            {% endif %}
+            <span>{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+            {% if page_obj.has_next %}
+            <a href="?q={{ keyword|urlencode }}&amp;page={{ page_obj.next_page_number }}">次へ</a>
+            {% endif %}
+        </nav>
+
+    </section>
+
+</div>
+
+{% endblock %}

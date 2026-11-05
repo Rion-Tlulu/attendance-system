@@ -15,46 +15,53 @@
 
     {% if request.resolver_match.namespace == "management" %}
 
-        <a href="{% url 'management:home' %}"
-           class="side-link side-link--current"
-           aria-current="page">
-            <i class="fa-solid fa-list"
-               aria-hidden="true"></i>
-            <span>管理者ホーム</span>
-        </a>
+        {% with current=request.resolver_match.view_name %}
 
-        <span class="side-link side-link--planned">
-            <i class="fa-solid fa-file-lines"
-               aria-hidden="true"></i>
-            <span>修正申請（準備中）</span>
-        </span>
+<a href="{% url 'management:home' %}"
+   class="side-link">
+    <i class="fa-solid fa-house" aria-hidden="true"></i>
+    <span>管理者ホーム</span>
+</a>
 
-        <span class="side-link side-link--planned">
-            <i class="fa-solid fa-users"
-               aria-hidden="true"></i>
-            <span>社員管理（準備中）</span>
-        </span>
+<a href="{% url 'management:attendance_list' %}"
+   class="side-link {% if current == 'management:attendance_list' or current == 'management:employee_month' %}side-link--current{% endif %}">
+    <i class="fa-solid fa-calendar-days" aria-hidden="true"></i>
+    <span>勤怠一覧</span>
+</a>
 
-        <span class="side-link side-link--planned">
-            <i class="fa-solid fa-file-csv"
-               aria-hidden="true"></i>
-            <span>月次確定・出力（準備中）</span>
-        </span>
+<a href="{% url 'management:corrections' %}"
+   class="side-link {% if current == 'management:corrections' or current == 'management:correction_detail' %}side-link--current{% endif %}">
+    <i class="fa-solid fa-file-circle-check" aria-hidden="true"></i>
+    <span>修正申請</span>
+</a>
 
-        <span class="side-link side-link--planned">
-            <i class="fa-solid fa-clock-rotate-left"
-               aria-hidden="true"></i>
-            <span>操作履歴（準備中）</span>
-        </span>
+<a href="{% url 'management:employees' %}"
+   class="side-link {% if current == 'management:employees' or current == 'management:employee_create' or current == 'management:employee_edit' %}side-link--current{% endif %}">
+    <i class="fa-solid fa-users" aria-hidden="true"></i>
+    <span>社員管理</span>
+</a>
 
-        <div class="side-separator"></div>
+<a href="{% url 'management:attendance_list' %}"
+   class="side-link">
+    <i class="fa-solid fa-file-csv" aria-hidden="true"></i>
+    <span>月次確定・出力</span>
+</a>
 
-        <a href="{% url 'attendance:home' %}"
-           class="side-link">
-            <i class="fa-solid fa-arrow-left"
-               aria-hidden="true"></i>
-            <span>社員画面へ</span>
-        </a>
+<a href="{% url 'management:audit_history' %}"
+   class="side-link {% if current == 'management:audit_history' or current == 'management:audit_detail' %}side-link--current{% endif %}">
+    <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i>
+    <span>操作履歴</span>
+</a>
+
+<div class="side-separator"></div>
+
+<a href="{% url 'attendance:home' %}"
+   class="side-link">
+    <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+    <span>社員画面へ</span>
+</a>
+
+{% endwith %}
 
     {% else %}
 

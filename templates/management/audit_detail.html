@@ -1,0 +1,65 @@
+
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}操作履歴詳細 | 勤怠管理{% endblock %}
+{% block screen_label %}管理者｜操作履歴詳細{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/management-phase9.css' %}">
+{% endblock %}
+
+{% block content %}
+
+<div class="admin-page">
+
+    <header class="admin-heading">
+        <h1>操作履歴詳細</h1>
+        <p>履歴番号：{{ item.pk }}</p>
+    </header>
+
+    <section class="ui-card admin-section">
+        <h2>{{ item.get_action_display }}</h2>
+
+        <dl class="admin-detail-list">
+            <div>
+                <dt>操作実行者</dt>
+                <dd>{{ item.actor.employee_number|default:"—" }}</dd>
+            </div>
+            <div>
+                <dt>対象社員</dt>
+                <dd>{{ item.target_employee.employee_number|default:"—" }}</dd>
+            </div>
+            <div>
+                <dt>対象モデル</dt>
+                <dd>{{ item.target_model }}</dd>
+            </div>
+            <div>
+                <dt>対象ID</dt>
+                <dd>{{ item.target_id }}</dd>
+            </div>
+            <div>
+                <dt>操作理由</dt>
+                <dd>{{ item.reason|default:"—" }}</dd>
+            </div>
+        </dl>
+    </section>
+
+    <section class="ui-card admin-section">
+        <h2>変更前</h2>
+        <pre class="admin-audit-data">{{ item.before_data }}</pre>
+
+        <h2>変更後</h2>
+        <pre class="admin-audit-data">{{ item.after_data }}</pre>
+
+        <h2>補足情報</h2>
+        <pre class="admin-audit-data">{{ item.details }}</pre>
+    </section>
+
+    <a href="{% url 'management:audit_history' %}">
+        操作履歴一覧へ戻る
+    </a>
+
+</div>
+
+{% endblock %}

@@ -1,0 +1,116 @@
+
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}管理者勤怠一覧 | 勤怠管理{% endblock %}
+{% block screen_label %}管理者｜勤怠一覧{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/management-phase9.css' %}">
+{% endblock %}
+
+{% block content %}
+
+<div class="admin-page">
+
+    <header class="admin-heading">
+        <h1>勤怠一覧</h1>
+        <p>対象月と社員を指定して勤怠状況を確認できます。</p>
+    </header>
+
+    <section class="ui-card admin-section">
+        <h2>検索条件</h2>
+
+        <form method="get" class="admin-search">
+            <div>
+                <label for="{{ form.month.id_for_label }}">
+                    対象月
+                </label>
+                {{ form.month }}
+                {{ form.month.errors }}
+            </div>
+
+            <div>
+                <label for="employee-keyword">
+                    社員番号・氏名
+                </label>
+                <input id="employee-keyword"
+                       type="search"
+                       name="q"
+                       value="{{ keyword|default:'' }}"
+                       maxlength="100">
+            </div>
+
+            <button type="submit"
+                    class="ui-button ui-button--primary">
+                検索
+            </button>
+        </form>
+    </section>
+
+    {% if page_obj %}
+    <section class="ui-card admin-section">
+        <h2>社員別の勤怠状況</h2>
+
+        <div class="table-scroll" role="region"
+             aria-label="社員別勤怠一覧" tabindex="0">
+            <table class="ui-table admin-table">
+                <thead>
+                    <tr>
+                        <th scope="col">社員番号</th>
+                        <th scope="col">氏名</th>
+                        <th scope="col">実働合計</th>
+                        <th scope="col">未完了</th>
+                        <th scope="col">審査中</th>
+                        <th scope="col">月次状態</th>
+                        <th scope="col">詳細</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                {% for entry in entries %}
+                    <tr>
+                        <td>{{ entry.employee.employee_number }}</td>
+                        <td>{{ entry.employee.get_full_name }}</td>
+                        <td>{{ entry.report.work_display }}</td>
+                        <td>{{ entry.report.incomplete_count }}件</td>
+                        <td>{{ entry.report.pending_count }}件</td>
+                        <td>
+                            {% if entry.report.is_finalized %}
+                                <span class="admin-state admin-state--success">確定済み</span>
+                            {% else %}
+                                <span class="admin-state">未確定</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{% url 'management:employee_month' entry.employee.pk entry.report.month.year entry.report.month.month %}">
+                                詳細を見る
+                            </a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="7">該当する社員はいません。</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <nav class="admin-pagination" aria-label="ページ切替">
+            {% if page_obj.has_previous %}
+            <a href="?month={{ month_query }}&amp;q={{ keyword|urlencode }}&amp;page={{ page_obj.previous_page_number }}">前へ</a>
+            {% endif %}
+
+            <span>{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+
+            {% if page_obj.has_next %}
+            <a href="?month={{ month_query }}&amp;q={{ keyword|urlencode }}&amp;page={{ page_obj.next_page_number }}">次へ</a>
+            {% endif %}
+        </nav>
+    </section>
+    {% endif %}
+
+</div>
+
+{% endblock %}

@@ -1,0 +1,69 @@
+
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}社員情報 | 勤怠管理{% endblock %}
+{% block screen_label %}管理者｜社員管理{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/management-phase9.css' %}">
+{% endblock %}
+
+{% block content %}
+
+<div class="admin-page">
+
+    <header class="admin-heading">
+        <h1>
+            {% if creating %}社員の新規登録{% else %}社員情報の編集{% endif %}
+        </h1>
+    </header>
+
+    <section class="ui-card admin-section admin-form-card">
+        <form method="post">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+            <div role="alert">{{ form.non_field_errors }}</div>
+            {% endif %}
+
+            {% if not creating %}
+            <p>
+                <strong>社員番号：</strong>
+                {{ employee.employee_number }}
+            </p>
+            {% endif %}
+
+            {% for field in form %}
+            <div class="admin-field">
+                {{ field.label_tag }}
+                {{ field }}
+                {{ field.errors }}
+            </div>
+            {% endfor %}
+
+            {% if creating %}
+            <p class="admin-warning">
+                新しい社員は一般社員として登録されます。
+                初回ログイン用パスワードは安全な方法で
+                本人に伝え、初回変更を行ってください。
+            </p>
+            {% endif %}
+
+            <div class="admin-actions">
+                <a href="{% url 'management:employees' %}"
+                   class="ui-button ui-button--secondary">
+                    戻る
+                </a>
+
+                <button type="submit"
+                        class="ui-button ui-button--primary">
+                    {% if creating %}社員を登録する{% else %}変更を保存する{% endif %}
+                </button>
+            </div>
+        </form>
+    </section>
+
+</div>
+
+{% endblock %}

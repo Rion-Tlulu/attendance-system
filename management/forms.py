@@ -1,0 +1,139 @@
+"""管理者用フォーム。"""
+
+from django import forms
+from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
+
+# Djangoのカスタム社員モデルを取得
+Employee = get_user_model()
+
+
+# ==========================================
+# 修正申請の審査フォーム
+# ==========================================
+
+
+class ReviewForm(forms.Form):
+    """承認・差戻しの入力フォーム。"""
+
+    action = forms.ChoiceField(
+        label="審査結果",
+        choices=[
+            ("approve", "承認する"),
+            ("return", "差し戻す"),
+        ],
+        widget=forms.RadioSelect,
+    )
+
+    return_reason = forms.CharField(
+        label="差戻し理由",
+        max_length=500,
+        required=False,
+        widget=forms.Textarea(
+            attrs={
+                "rows": 4,
+                "maxlength": 500,
+            }
+        ),
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+
+        action = cleaned_data.get("action")
+        return_reason = (cleaned_data.get("return_reason") or "").strip()
+
+        if action == "return" and not return_reason:
+            self.add_error(
+                "return_reason",
+                "差戻し理由を入力してください。",
+            )
+
+        cleaned_data["return_reason"] = return_reason
+
+        return cleaned_data
+
+
+# ==========================================
+# 月次確定の確認フォーム
+# ==========================================
+
+
+class MonthClosingForm(forms.Form):
+    """記録なしの日の照合確認。"""
+
+    checked_no_record = forms.BooleanField(
+        label=(
+            "記録なしの日について、"
+            "勤務予定や休暇等の情報と"
+            "照合したことを確認しました"
+        ),
+        required=True,
+    )
+
+
+# ==========================================
+# 社員モデルのフィールド確認
+# ==========================================
+
+employee_field_names = {field.name for field in Employee._meta.fields}
+
+profile_fields = [
+    name
+    for name in (
+        "first_name",
+        "last_name",
+        "department",
+    )
+    if name in employee_field_names
+]
+
+
+# ==========================================
+# 社員登録フォーム
+# ==========================================
+
+
+class EmployeeCreateForm(forms.ModelForm):
+    """一般社員の新規登録フォーム。"""
+
+    temporary_password = forms.CharField(
+        label="初回ログイン用パスワード",
+        strip=False,
+        widget=forms.PasswordInput,
+    )
+
+    class Meta:
+        model = Employee
+        fields = [
+            "employee_number",
+            *profile_fields,
+        ]
+
+    def clean_temporary_password(self):
+        password = self.cleaned_data["temporary_password"]
+
+        try:
+            validate_password(password)
+
+        except ValidationError as exc:
+            raise forms.ValidationError(exc.messages) from exc
+
+        return password
+
+
+# ==========================================
+# 社員情報編集フォーム
+# ==========================================
+
+
+class EmployeeEditForm(forms.ModelForm):
+    """社員の基本情報を編集するフォーム。"""
+
+    class Meta:
+        model = Employee
+        fields = [
+            *profile_fields,
+            "is_active",
+        ]

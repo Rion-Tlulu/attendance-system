@@ -1,0 +1,91 @@
+
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}操作履歴 | 勤怠管理{% endblock %}
+{% block screen_label %}管理者｜操作履歴{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/management-phase9.css' %}">
+{% endblock %}
+
+{% block content %}
+
+<div class="admin-page">
+
+    <header class="admin-heading">
+        <h1>操作履歴</h1>
+        <p>管理者操作と勤怠修正の監査記録です。</p>
+    </header>
+
+    <section class="ui-card admin-section">
+
+        <form method="get" class="admin-search">
+            <div>
+                <label for="audit-action">操作種別</label>
+
+                <select id="audit-action" name="action">
+                    <option value="">すべて</option>
+                    {% for value, label in actions %}
+                    <option value="{{ value }}"
+                      {% if selected_action == value %}selected{% endif %}>
+                        {{ label }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <button class="ui-button ui-button--primary"
+                    type="submit">検索</button>
+        </form>
+
+        <div class="table-scroll" role="region"
+             aria-label="操作履歴一覧" tabindex="0">
+            <table class="ui-table admin-table">
+                <thead>
+                    <tr>
+                        <th scope="col">履歴ID</th>
+                        <th scope="col">操作種別</th>
+                        <th scope="col">実行者</th>
+                        <th scope="col">対象社員</th>
+                        <th scope="col">詳細</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                {% for item in page_obj %}
+                    <tr>
+                        <td>{{ item.pk }}</td>
+                        <td>{{ item.get_action_display }}</td>
+                        <td>{{ item.actor.employee_number|default:"—" }}</td>
+                        <td>{{ item.target_employee.employee_number|default:"—" }}</td>
+                        <td>
+                            <a href="{% url 'management:audit_detail' item.pk %}">
+                                内容を見る
+                            </a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="5">操作履歴はありません。</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <nav class="admin-pagination" aria-label="ページ切替">
+            {% if page_obj.has_previous %}
+            <a href="?action={{ selected_action }}&amp;page={{ page_obj.previous_page_number }}">前へ</a>
+            {% endif %}
+            <span>{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+            {% if page_obj.has_next %}
+            <a href="?action={{ selected_action }}&amp;page={{ page_obj.next_page_number }}">次へ</a>
+            {% endif %}
+        </nav>
+
+    </section>
+
+</div>
+
+{% endblock %}

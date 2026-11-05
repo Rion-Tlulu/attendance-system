@@ -1,0 +1,388 @@
+/* ========================================
+   Phase 9 管理者画面
+   濃紺・青色・白色
+======================================== */
+
+.admin-page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+
+  width: 100%;
+  min-width: 0;
+  margin: 0 auto;
+
+  color: #142541;
+}
+
+.admin-heading h1 {
+  margin: 0 0 8px;
+  font-size: clamp(1.35rem, 2.5vw, 1.9rem);
+}
+
+.admin-heading p {
+  margin: 0;
+  color: #46556c;
+}
+
+.admin-section {
+  padding: 22px;
+  min-width: 0;
+  border-radius: 12px;
+}
+
+.admin-section h2 {
+  margin: 0 0 16px;
+  font-size: 1.15rem;
+}
+
+.admin-section h3 {
+  margin-top: 20px;
+  font-size: 1rem;
+}
+
+.admin-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.admin-search {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 14px;
+
+  margin-bottom: 18px;
+}
+
+.admin-search > div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 180px;
+  flex: 1 1 180px;
+}
+
+.admin-search label,
+.admin-field label {
+  font-weight: 700;
+}
+
+.admin-search input,
+.admin-search select,
+.admin-field input,
+.admin-field select,
+.admin-field textarea,
+.admin-closing-form textarea {
+  width: 100%;
+  min-height: 48px;
+
+  padding: 10px 12px;
+
+  border: 1px solid #889bb2;
+  border-radius: 8px;
+
+  background: white;
+  color: #142541;
+}
+
+.admin-field textarea,
+.admin-closing-form textarea {
+  min-height: 110px;
+  resize: vertical;
+}
+
+.admin-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-bottom: 18px;
+}
+
+.admin-field p {
+  margin: 0;
+  color: #46556c;
+  font-size: 0.87rem;
+}
+
+/* 一覧表 */
+
+.admin-page .table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+}
+
+.admin-table {
+  min-width: 790px;
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 13px 11px;
+  text-align: left;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.admin-table th {
+  background: #eaf1fa;
+  font-weight: 700;
+}
+
+.admin-table tbody tr:hover {
+  background: #f3f7fc;
+}
+
+.admin-page a {
+  text-underline-offset: 3px;
+}
+
+/* 集計カード */
+
+.admin-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.admin-summary > section {
+  padding: 18px;
+  min-width: 0;
+}
+
+.admin-summary h2 {
+  margin: 0 0 10px;
+  font-size: 0.9rem;
+  color: #46556c;
+}
+
+.admin-summary strong {
+  font-size: clamp(1.1rem, 2vw, 1.7rem);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+/* 状態ラベル */
+
+.admin-state {
+  display: inline-flex;
+  align-items: center;
+
+  min-height: 30px;
+  padding: 5px 12px;
+
+  border-radius: 999px;
+  background: #edf0f5;
+  color: #35445b;
+
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.admin-state--success {
+  background: #dff3e6;
+  color: #155b32;
+}
+
+/* 詳細 */
+
+.admin-detail-list {
+  margin: 0;
+}
+
+.admin-detail-list > div {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr);
+  gap: 14px;
+
+  padding: 14px 0;
+  border-bottom: 1px solid #d4dde9;
+}
+
+.admin-detail-list dt {
+  font-weight: 700;
+  color: #46556c;
+}
+
+.admin-detail-list dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* 承認・確定 */
+
+.admin-warning {
+  padding: 14px 16px;
+  margin: 14px 0;
+
+  border: 1px solid #d9bc76;
+  border-radius: 8px;
+
+  background: #fff6e3;
+  color: #704600;
+}
+
+.admin-review-options {
+  padding: 14px;
+  margin: 14px 0;
+
+  border: 1px solid #c8d2e0;
+  border-radius: 8px;
+}
+
+.admin-review-options label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+
+  min-height: 44px;
+  margin-right: 18px;
+  cursor: pointer;
+}
+
+.admin-closing-form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+
+  margin-top: 18px;
+}
+
+.admin-closing-form label {
+  font-weight: 700;
+}
+
+.admin-closing-form textarea {
+  max-width: 650px;
+}
+
+.admin-closing-form button {
+  min-height: 48px;
+}
+
+.admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.admin-form-card {
+  max-width: 760px;
+}
+
+/* ページ切替 */
+
+.admin-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+
+  margin-top: 20px;
+}
+
+.admin-pagination a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  min-height: 44px;
+  padding: 8px 15px;
+
+  border: 1px solid #075ed8;
+  border-radius: 8px;
+
+  color: #075ed8;
+  background: white;
+
+  text-decoration: none;
+  font-weight: 700;
+}
+
+/* 監査履歴 */
+
+.admin-audit-data {
+  max-width: 100%;
+  overflow-x: auto;
+
+  padding: 16px;
+
+  border: 1px solid #d2dce8;
+  border-radius: 8px;
+
+  background: #f3f7fb;
+  color: #142541;
+
+  font-size: 0.87rem;
+  line-height: 1.7;
+
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* タブレット */
+
+@media (max-width: 1100px) {
+  .admin-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* スマートフォン */
+
+@media (max-width: 767px) {
+  .admin-section {
+    padding: 15px;
+  }
+
+  .admin-search {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-search > div {
+    width: 100%;
+    flex: 0 1 auto;
+  }
+
+  .admin-summary {
+    gap: 8px;
+  }
+
+  .admin-summary > section {
+    padding: 12px;
+  }
+
+  .admin-summary strong {
+    font-size: 1.15rem;
+  }
+
+  .admin-detail-list > div {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+
+  .admin-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-actions .ui-button,
+  .admin-actions button {
+    width: 100%;
+  }
+
+  .admin-closing-form {
+    align-items: stretch;
+  }
+}

@@ -65,35 +65,11 @@
             </a>
 
             {% if request.user.is_business_admin %}
-
-            <a href="{% url 'management:home' %}">
-                管理者画面へ
-            </a>
-
-            <a href="{% url 'attendance:home' %}">
-                社員画面へ
-            </a>
-            <a href="{% url 'corrections:list' %}">
-    <i class="fa-solid fa-file-pen"
-       aria-hidden="true"></i>
-    修正申請・申請履歴
-</a>
-
-
-<a href="{% url 'accounts:overview' %}">
-    <i class="fa-solid fa-user-gear"
-       aria-hidden="true"></i>
-    アカウントと使い方
-</a>
-
-<a href="{% url 'accounts:guide' %}">
-    <i class="fa-solid fa-book-open"
-       aria-hidden="true"></i>
-    使い方ガイド
-</a>
-
-
-            {% endif %}
+<a href="{% url 'management:attendance_list' %}">勤怠一覧</a>
+<a href="{% url 'management:corrections' %}">修正申請の審査</a>
+<a href="{% url 'management:employees' %}">社員管理</a>
+<a href="{% url 'management:audit_history' %}">操作履歴</a>
+{% endif %}
 
             <form method="post"
                   action="{% url 'accounts:logout' %}">
