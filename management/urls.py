@@ -43,10 +43,11 @@ urlpatterns = [
         views.employee_create,
         name="employee_create",
     ),
+    # 社員情報の編集
     path(
         "employees/<int:employee_id>/edit/",
-        views.employee_month,
-        name="employee_month",
+        views.employee_edit,
+        name="employee_edit",
     ),
     # 社員別月次詳細
     path(
