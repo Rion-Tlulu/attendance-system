@@ -636,6 +636,7 @@ def _csv_safe(value):
 
 @never_cache
 @business_admin_required
+@require_POST
 @transaction.atomic
 def month_csv(request, employee_id, year, month):
     """確定済みの月次勤怠をCSV出力する"""

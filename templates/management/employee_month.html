@@ -65,10 +65,24 @@
 
         {% elif report.is_finalized %}
 
-        <a class="ui-button ui-button--primary"
-           href="{% url 'management:month_csv' employee.pk report.month.year report.month.month %}">
-            CSVを出力する
-        </a>
+        <form
+    method="post"
+    action="{% url 'management:month_csv' employee.pk report.month.year report.month.month %}"
+    class="admin-csv-form"
+>
+    {% csrf_token %}
+
+    <button
+        type="submit"
+        class="ui-button ui-button--primary"
+    >
+        <i
+            class="fa-solid fa-file-csv"
+            aria-hidden="true"
+        ></i>
+        確定済みCSVを出力する
+    </button>
+</form>
 
         <form method="post"
               action="{% url 'management:month_reopen' employee.pk report.month.year report.month.month %}"

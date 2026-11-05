@@ -83,7 +83,7 @@ class Phase9Tests(TestCase):
         )
 
     def test_anonymous_admin_access_redirected(self):
-        response = self.client.get(reverse("management:attendance_list"))
+        response = self.client.post(reverse("management:attendance_list"))
 
         self.assertEqual(response.status_code, 302)
 
@@ -337,7 +337,7 @@ class Phase9Tests(TestCase):
             ).exists()
         )
 
-        response = self.client.get(
+        response = self.client.post(
             reverse(
                 "management:month_csv",
                 args=[self.employee.pk, 2026, 9],
@@ -358,7 +358,7 @@ class Phase9Tests(TestCase):
     def test_unfinalized_month_csv_is_blocked(self):
         self.client.force_login(self.manager)
 
-        response = self.client.get(
+        response = self.client.post(
             reverse(
                 "management:month_csv",
                 args=[self.employee.pk, 2026, 9],
@@ -370,7 +370,7 @@ class Phase9Tests(TestCase):
     def test_regular_employee_cannot_download_csv(self):
         self.client.force_login(self.employee)
 
-        response = self.client.get(
+        response = self.client.post(
             reverse(
                 "management:month_csv",
                 args=[self.employee.pk, 2026, 9],
@@ -401,7 +401,10 @@ class Phase9Tests(TestCase):
             employee=self.employee,
             work_date=work_day,
             clock_in_at=datetime(
-                2026, 9, 16, 9,
+                2026,
+                9,
+                16,
+                9,
                 tzinfo=self.jst,
             ),
             status=WorkSession.Status.WORKING,
