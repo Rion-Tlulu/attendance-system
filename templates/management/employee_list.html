@@ -1,109 +1,667 @@
 
 {% extends "base.html" %}
-{% load static %}
+{% load static a03_directory %}
 
-{% block title %}社員管理 | 勤怠管理{% endblock %}
-{% block screen_label %}管理者｜社員管理{% endblock %}
+{% block title %}
+社員管理 | 勤怠管理
+{% endblock %}
+
+{% block screen_label %}
+管理者｜社員管理
+{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/management-phase9.css' %}">
+<link
+    rel="stylesheet"
+    href="{% static 'css/a03-v2.css' %}"
+>
 {% endblock %}
 
 {% block content %}
 
-<div class="admin-page">
+{% a03_directory as a03 %}
 
-    <header class="admin-heading">
-        <h1>社員管理</h1>
-        <p>社員アカウントの登録情報を管理します。</p>
-    </header>
+{% if a03.allowed %}
 
-    <section class="ui-card admin-section">
+<div class="a03-page">
 
-        <div class="admin-section-heading">
-            <h2>社員一覧</h2>
+    <!-- ======================================
+         ページ見出し
+    ======================================= -->
+    <header class="a03-heading">
 
-            <a class="ui-button ui-button--primary"
-               href="{% url 'management:employee_create' %}">
-                社員を登録
-            </a>
+        <div>
+            <p class="a03-eyebrow">
+                MANAGEMENT / EMPLOYEES
+            </p>
+
+            <h1>
+                <i
+                    class="fa-solid fa-users"
+                    aria-hidden="true"
+                ></i>
+                社員管理
+            </h1>
+
+            <p>
+                社員情報・部署・業務権限・利用状態を
+                確認できます。
+            </p>
         </div>
 
-        <form method="get" class="admin-search">
-            <div>
-                <label for="employee-search">
-                    社員番号・氏名
-                </label>
-                <input type="search"
-                       id="employee-search"
-                       name="q"
-                       value="{{ keyword }}"
-                       maxlength="100">
+        <a
+            href="{% url 'management:employee_create' %}"
+            class="a03-button a03-button--primary"
+        >
+            <i
+                class="fa-solid fa-user-plus"
+                aria-hidden="true"
+            ></i>
+            新しい社員を登録
+        </a>
+
+    </header>
+
+
+    <!-- ======================================
+         集計カード
+    ======================================= -->
+    <section
+        class="a03-summary-grid"
+        aria-label="社員管理の集計"
+    >
+
+        <article class="a03-summary-card">
+
+            <div class="a03-summary-icon a03-summary-icon--blue">
+                <i
+                    class="fa-solid fa-users"
+                    aria-hidden="true"
+                ></i>
             </div>
 
-            <button class="ui-button ui-button--secondary"
-                    type="submit">検索</button>
+            <div>
+                <h2>対象社員</h2>
+                <p>
+                    <strong>{{ a03.total_count }}</strong>
+                    <span>人</span>
+                </p>
+            </div>
+
+        </article>
+
+
+        <article class="a03-summary-card">
+
+            <div class="a03-summary-icon a03-summary-icon--green">
+                <i
+                    class="fa-solid fa-user-check"
+                    aria-hidden="true"
+                ></i>
+            </div>
+
+            <div>
+                <h2>有効アカウント</h2>
+                <p>
+                    <strong>{{ a03.active_count }}</strong>
+                    <span>人</span>
+                </p>
+            </div>
+
+        </article>
+
+
+        <article class="a03-summary-card">
+
+            <div class="a03-summary-icon a03-summary-icon--gray">
+                <i
+                    class="fa-solid fa-user-lock"
+                    aria-hidden="true"
+                ></i>
+            </div>
+
+            <div>
+                <h2>無効アカウント</h2>
+                <p>
+                    <strong>{{ a03.inactive_count }}</strong>
+                    <span>人</span>
+                </p>
+            </div>
+
+        </article>
+
+
+        <article class="a03-summary-card">
+
+            <div class="a03-summary-icon a03-summary-icon--purple">
+                <i
+                    class="fa-solid fa-shield-halved"
+                    aria-hidden="true"
+                ></i>
+            </div>
+
+            <div>
+                <h2>業務管理者</h2>
+                <p>
+                    <strong>{{ a03.manager_count }}</strong>
+                    <span>人</span>
+                </p>
+            </div>
+
+        </article>
+
+    </section>
+
+
+    <!-- ======================================
+         検索
+    ======================================= -->
+    <section
+        class="a03-panel"
+        aria-labelledby="a03-filter-title"
+    >
+
+        <div class="a03-section-heading">
+            <h2 id="a03-filter-title">
+                <i
+                    class="fa-solid fa-filter"
+                    aria-hidden="true"
+                ></i>
+                社員を検索・絞り込み
+            </h2>
+        </div>
+
+        <form
+            method="get"
+            action="{% url 'management:employee_list' %}"
+            class="a03-search-form"
+            role="search"
+        >
+
+            <div class="a03-field">
+                <label for="a03-q">
+                    社員番号・氏名
+                </label>
+
+                <input
+                    id="a03-q"
+                    name="q"
+                    type="search"
+                    value="{{ a03.filters.q }}"
+                    maxlength="100"
+                    placeholder="社員番号や名前で検索"
+                    autocomplete="off"
+                >
+            </div>
+
+
+            <div class="a03-field">
+                <label for="a03-department">
+                    部署
+                </label>
+
+                <select
+                    id="a03-department"
+                    name="department"
+                >
+                    <option value="">
+                        すべての部署
+                    </option>
+
+                    {% for department in a03.departments %}
+
+                    <option
+                        value="{{ department }}"
+                        {% if a03.filters.department == department %}
+                        selected
+                        {% endif %}
+                    >
+                        {{ department }}
+                    </option>
+
+                    {% endfor %}
+                </select>
+            </div>
+
+
+            <div class="a03-field">
+                <label for="a03-status">
+                    利用状態
+                </label>
+
+                <select
+                    id="a03-status"
+                    name="status"
+                >
+                    <option
+                        value="all"
+                        {% if a03.filters.status == "all" %}
+                        selected
+                        {% endif %}
+                    >
+                        すべて
+                    </option>
+
+                    <option
+                        value="active"
+                        {% if a03.filters.status == "active" %}
+                        selected
+                        {% endif %}
+                    >
+                        有効
+                    </option>
+
+                    <option
+                        value="inactive"
+                        {% if a03.filters.status == "inactive" %}
+                        selected
+                        {% endif %}
+                    >
+                        無効
+                    </option>
+                </select>
+            </div>
+
+
+            <div class="a03-field">
+                <label for="a03-role">
+                    業務権限
+                </label>
+
+                <select
+                    id="a03-role"
+                    name="role"
+                >
+                    <option
+                        value="all"
+                        {% if a03.filters.role == "all" %}
+                        selected
+                        {% endif %}
+                    >
+                        すべて
+                    </option>
+
+                    <option
+                        value="employee"
+                        {% if a03.filters.role == "employee" %}
+                        selected
+                        {% endif %}
+                    >
+                        一般社員
+                    </option>
+
+                    <option
+                        value="business_admin"
+                        {% if a03.filters.role == "business_admin" %}
+                        selected
+                        {% endif %}
+                    >
+                        業務管理者
+                    </option>
+                </select>
+            </div>
+
+
+            <div class="a03-search-actions">
+
+                <button
+                    type="submit"
+                    class="a03-button a03-button--primary"
+                >
+                    <i
+                        class="fa-solid fa-magnifying-glass"
+                        aria-hidden="true"
+                    ></i>
+                    検索
+                </button>
+
+                <a
+                    href="{% url 'management:employee_list' %}"
+                    class="a03-button a03-button--outline"
+                >
+                    条件をクリア
+                </a>
+
+            </div>
+
         </form>
 
-        <div class="table-scroll" role="region"
-             aria-label="社員一覧" tabindex="0">
-            <table class="ui-table admin-table">
+    </section>
+
+
+    <!-- ======================================
+         一覧
+    ======================================= -->
+    <section
+        class="a03-panel a03-list-panel"
+        aria-labelledby="a03-list-title"
+    >
+
+        <div class="a03-section-heading">
+
+            <div>
+                <h2 id="a03-list-title">
+                    社員一覧
+                </h2>
+
+                <p>
+                    該当 {{ a03.total_count }} 人
+                    ／1ページ最大25人
+                </p>
+            </div>
+
+            <span class="a03-page-count">
+                {{ a03.page_obj.number }}
+                /
+                {{ a03.page_obj.paginator.num_pages }}
+                ページ
+            </span>
+
+        </div>
+
+
+        <!-- PC：テーブル -->
+        <div
+            class="a03-table-scroll"
+            role="region"
+            aria-label="社員情報の一覧表"
+            tabindex="0"
+        >
+
+            <table class="a03-table">
+
                 <thead>
                     <tr>
-                        <th scope="col">社員番号</th>
-                        <th scope="col">氏名</th>
-                        <th scope="col">所属</th>
-                        <th scope="col">状態</th>
-                        <th scope="col">権限</th>
-                        <th scope="col">編集</th>
+                        <th scope="col">社員番号・氏名</th>
+                        <th scope="col">部署</th>
+                        <th scope="col">入社日</th>
+                        <th scope="col">退職日</th>
+                        <th scope="col">業務権限</th>
+                        <th scope="col">利用状態</th>
+                        <th scope="col">操作</th>
                     </tr>
                 </thead>
 
                 <tbody>
-                {% for employee in page_obj %}
+
+                    {% for row in a03.rows %}
+
                     <tr>
-                        <td>{{ employee.employee_number }}</td>
-                        <td>{{ employee.get_full_name }}</td>
-                        <td>{{ employee.department|default:"未設定" }}</td>
+
+                        <th scope="row">
+                            <div class="a03-employee-name">
+                                <strong>
+                                    {{ row.employee.get_full_name|default:"氏名未設定" }}
+                                </strong>
+                                <span>
+                                    {{ row.employee.employee_number }}
+                                </span>
+                            </div>
+                        </th>
+
                         <td>
-                            {% if employee.is_active %}
-                            利用中
+                            {{ row.department }}
+                        </td>
+
+                        <td>
+                            {% if row.hire_date %}
+                                {{ row.hire_date|date:"Y/m/d" }}
                             {% else %}
-                            利用停止
+                                —
                             {% endif %}
                         </td>
+
                         <td>
-                            {% if employee.is_business_admin %}
-                            業務管理者
+                            {% if row.leave_date %}
+                                {{ row.leave_date|date:"Y/m/d" }}
                             {% else %}
-                            一般社員
+                                —
                             {% endif %}
                         </td>
+
                         <td>
-                            <a href="{% url 'management:employee_edit' employee.pk %}">
-                                編集
-                            </a>
+                            {% if row.is_manager %}
+                                <span class="a03-state a03-state--manager">
+                                    管理者権限あり
+                                </span>
+                            {% else %}
+                                <span class="a03-state a03-state--regular">
+                                    一般社員
+                                </span>
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if row.is_active %}
+                                <span class="a03-state a03-state--active">
+                                    有効
+                                </span>
+                            {% else %}
+                                <span class="a03-state a03-state--inactive">
+                                    無効
+                                </span>
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            <div class="a03-row-actions">
+
+                                <a
+                                    href="{{ row.edit_url }}"
+                                    class="a03-action-link"
+                                >
+                                    社員情報
+                                </a>
+
+                                <a
+                                    href="{{ row.employment_url }}"
+                                    class="a03-action-link a03-action-link--outline"
+                                >
+                                    部署・在籍情報
+                                </a>
+
+                            </div>
+                        </td>
+
+                    </tr>
+
+                    {% empty %}
+
+                    <tr>
+                        <td
+                            colspan="7"
+                            class="a03-empty-cell"
+                        >
+                            検索条件に一致する社員がいません。
                         </td>
                     </tr>
-                {% empty %}
-                    <tr><td colspan="6">社員が見つかりません。</td></tr>
-                {% endfor %}
+
+                    {% endfor %}
+
                 </tbody>
+
             </table>
+
         </div>
 
-        <nav class="admin-pagination" aria-label="ページ切替">
-            {% if page_obj.has_previous %}
-            <a href="?q={{ keyword|urlencode }}&amp;page={{ page_obj.previous_page_number }}">前へ</a>
+
+        <!-- スマートフォン：カード -->
+        <div class="a03-mobile-list">
+
+            {% for row in a03.rows %}
+
+            <article class="a03-employee-card">
+
+                <header class="a03-employee-card__heading">
+
+                    <div>
+                        <h3>
+                            {{ row.employee.get_full_name|default:"氏名未設定" }}
+                        </h3>
+
+                        <p>
+                            社員番号：
+                            {{ row.employee.employee_number }}
+                        </p>
+                    </div>
+
+                    {% if row.is_active %}
+                        <span class="a03-state a03-state--active">
+                            有効
+                        </span>
+                    {% else %}
+                        <span class="a03-state a03-state--inactive">
+                            無効
+                        </span>
+                    {% endif %}
+
+                </header>
+
+                <dl class="a03-employee-card__data">
+
+                    <div>
+                        <dt>部署</dt>
+                        <dd>{{ row.department }}</dd>
+                    </div>
+
+                    <div>
+                        <dt>入社日</dt>
+                        <dd>
+                            {{ row.hire_date|date:"Y/m/d"|default:"—" }}
+                        </dd>
+                    </div>
+
+                    <div>
+                        <dt>退職日</dt>
+                        <dd>
+                            {{ row.leave_date|date:"Y/m/d"|default:"—" }}
+                        </dd>
+                    </div>
+
+                    <div>
+                        <dt>業務権限</dt>
+                        <dd>
+                            {% if row.is_manager %}
+                                管理者権限あり
+                            {% else %}
+                                一般社員
+                            {% endif %}
+                        </dd>
+                    </div>
+
+                </dl>
+
+                <div class="a03-card-actions">
+
+                    <a
+                        href="{{ row.edit_url }}"
+                        class="a03-button a03-button--primary"
+                    >
+                        社員情報を編集
+                    </a>
+
+                    <a
+                        href="{{ row.employment_url }}"
+                        class="a03-button a03-button--outline"
+                    >
+                        部署・在籍情報
+                    </a>
+
+                </div>
+
+            </article>
+
+            {% empty %}
+
+            <div class="a03-mobile-empty">
+                <i
+                    class="fa-solid fa-user-slash"
+                    aria-hidden="true"
+                ></i>
+
+                <p>
+                    検索条件に一致する社員がいません。
+                </p>
+            </div>
+
+            {% endfor %}
+
+        </div>
+
+
+        <!-- ページ切替 -->
+        <nav
+            class="a03-pagination"
+            aria-label="社員一覧のページ切替"
+        >
+
+            {% if a03.page_obj.has_previous %}
+            <a href="?{{ a03.previous_query }}">
+                <i
+                    class="fa-solid fa-chevron-left"
+                    aria-hidden="true"
+                ></i>
+                前へ
+            </a>
             {% endif %}
-            <span>{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
-            {% if page_obj.has_next %}
-            <a href="?q={{ keyword|urlencode }}&amp;page={{ page_obj.next_page_number }}">次へ</a>
+
+            <span aria-current="page">
+                {{ a03.page_obj.number }}
+                /
+                {{ a03.page_obj.paginator.num_pages }}
+            </span>
+
+            {% if a03.page_obj.has_next %}
+            <a href="?{{ a03.next_query }}">
+                次へ
+                <i
+                    class="fa-solid fa-chevron-right"
+                    aria-hidden="true"
+                ></i>
+            </a>
             {% endif %}
+
         </nav>
 
     </section>
 
+
+    <!-- 補足 -->
+    <aside
+        class="a03-info"
+        aria-label="社員管理の注意事項"
+    >
+        <i
+            class="fa-solid fa-circle-info"
+            aria-hidden="true"
+        ></i>
+
+        <div>
+            <p>
+                アカウントを無効にしても、
+                過去の勤怠記録と申請履歴は保持されます。
+            </p>
+
+            <p>
+                業務管理者の権限変更や利用状態の変更は、
+                社員情報の編集画面から行います。
+            </p>
+
+            <p>
+                初期パスワードや再設定用の認証情報は、
+                この一覧には表示しません。
+            </p>
+        </div>
+    </aside>
+
 </div>
+
+{% else %}
+
+<div class="a03-access-denied" role="alert">
+    この画面を表示する権限がありません。
+</div>
+
+{% endif %}
 
 {% endblock %}
