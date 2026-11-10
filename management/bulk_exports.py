@@ -25,9 +25,10 @@ from django.shortcuts import render
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
 
-from attendance.models import MonthlyClosing
+from attendance.models import MonthlyClosing, WorkSession
 from attendance.reporting import build_monthly_report
 from auditlog.models import AuditLog
+from django.utils import timezone
 
 from .access import business_admin_required
 from .models import EmploymentInfo
@@ -60,6 +61,11 @@ def csv_safe(value):
         return "'" + text
 
     return text
+
+
+def csv_datetime(value):
+    """日時を日本時間の給与連携形式へ変換する。"""
+    return timezone.localtime(value).strftime("%Y-%m-%d %H:%M:%S") if value else ""
 
 
 # ============================================
@@ -276,12 +282,13 @@ def write_csv(
                 "氏名",
                 "部署",
                 "勤務日",
-                "出勤",
-                "退勤",
-                "休憩",
-                "実働",
+                "出勤日時",
+                "退勤日時",
+                "休憩秒数",
+                "実働秒数",
                 "記録状態",
-                "修正状態",
+                "確定状態",
+                "データ版",
             ]
         )
 
@@ -293,9 +300,12 @@ def write_csv(
                 "氏名",
                 "部署",
                 "対象月",
+                "勤務記録日数",
                 "実働秒数",
                 "休憩秒数",
-                "確定状態",
+                "未完了件数",
+                "確定日時",
+                "データ版",
             ]
         )
 
@@ -323,6 +333,7 @@ def write_csv(
             csv_safe(employee.get_full_name()),
             csv_safe(department),
         ]
+        closing = MonthlyClosing.objects.get(employee=employee, target_month=target_month)
 
         # ------------------------------
         # 月次集計CSV
@@ -344,9 +355,12 @@ def write_csv(
                 [
                     *common_columns,
                     target_month.strftime("%Y-%m"),
+                    sum(row.record_key != "no_record" for row in report.rows),
                     work_seconds,
                     break_seconds,
-                    "確定済み",
+                    report.incomplete_count,
+                    csv_datetime(closing.finalized_at),
+                    closing.version,
                 ]
             )
 
@@ -370,6 +384,13 @@ def write_csv(
                     "day",
                 ),
             )
+            sessions_by_day = {
+                session.work_date: session for session in WorkSession.objects.filter(
+                    employee=employee,
+                    work_date__year=target_month.year,
+                    work_date__month=target_month.month,
+                )
+            }
 
             for row in ordered_rows:
 
@@ -383,34 +404,20 @@ def write_csv(
                 else:
                     day_text = str(work_day)
 
+                hire_date = (employment.hire_date if employment else None) or employee.hire_date
+                leave_date = (employment.leave_date if employment else None) or employee.retirement_date
+                if (hire_date and work_day < hire_date) or (leave_date and work_day > leave_date):
+                    continue
+                session = sessions_by_day.get(work_day)
+
                 writer.writerow(
                     [
                         *common_columns,
                         day_text,
-                        csv_safe(
-                            report_value(
-                                row,
-                                "clock_in",
-                            )
-                        ),
-                        csv_safe(
-                            report_value(
-                                row,
-                                "clock_out",
-                            )
-                        ),
-                        csv_safe(
-                            report_value(
-                                row,
-                                "break_display",
-                            )
-                        ),
-                        csv_safe(
-                            report_value(
-                                row,
-                                "work_display",
-                            )
-                        ),
+                        csv_datetime(session.clock_in_at) if session else "",
+                        csv_datetime(session.clock_out_at) if session else "",
+                        row.break_seconds if row.break_seconds is not None else "",
+                        row.work_seconds if row.work_seconds is not None else "",
                         csv_safe(
                             report_value(
                                 row,
@@ -420,9 +427,10 @@ def write_csv(
                         csv_safe(
                             report_value(
                                 row,
-                                "correction_label",
+                                "closing_label",
                             )
                         ),
+                        session.version if session else "",
                     ]
                 )
 

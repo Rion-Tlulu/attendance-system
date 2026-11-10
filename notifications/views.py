@@ -3,7 +3,7 @@ from urllib.parse import urlsplit
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.utils import timezone
@@ -14,6 +14,7 @@ from django.views.decorators.http import (
 )
 
 from .models import Notification
+from .services import visible_notifications
 
 
 def safe_notification_path(value):
@@ -39,9 +40,7 @@ def safe_notification_path(value):
 def notification_list(request):
     """本人に届いた通知を一覧表示する"""
 
-    notifications = Notification.objects.filter(
-        recipient=request.user,
-    )
+    notifications = visible_notifications(request.user)
 
     status = request.GET.get("status", "all")
 
@@ -53,8 +52,7 @@ def notification_list(request):
     else:
         status = "all"
 
-    unread_count = Notification.objects.filter(
-        recipient=request.user,
+    unread_count = visible_notifications(request.user).filter(
         read_at__isnull=True,
     ).count()
 
@@ -79,7 +77,7 @@ def notification_open(request, pk):
     """本人の通知を既読にして対象画面へ移動"""
 
     notification = get_object_or_404(
-        Notification.objects.select_for_update(),
+        visible_notifications(request.user).select_for_update(),
         pk=pk,
         recipient=request.user,
     )
@@ -99,9 +97,31 @@ def notification_open(request, pk):
 def mark_all_read(request):
     """本人の未読通知だけを既読にする"""
 
-    Notification.objects.filter(
-        recipient=request.user,
+    started_at = timezone.now()
+    visible_notifications(request.user).filter(
         read_at__isnull=True,
-    ).update(read_at=timezone.now())
+        created_at__lte=started_at,
+    ).update(read_at=started_at)
 
     return HttpResponseRedirect(reverse("notifications:list"))
+
+
+@never_cache
+@login_required
+@require_GET
+def notification_panel(request):
+    """右パネルの最新20件と未読件数を返す。"""
+    items = list(visible_notifications(request.user)[:20])
+    count = visible_notifications(request.user).filter(read_at__isnull=True).count()
+    return JsonResponse({
+        "unread_count": count,
+        "items": [{
+            "id": item.pk,
+            "title": item.title,
+            "body": item.body,
+            "created_at": timezone.localtime(item.created_at).strftime("%Y/%m/%d %H:%M"),
+            "read": item.is_read,
+            "resolved": item.is_resolved,
+            "open_url": reverse("notifications:open", args=[item.pk]),
+        } for item in items],
+    })

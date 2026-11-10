@@ -21,7 +21,7 @@ from corrections.services import (
     validate_proposal,
 )
 
-from notifications.services import notify_correction_reviewed
+from notifications.services import notify_correction_reviewed, notify_month_changed
 
 
 class AdminActionError(Exception):
@@ -215,6 +215,8 @@ def review_correction(
         session.clock_in_at = start
         session.clock_out_at = end
         session.status = new_status
+        if new_status not in (WorkSession.Status.WORKING, WorkSession.Status.ON_BREAK):
+            session.incomplete_notified_version = None
         session.version += 1
         session.save()
 
@@ -393,7 +395,10 @@ def finalize_month(
         closing.status = MonthlyClosing.Status.FINALIZED
         closing.finalized_by = manager
         closing.finalized_at = timezone.now()
+        closing.version += 1
         closing.save()
+
+    notify_month_changed(closing)
 
     _audit(
         actor=manager,
@@ -463,7 +468,12 @@ def reopen_month(
     closing.status = open_status
     closing.finalized_by = None
     closing.finalized_at = None
+    closing.unlocked_at = timezone.now()
+    closing.unlock_reason = reason
+    closing.version += 1
     closing.save()
+
+    notify_month_changed(closing)
 
     _audit(
         actor=manager,

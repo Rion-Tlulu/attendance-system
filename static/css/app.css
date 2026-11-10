@@ -3606,3 +3606,37 @@ a.nav-item:hover {
     animation-duration: 0.01ms;
   }
 }
+/* 通知ドロワー */
+.notification-backdrop:not([hidden]) {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0, 0, 0, .42);
+}
+.notification-panel:not([hidden]) {
+  position: fixed; z-index: 1001; inset: 0 0 0 auto;
+  width: min(420px, 100vw); background: #fff;
+  box-shadow: -8px 0 24px rgba(0, 0, 0, .18);
+  display: flex; flex-direction: column;
+}
+.notification-panel__header, .notification-panel__actions {
+  padding: 16px; border-bottom: 1px solid #ddd;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.notification-panel__header h2 { margin: 0; font-size: 1.2rem; }
+.notification-panel__items { overflow-y: auto; padding: 16px; flex: 1; }
+.notification-panel__item { padding: 12px 0; border-bottom: 1px solid #ddd; }
+.notification-panel__item h3 { margin: 0 0 8px; font-size: 1rem; }
+.notification-panel__item p { margin: 0 0 8px; }
+.notification-panel__item small { display: block; margin-bottom: 8px; }
+.notification-panel__all { padding: 16px; border-top: 1px solid #ddd; }
+/* CSP対応の定型余白 */
+.spacing-top-12 { margin-top: 12px; }
+.spacing-top-16 { margin-top: 16px; }
+.spacing-top-20 { margin-top: 20px; }
+.spacing-bottom-16 { margin-bottom: 16px; }
+.app-notification-link { border: 0; background: transparent; cursor: pointer; font: inherit; }
+.app-notification-count[hidden] { display: none; }
+@media (max-width: 360px) {
+  .app-notification-link > span:not(.app-notification-count) { display: none; }
+  .app-v6 .app-user-name { max-width: 70px; }
+  .app-v6 .app-topbar__user { gap: 5px; }
+}

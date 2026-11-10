@@ -85,11 +85,11 @@
 
                 {% if request.user.is_authenticated %}
 
-<a
-    href="{% url 'notifications:list' %}"
-    class="app-notification-link"
+<button type="button" id="notification-panel-open"
+    class="app-notification-link" aria-haspopup="dialog"
+    aria-controls="notification-panel" aria-expanded="false"
     aria-label="お知らせ・通知。未読{{ notification_unread_count }}件"
->
+    data-panel-url="{% url 'notifications:panel' %}">
     <i
         class="fa-solid fa-bell"
         aria-hidden="true"
@@ -97,13 +97,11 @@
 
     <span>通知</span>
 
-    {% if notification_unread_count > 0 %}
     <span class="app-notification-count"
-          aria-hidden="true">
-        {{ notification_unread_count }}
+          aria-hidden="true" {% if notification_unread_count == 0 %}hidden{% endif %}>
+        {% if notification_unread_count > 99 %}99+{% else %}{{ notification_unread_count }}{% endif %}
     </span>
-    {% endif %}
-</a>
+</button>
 
 {% endif %}
 
@@ -209,6 +207,23 @@
 
 {% include "components/bottom_nav.html" %}
 
+<div id="notification-backdrop" class="notification-backdrop" hidden></div>
+<aside id="notification-panel" class="notification-panel" role="dialog"
+      aria-modal="true" aria-labelledby="notification-panel-title" hidden>
+    <header class="notification-panel__header">
+        <h2 id="notification-panel-title">お知らせ・通知</h2>
+        <button type="button" id="notification-panel-close" aria-label="通知を閉じる">×</button>
+    </header>
+    <div class="notification-panel__actions">
+        <label><input type="checkbox" id="notification-unread-only">未読のみ</label>
+        <form method="post" action="{% url 'notifications:read_all' %}">{% csrf_token %}
+            <button type="submit">すべて既読にする</button>
+        </form>
+    </div>
+    <div id="notification-panel-items" class="notification-panel__items" aria-live="polite"></div>
+    <a class="notification-panel__all" href="{% url 'notifications:list' %}">通知一覧を見る</a>
+</aside>
+
 {% else %}
 
 </div>
@@ -218,6 +233,7 @@
 
 <script src="{% static 'js/app.js' %}"
         defer></script>
+<script src="{% static 'js/notifications.js' %}" defer></script>
 
 {% block extra_js %}{% endblock %}
 

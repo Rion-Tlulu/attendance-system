@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ operation_label }}完了 | 勤怠管理{% endblock %}
+{% block screen_label %}管理者画面・社員管理{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/manager-pages.css' %}">{% endblock %}
+
+{% block content %}
+<div class="admin-page">
+    <header class="admin-heading">
+        <h1>{{ operation_label }}が完了しました</h1>
+        <p>初期パスワードはこの画面で一度だけ確認できます。再読込みでは表示されません。</p>
+    </header>
+    <section class="ui-card admin-section" aria-labelledby="issued-password-title">
+        <h2 id="issued-password-title">本人に渡す情報</h2>
+        <dl class="issued-credentials">
+            <div><dt>社員番号</dt><dd>{{ employee.employee_number }}</dd></div>
+            <div><dt>氏名</dt><dd>{{ employee.display_name }}</dd></div>
+            <div><dt>有効期限</dt><dd>{{ expires_at|date:"Y年n月j日 H:i" }}</dd></div>
+        </dl>
+        <div class="admin-field">
+            <label for="issued-password">初期パスワード</label>
+            <input id="issued-password" type="password" value="{{ initial_password }}"
+                   readonly autocomplete="off" data-issued-password>
+        </div>
+        <div class="admin-actions">
+            <button type="button" class="ui-button ui-button--secondary"
+                    data-issued-toggle aria-controls="issued-password" aria-pressed="false">表示する</button>
+            <button type="button" class="ui-button ui-button--primary"
+                    data-issued-copy>コピー</button>
+        </div>
+        <p data-issued-result role="status" aria-live="polite"></p>
+        <p>本人確認後、社内で承認された個別の方法で本人に渡してください。初回ログイン後に変更が必要です。</p>
+    </section>
+    <a class="ui-button ui-button--secondary" href="{% url 'management:employees' %}">社員一覧に戻る</a>
+</div>
+{% endblock %}
+
+{% block extra_js %}<script src="{% static 'js/issued-credentials.js' %}" defer></script>{% endblock %}

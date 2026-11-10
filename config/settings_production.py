@@ -141,11 +141,19 @@ X_FRAME_OPTIONS = "DENY"
 # HSTS
 # ==========================================
 
-# HTTPS構築・ドメイン確認後に設定
-SECURE_HSTS_SECONDS = 0
+# 本番環境は HTTPS 専用。初期値は短い期間とし、運用確認後に延長する。
+SECURE_HSTS_SECONDS = int(os.environ.get("DJANGO_HSTS_SECONDS", "3600"))
+if SECURE_HSTS_SECONDS < 0:
+    raise ImproperlyConfigured("DJANGO_HSTS_SECONDS は0以上にしてください。")
 
 SECURE_HSTS_INCLUDE_SUBDOMAINS = False
 SECURE_HSTS_PRELOAD = False
+
+MIDDLEWARE += ["config.security.ContentSecurityPolicyMiddleware"]
+
+if os.environ.get("DJANGO_TRUST_PROXY_SSL_HEADER", "").lower() == "true":
+    # 信頼済みリバースプロキシが外部入力の同名ヘッダーを破棄する場合だけ設定。
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 
 # ==========================================

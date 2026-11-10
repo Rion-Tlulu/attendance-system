@@ -6,6 +6,7 @@ app_name = "notifications"
 
 
 urlpatterns = [
+    path("panel/", views.notification_panel, name="panel"),
     # 通知一覧
     path(
         "",

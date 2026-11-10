@@ -67,7 +67,9 @@
 
                     <h2>{{ item.title }}</h2>
 
-                    {% if item.is_read %}
+                    {% if item.is_resolved %}
+                    <span class="v2-state">対応済み</span>
+                    {% elif item.is_read %}
                     <span class="v2-state">既読</span>
                     {% else %}
                     <span class="v2-state v2-state--info">

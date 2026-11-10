@@ -48,6 +48,12 @@ class WorkSession(models.Model):
         "データ版",
         default=1,
     )
+    incomplete_notified_version = models.PositiveIntegerField(
+        "未完了通知済みのデータ版",
+        null=True,
+        blank=True,
+        editable=False,
+    )
 
     created_at = models.DateTimeField(
         "作成日時",

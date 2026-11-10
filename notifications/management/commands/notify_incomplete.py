@@ -1,160 +1,107 @@
-"""未完了勤務を本人に一度だけ通知する管理コマンド。"""
+"""前日以前の未完了勤務を本人と業務管理者に通知する。毎日09:00 JSTに実行。"""
 
 from datetime import timedelta
 
-from django.core.management.base import (
-    BaseCommand,
-    CommandError,
-)
+from django.contrib.auth import get_user_model
+from django.core.management.base import BaseCommand, CommandError
+from django.db import transaction
 from django.urls import reverse
 from django.utils import timezone
 
-from attendance.models import (
-    MonthlyClosing,
-    WorkSession,
-)
+from attendance.models import MonthlyClosing, WorkSession
 from corrections.models import CorrectionRequest
 from notifications.models import Notification
+from notifications.services import create_notification
 
 
 class Command(BaseCommand):
-    help = "一定日数前の未完了勤務を本人に通知します。"
+    help = "前日以前の未完了勤務を本人と業務管理者に通知します。"
 
     def add_arguments(self, parser):
-        parser.add_argument(
-            "--days",
-            type=int,
-            default=2,
-            help="何日以上前の勤務を対象とするか",
-        )
-
-        parser.add_argument(
-            "--dry-run",
-            action="store_true",
-            help="通知を書き込まず対象を確認する",
-        )
-
-        parser.add_argument(
-            "--max-new",
-            type=int,
-            default=500,
-            help="1回に作成する通知の上限",
-        )
+        parser.add_argument("--days", type=int, default=1)
+        parser.add_argument("--dry-run", action="store_true")
+        parser.add_argument("--max-new", type=int, default=500)
 
     def handle(self, *args, **options):
-
         days = options["days"]
         maximum = options["max_new"]
-
         if days < 1 or maximum < 1:
-            raise CommandError("--days と --max-new は" "1以上にしてください。")
-
-        if not hasattr(
-            Notification.Kind,
-            "INCOMPLETE",
-        ):
-            raise CommandError(
-                "Notification.Kind.INCOMPLETE がありません。"
-                "notifications/models.py の Kind に"
-                "追加してから実行してください。"
-            )
+            raise CommandError("--days と --max-new は1以上にしてください。")
 
         cutoff = timezone.localdate() - timedelta(days=days)
-
-        # アカウントが有効で、
-        # 勤務中または休憩中のままの記録を取得。
         sessions = (
             WorkSession.objects.filter(
-                status__in=(
-                    WorkSession.Status.WORKING,
-                    WorkSession.Status.ON_BREAK,
-                ),
+                status__in=(WorkSession.Status.WORKING, WorkSession.Status.ON_BREAK),
                 work_date__lte=cutoff,
                 employee__is_active=True,
             )
             .select_related("employee")
             .order_by("work_date", "pk")
         )
+        Employee = get_user_model()
+        managers = list(Employee.objects.filter(is_active=True, is_business_admin=True))
+        created_count = eligible_count = skipped_count = 0
 
-        created_count = 0
-        eligible_count = 0
-        skipped_count = 0
-
-        for session in sessions.iterator(chunk_size=200):
-
-            # 審査中の修正申請があれば通知しない。
-            has_pending_request = CorrectionRequest.objects.filter(
-                work_session=session,
-                status=CorrectionRequest.Status.PENDING,
-            ).exists()
-
-            if has_pending_request:
+        for candidate in sessions.iterator(chunk_size=200):
+            if created_count >= maximum:
+                break
+            if CorrectionRequest.objects.filter(
+                work_session=candidate, status=CorrectionRequest.Status.PENDING
+            ).exists():
                 skipped_count += 1
                 continue
-
-            # 対象月が確定済みなら通知しない。
-            is_finalized = MonthlyClosing.objects.filter(
-                employee_id=session.employee_id,
-                target_month=(session.work_date.replace(day=1)),
+            if MonthlyClosing.objects.filter(
+                employee_id=candidate.employee_id,
+                target_month=candidate.work_date.replace(day=1),
                 status=MonthlyClosing.Status.FINALIZED,
-            ).exists()
-
-            if is_finalized:
+            ).exists():
+                skipped_count += 1
+                continue
+            if candidate.incomplete_notified_version is not None:
                 skipped_count += 1
                 continue
 
-            # 勤務IDごとに重複を防止する。
-            event_key = f"incomplete:{session.pk}"
-
-            already_notified = Notification.objects.filter(
-                event_key=event_key,
-            ).exists()
-
-            if already_notified:
-                skipped_count += 1
-                continue
-
-            eligible_count += 1
-
-            # dry-runではDBへ書き込まない。
+            recipients = [(candidate.employee, False)] + [
+                (manager, True) for manager in managers if manager.pk != candidate.employee_id
+            ]
+            eligible_count += len(recipients)
             if options["dry_run"]:
                 continue
 
-            target_path = reverse(
-                "attendance:daily",
-                args=[
-                    session.work_date.year,
-                    session.work_date.month,
-                    session.work_date.day,
-                ],
-            )
-
-            # event_keyにはユニーク制約がある前提。
-            # 同時実行時の重複もDB側で防ぐ。
-            _, created = Notification.objects.get_or_create(
-                event_key=event_key,
-                defaults={
-                    "recipient": session.employee,
-                    "kind": (Notification.Kind.INCOMPLETE),
-                    "title": ("未完了の勤怠があります"),
-                    "body": (
-                        f"{session.work_date:%Y/%m/%d}"
-                        "の勤務記録が未完了です。"
-                        "内容をご確認ください。"
-                    ),
-                    "target_path": target_path,
-                },
-            )
-
-            if created:
-                created_count += 1
-
-            if created_count >= maximum:
-                break
+            with transaction.atomic():
+                session = WorkSession.objects.select_for_update().get(pk=candidate.pk)
+                if session.incomplete_notified_version is not None:
+                    continue
+                target = reverse("attendance:daily", args=[
+                    session.work_date.year, session.work_date.month, session.work_date.day,
+                ])
+                for recipient, is_management in recipients:
+                    if created_count >= maximum:
+                        break
+                    event_key = f"incomplete:{session.pk}:v{session.version}:{recipient.pk}"
+                    existed = Notification.objects.filter(event_key=event_key).exists()
+                    create_notification(
+                        recipient=recipient,
+                        kind=Notification.Kind.INCOMPLETE,
+                        title="未完了の勤務があります",
+                        body=f"{session.work_date:%Y/%m/%d}の勤務記録が未完了です。内容を確認してください。",
+                        target_path=(
+                            reverse("management:employee_month", args=[
+                                session.employee_id, session.work_date.year, session.work_date.month,
+                            ])
+                            if is_management else target
+                        ),
+                        event_key=event_key,
+                        is_management=is_management,
+                    )
+                    created_count += not existed
+                if all(Notification.objects.filter(
+                    event_key=f"incomplete:{session.pk}:v{session.version}:{recipient.pk}"
+                ).exists() for recipient, _ in recipients):
+                    session.incomplete_notified_version = session.version
+                    session.save(update_fields=["incomplete_notified_version"])
 
         self.stdout.write(
-            f"対象候補={eligible_count} "
-            f"新規通知={created_count} "
-            f"除外済み={skipped_count} "
+            f"対象={eligible_count} 新規通知={created_count} 除外={skipped_count} "
             f"dry_run={options['dry_run']}"
         )

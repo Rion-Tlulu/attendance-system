@@ -4,6 +4,16 @@ from django.urls import reverse
 from .models import Notification
 
 
+def visible_notifications(user):
+    """現在の権限で閲覧できる本人宛通知。"""
+    queryset = Notification.objects.filter(recipient=user)
+    if not user.is_business_admin:
+        queryset = queryset.filter(is_management=False).exclude(
+            kind=Notification.Kind.CORRECTION_SUBMITTED
+        )
+    return queryset
+
+
 def create_notification(
     *,
     recipient,
@@ -12,6 +22,7 @@ def create_notification(
     body,
     target_path="",
     event_key=None,
+    is_management=False,
 ):
     """通知重複させずに作成する"""
 
@@ -24,6 +35,7 @@ def create_notification(
                 "title": title,
                 "body": body,
                 "target_path": target_path,
+                "is_management": is_management,
             },
         )
 
@@ -35,6 +47,7 @@ def create_notification(
         title=title,
         body=body,
         target_path=target_path,
+        is_management=is_management,
     )
 
 
@@ -63,6 +76,7 @@ def notify_correction_submitted(correction):
             body=("社員から勤怠修正申請が提出されました" "内容を確認してください"),
             target_path=target,
             event_key=(f"correction:{correction.pk}:" f"submitted:{manager.pk}"),
+            is_management=True,
         )
 
 
@@ -98,4 +112,24 @@ def notify_correction_reviewed(correction):
         event_key=(
             f"correction:{correction.pk}" f"{status}:{correction.requested_by_id}"
         ),
+    )
+
+
+def notify_month_changed(closing):
+    """月次確定・解除を対象社員本人へ通知する。呼び出し元のトランザクションで保存する。"""
+    from attendance.models import MonthlyClosing
+
+    finalized = closing.status == MonthlyClosing.Status.FINALIZED
+    kind = (
+        Notification.Kind.MONTH_FINALIZED
+        if finalized else Notification.Kind.MONTH_REOPENED
+    )
+    month = closing.target_month
+    return create_notification(
+        recipient=closing.employee,
+        kind=kind,
+        title="月次勤怠が確定しました" if finalized else "月次勤怠の確定が解除されました",
+        body=f"{month:%Y年%m月}の勤怠を確認してください。",
+        target_path=reverse("attendance:monthly") + f"?month={month:%Y-%m}",
+        event_key=f"closing:{closing.pk}:{closing.version}:{closing.employee_id}",
     )

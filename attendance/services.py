@@ -285,7 +285,8 @@ def record_clock_action(
 
             session.clock_out_at = now
             session.status = WorkSession.Status.COMPLETED
-            update_fields = ["clock_out_at", "status"]
+            session.incomplete_notified_version = None
+            update_fields = ["clock_out_at", "status", "incomplete_notified_version"]
 
         # 打刻による更新版を進める
         session.version += 1

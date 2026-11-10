@@ -31,6 +31,14 @@ class Notification(models.Model):
             "incomplete",
             "未完了勤怠のお知らせ",
         )
+        MONTH_FINALIZED = (
+            "month_finalized",
+            "月次確定",
+        )
+        MONTH_REOPENED = (
+            "month_reopened",
+            "月次確定解除",
+        )
 
     recipient = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -60,6 +68,11 @@ class Notification(models.Model):
         "移動先",
         max_length=255,
         blank=True,
+    )
+
+    is_management = models.BooleanField(
+        "管理業務通知",
+        default=False,
     )
 
     # 同じ業務イベントの重複通知を防止
@@ -102,6 +115,30 @@ class Notification(models.Model):
     @property
     def is_read(self):
         return self.read_at is not None
+
+    @property
+    def is_resolved(self):
+        """通知先の現在の業務状態を確認する。"""
+        if not self.event_key:
+            return False
+        if self.kind == self.Kind.INCOMPLETE:
+            from attendance.models import WorkSession
+
+            parts = self.event_key.split(":")
+            if len(parts) >= 2 and parts[1].isdigit():
+                return not WorkSession.objects.filter(
+                    pk=int(parts[1]),
+                    status__in=(WorkSession.Status.WORKING, WorkSession.Status.ON_BREAK),
+                ).exists()
+        if self.kind == self.Kind.CORRECTION_SUBMITTED:
+            from corrections.models import CorrectionRequest
+
+            parts = self.event_key.split(":")
+            if len(parts) >= 2 and parts[1].isdigit():
+                return not CorrectionRequest.objects.filter(
+                    pk=int(parts[1]), status=CorrectionRequest.Status.PENDING,
+                ).exists()
+        return False
 
     def __str__(self):
         return self.title

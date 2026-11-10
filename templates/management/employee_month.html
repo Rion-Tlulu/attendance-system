@@ -237,7 +237,7 @@
         <form
             method="post"
             action="{% url 'management:month_reopen' employee.pk report.month.year report.month.month %}"
-            style="margin-top: 20px;"
+            class="spacing-top-20"
         >
             {% csrf_token %}
 
@@ -293,8 +293,7 @@
             </p>
             {% endif %}
 
-            <div class="v2-actions"
-                 style="margin-top: 16px;">
+            <div class="v2-actions spacing-top-16">
 
                 <button
                     type="submit"
@@ -438,6 +437,6 @@
 
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+<script src="{% static 'vendor/chartjs/chart.umd.min.js' %}" defer></script>
 
 {% endblock %}

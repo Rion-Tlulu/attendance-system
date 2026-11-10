@@ -183,6 +183,27 @@ class NotificationTests(TestCase):
         self.assertIsNotNone(own.read_at)
         self.assertIsNone(other.read_at)
 
+    def test_08_read_all_keeps_later_notification_unread(self):
+        later = self.make_user_notification()
+        later.created_at = timezone.now() + timedelta(minutes=1)
+        later.save(update_fields=["created_at"])
+        self.client.force_login(self.employee)
+        self.client.post(reverse("notifications:read_all"))
+        later.refresh_from_db()
+        self.assertIsNone(later.read_at)
+
+    def test_09_panel_limits_to_20_and_badge_caps_at_99(self):
+        Notification.objects.bulk_create([
+            Notification(recipient=self.employee, kind=Notification.Kind.GENERAL,
+                         title=f"通知{i}", body="確認") for i in range(100)
+        ])
+        self.client.force_login(self.employee)
+        page = self.client.get(reverse("attendance:home"))
+        self.assertContains(page, "99+")
+        panel = self.client.get(reverse("notifications:panel")).json()
+        self.assertEqual(panel["unread_count"], 100)
+        self.assertEqual(len(panel["items"]), 20)
+
 
 # ---- notifications/tests_incomplete.py ----
 """未完了勤務通知のテスト。"""
@@ -260,8 +281,55 @@ class IncompleteNotificationTests(TestCase):
 
         self.assertEqual(
             Notification.objects.count(),
-            1,
+            2,
         )
+
+    def test_02b_manager_is_notified_and_role_loss_hides_notice(self):
+        self.create_working_session()
+        self.execute()
+        notice = Notification.objects.get(recipient=self.manager)
+        self.assertTrue(notice.is_management)
+        self.client.force_login(self.manager)
+        self.assertEqual(self.client.get(reverse("notifications:panel")).json()["unread_count"], 1)
+        self.manager.is_business_admin = False
+        self.manager.save(update_fields=["is_business_admin"])
+        self.assertEqual(self.client.get(reverse("notifications:panel")).json()["unread_count"], 0)
+        self.assertEqual(self.client.post(reverse("notifications:open", args=[notice.pk])).status_code, 404)
+
+    def test_02c_expired_notification_does_not_repeat_until_resolved(self):
+        session = self.create_working_session()
+        self.execute()
+        Notification.objects.all().delete()
+        self.execute()
+        self.assertFalse(Notification.objects.exists())
+        session.version += 1
+        session.save(update_fields=["version"])
+        self.execute()
+        self.assertFalse(Notification.objects.exists())
+        session.status = WorkSession.Status.COMPLETED
+        session.clock_out_at = timezone.now()
+        session.incomplete_notified_version = None
+        session.save(update_fields=["status", "clock_out_at", "incomplete_notified_version"])
+        session.status = WorkSession.Status.WORKING
+        session.clock_out_at = None
+        session.version += 1
+        session.save(update_fields=["status", "clock_out_at", "version"])
+        self.execute()
+        self.assertEqual(Notification.objects.count(), 2)
+
+    def test_02d_cleanup_only_removes_old_notifications(self):
+        old = Notification.objects.create(
+            recipient=self.employee, kind=Notification.Kind.GENERAL,
+            title="古い通知", body="削除対象",
+            created_at=timezone.now() - timedelta(days=91),
+        )
+        recent = Notification.objects.create(
+            recipient=self.employee, kind=Notification.Kind.GENERAL,
+            title="新しい通知", body="残す通知",
+        )
+        call_command("cleanup_notifications", stdout=StringIO())
+        self.assertFalse(Notification.objects.filter(pk=old.pk).exists())
+        self.assertTrue(Notification.objects.filter(pk=recent.pk).exists())
 
     def test_03_dry_run_does_not_save(self):
         self.create_working_session()
