@@ -1,5 +1,3 @@
-
-
 /* ---- static/css/auth.css ---- */
 :root {
   --navy: #19345b;
@@ -610,7 +608,6 @@ a {
     font-size: 1.2rem;
   }
 }
-
 
 /* ---- static/css/app.css ---- */
 /* =====================================
@@ -1281,7 +1278,6 @@ a.nav-item:hover {
   }
 }
 
-
 /* ---- static/css/compact.css ---- */
 /* Phase 5 UI調整：全画面共通で余白を詰め、重要操作の表示領域を確保。
    base.htmlで app.css の後に読み込むこと。 */
@@ -1528,7 +1524,6 @@ a.nav-item:hover {
     padding-inline: 9px;
   }
 }
-
 
 /* ---- static/css/header.css ---- */
 /* =====================================================
@@ -1849,7 +1844,6 @@ a.nav-item:hover {
   font-size: 0.75rem;
   font-weight: 700;
 }
-
 
 /* ---- static/css/latest-layout.css ---- */
 /* =====================================
@@ -2368,7 +2362,6 @@ a.nav-item:hover {
     transition: none;
   }
 }
-
 
 /* ---- static/css/design-v2.css ---- */
 /* =========================================
@@ -3044,7 +3037,6 @@ a.nav-item:hover {
   }
 }
 
-
 /* ---- static/css/step4-ui-v2.css ---- */
 /* ==========================================
    STEP 4 - UI V2
@@ -3440,5 +3432,177 @@ a.nav-item:hover {
     scroll-behavior: auto !important;
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* ==============================================
+   F11 勤怠グラフ / v1.4
+============================================== */
+
+.f11-chart {
+  --f11-border: #d6e0ec;
+  --f11-heading: #17324e;
+  --f11-muted: #52657b;
+  --f11-primary: #175ba6;
+
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  padding: 20px;
+
+  color: var(--text-primary, var(--f11-heading));
+
+  background: var(--surface, #ffffff);
+
+  border: 1px solid var(--border-color, var(--f11-border));
+
+  border-radius: 14px;
+}
+
+.f11-chart__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.f11-chart__heading {
+  min-width: 0;
+}
+
+.f11-chart__heading h2 {
+  margin: 0 0 6px;
+  font-size: 1.2rem;
+  line-height: 1.5;
+}
+
+.f11-chart__heading p,
+.f11-chart__help {
+  margin: 0;
+  color: var(--text-secondary, var(--f11-muted));
+  line-height: 1.7;
+}
+
+.f11-chart__toggle {
+  min-height: 44px;
+  min-width: 140px;
+  padding: 10px 16px;
+
+  color: #ffffff;
+  background: var(--primary, var(--f11-primary));
+
+  border: 1px solid currentColor;
+  border-radius: 9px;
+
+  font: inherit;
+  font-weight: 700;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.f11-chart__toggle:hover {
+  filter: brightness(1.08);
+}
+
+.f11-chart__toggle:focus-visible,
+.f11-chart__table-wrap:focus-visible {
+  outline: 3px solid #c77c00;
+  outline-offset: 3px;
+}
+
+.f11-chart__table-wrap {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.f11-chart__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+  line-height: 1.65;
+}
+
+.f11-chart__table caption {
+  text-align: left;
+  font-weight: 700;
+  padding-bottom: 12px;
+}
+
+.f11-chart__table th,
+.f11-chart__table td {
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--border-color, var(--f11-border));
+  text-align: left;
+  white-space: nowrap;
+}
+
+.f11-chart__table th {
+  font-weight: 700;
+}
+
+.f11-chart__table thead {
+  background: var(--surface-secondary, #edf3fa);
+}
+
+.f11-chart__panel {
+  width: 100%;
+  min-width: 0;
+}
+
+.f11-chart__canvas-wrap {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  height: 320px;
+}
+
+.f11-chart__message {
+  margin: 0;
+  padding: 12px 14px;
+  line-height: 1.7;
+
+  border: 1px solid #b99142;
+  border-radius: 9px;
+
+  color: #654500;
+  background: #fff5df;
+}
+
+.f11-chart [hidden] {
+  display: none !important;
+}
+
+@media (max-width: 767px) {
+  .f11-chart {
+    padding: 14px;
+    gap: 12px;
+  }
+
+  .f11-chart__header {
+    flex-direction: column;
+  }
+
+  .f11-chart__toggle {
+    width: 100%;
+  }
+
+  .f11-chart__canvas-wrap {
+    height: 270px;
+  }
+
+  .f11-chart__table {
+    font-size: 0.875rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .f11-chart *,
+  .f11-chart *::before,
+  .f11-chart *::after {
+    scroll-behavior: auto;
+    transition-duration: 0.01ms;
+    animation-duration: 0.01ms;
   }
 }

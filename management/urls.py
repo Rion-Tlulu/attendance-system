@@ -98,4 +98,10 @@ urlpatterns = [
         bulk_exports.bulk_export,
         name="bulk_export",
     ),
+    # 社員の初期パスワード再発行URL
+    path(
+        "employees/<int:employee_id>/reset-password/",
+        views.employee_reset_password,
+        name="employee_password_reset",
+    ),
 ]

@@ -1,8 +1,10 @@
-
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}社員情報 | 勤怠管理{% endblock %}
+{% block title %}
+{% if creating %}社員の新規登録{% else %}社員情報の編集{% endif %} | 勤怠管理
+{% endblock %}
+
 {% block screen_label %}管理者｜社員管理{% endblock %}
 
 {% block extra_css %}
@@ -10,21 +12,29 @@
 {% endblock %}
 
 {% block content %}
-
 <div class="admin-page">
-
     <header class="admin-heading">
-        <h1>
+        <h1 id="employee-form-title">
             {% if creating %}社員の新規登録{% else %}社員情報の編集{% endif %}
         </h1>
+        <p>
+            {% if creating %}
+                社員情報を登録すると、初回ログイン用パスワードが自動発行されます。
+            {% else %}
+                社員の基本情報とアカウントの有効状態を管理します。
+            {% endif %}
+        </p>
     </header>
 
-    <section class="ui-card admin-section admin-form-card">
-        <form method="post">
+    <section class="ui-card admin-section admin-form-card"
+             aria-labelledby="employee-form-title">
+        <form method="post" autocomplete="off">
             {% csrf_token %}
 
             {% if form.non_field_errors %}
-            <div role="alert">{{ form.non_field_errors }}</div>
+            <div class="admin-warning" role="alert">
+                {{ form.non_field_errors }}
+            </div>
             {% endif %}
 
             {% if not creating %}
@@ -38,16 +48,29 @@
             <div class="admin-field">
                 {{ field.label_tag }}
                 {{ field }}
-                {{ field.errors }}
+                {% if field.help_text %}
+                <p class="admin-field-help">{{ field.help_text }}</p>
+                {% endif %}
+                {% if field.errors %}
+                <div class="admin-warning" role="alert">
+                    {{ field.errors }}
+                </div>
+                {% endif %}
             </div>
             {% endfor %}
 
             {% if creating %}
-            <p class="admin-warning">
-                新しい社員は一般社員として登録されます。
-                初回ログイン用パスワードは安全な方法で
-                本人に伝え、初回変更を行ってください。
-            </p>
+            <div class="admin-warning" role="note">
+                <p>新しい社員は一般社員として登録されます。</p>
+                <p>
+                    初期パスワードはシステムが20文字で自動生成します。
+                    発行から72時間有効で、初回ログイン時に本人による変更が必要です。
+                </p>
+                <p>
+                    登録完了画面で一度だけ確認できます。
+                    本人確認後、社内で承認された方法で個別に伝えてください。
+                </p>
+            </div>
             {% endif %}
 
             <div class="admin-actions">
@@ -55,7 +78,6 @@
                    class="ui-button ui-button--secondary">
                     戻る
                 </a>
-
                 <button type="submit"
                         class="ui-button ui-button--primary">
                     {% if creating %}社員を登録する{% else %}変更を保存する{% endif %}
@@ -64,6 +86,20 @@
         </form>
     </section>
 
+    {% if not creating and employee.pk and employee.is_active and not employee.is_business_admin and not employee.is_staff and not employee.is_superuser %}
+    <section class="ui-card admin-section"
+             aria-labelledby="reset-password-title">
+        <h2 id="reset-password-title">初期パスワードの再発行</h2>
+        <p>
+            パスワードを忘れた社員には、本人確認を行ったうえで
+            初期パスワードを再発行できます。
+            再発行すると、以前のパスワードは利用できなくなります。
+        </p>
+        <a class="ui-button ui-button--secondary"
+           href="{% url 'management:employee_password_reset' employee.pk %}">
+            初期パスワードを再発行
+        </a>
+    </section>
+    {% endif %}
 </div>
-
 {% endblock %}

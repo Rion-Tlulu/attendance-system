@@ -1,46 +1,35 @@
-from django.shortcuts import render
-from django.views.decorators.cache import never_cache
+"""勤怠管理システム 管理者ビュー（v1.4対応）。
 
-from accounts.decorators import business_admin_required
-
-
-@never_cache
-@business_admin_required
-def home(request):
-    """管理者用ホーム（Phase 3では仮画面）。"""
-
-    return render(
-        request,
-        "management/home.html",
-    )
-
+旧管理機能を維持し、初期パスワードの自動発行・再発行を追加する。
+このファイルのみで認証仕様が完成するわけではない。
+"""
 
 import csv
 import io
 import logging
-
-from datetime import date
+from datetime import timedelta
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model
+from django.core import signing
 from django.core.paginator import Paginator
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Q
-from django.http import Http404, HttpResponse
-from django.shortcuts import (
-    get_object_or_404,
-    redirect,
-    render,
-)
+from django.http import Http404, HttpResponse, HttpResponseBadRequest
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_http_methods, require_POST
 
+from accounts.decorators import (
+    business_admin_required as account_business_admin_required,
+)
 from attendance.forms import MonthSelectForm
 from attendance.models import MonthlyClosing
 from attendance.reporting import build_monthly_report
 from auditlog.models import AuditLog
 from corrections.models import CorrectionRequest
+from corrections.services import current_values as correction_current_values
 
 from .access import business_admin_required
 from .forms import (
@@ -49,6 +38,7 @@ from .forms import (
     MonthClosingForm,
     ReviewForm,
 )
+from .initial_passwords import set_initial_password
 from .services import (
     AdminActionError,
     finalize_month,
@@ -57,9 +47,13 @@ from .services import (
     validate_target_month,
 )
 
-from corrections.services import (
-    current_values as correction_current_values,
-)
+
+@never_cache
+@account_business_admin_required
+def home(request):
+    """管理者用ホーム（既存の認可方式を維持）。"""
+    return render(request, "management/home.html")
+
 
 logger = logging.getLogger(__name__)
 Employee = get_user_model()
@@ -402,41 +396,51 @@ def employee_list(request):
 @never_cache
 @business_admin_required
 def employee_create(request):
-    """一般社員の新規登録。"""
+    """F07：初期パスワードを安全に自動生成して社員を登録する。"""
 
     if request.method == "POST":
         form = EmployeeCreateForm(request.POST)
-
         if form.is_valid():
-            with transaction.atomic():
-                employee = form.save(commit=False)
+            password = None
+            employee = None
+            try:
+                with transaction.atomic():
+                    employee = form.save(commit=False)
+                    password = set_initial_password(employee)
+                    employee.is_active = True
+                    employee.is_business_admin = False
+                    employee.is_staff = False
+                    employee.is_superuser = False
+                    employee.save()
 
-                employee.set_password(form.cleaned_data["temporary_password"])
-
-                employee.is_active = True
-                employee.is_business_admin = False
-                employee.is_staff = False
-                employee.is_superuser = False
-
-                if hasattr(employee, "must_change_password"):
-                    employee.must_change_password = True
-
-                employee.save()
-
-                _audit_employee_change(
-                    actor=request.user,
-                    employee=employee,
-                    action=AuditLog.Action.EMPLOYEE_CREATE,
-                    before={},
-                    after=_employee_snapshot(employee),
+                    _audit_employee_change(
+                        actor=request.user,
+                        employee=employee,
+                        action=AuditLog.Action.EMPLOYEE_CREATE,
+                        before={},
+                        after=_employee_snapshot(employee),
+                    )
+            except IntegrityError:
+                # 同時に同じ社員番号が登録されたケースも再表示を禁止する。
+                form.add_error(
+                    "employee_number",
+                    "この社員番号はすでに登録されています。",
                 )
-
-            messages.success(
-                request,
-                "一般社員を登録しました。",
-            )
-            return redirect("management:employees")
-
+            else:
+                # 成功したPOST応答で1回だけ表示。session/DB/URLへ平文を保存しない。
+                response = render(
+                    request,
+                    "management/employee_created.html",
+                    {
+                        "employee": employee,
+                        "initial_password": password,
+                        "expires_at": employee.initial_password_expires_at,
+                        "operation_label": "新規社員登録",
+                    },
+                )
+                response["Referrer-Policy"] = "no-referrer"
+                response["X-Robots-Tag"] = "noindex, nofollow"
+                return response
     else:
         form = EmployeeCreateForm()
 
@@ -539,6 +543,133 @@ def employee_edit(request, employee_id):
             "employee": employee,
         },
     )
+
+
+@never_cache
+@business_admin_required
+@require_http_methods(["GET", "POST"])
+def employee_reset_password(request, employee_id):
+    """管理者による本人確認済み社員の初期パスワード再発行。"""
+
+    employee = get_object_or_404(Employee, pk=employee_id)
+
+    # 権限者や技術管理者の再発行は、より厳格な別の運用で行う。
+    if (
+        employee.pk == request.user.pk
+        or not employee.is_active
+        or employee.is_staff
+        or employee.is_superuser
+        or employee.is_business_admin
+    ):
+        return HttpResponseBadRequest(
+            "このアカウントは管理画面から再発行できません。"
+        )
+
+    if request.method == "GET":
+        issued_version = (
+            employee.initial_password_issued_at.isoformat()
+            if employee.initial_password_issued_at is not None
+            else None
+        )
+        # 署名付き・短時間有効の確認チケット。平文パスワードは含めない。
+        ticket = signing.dumps(
+            {
+                "employee_id": employee.pk,
+                "manager_id": request.user.pk,
+                "issued_version": issued_version,
+            },
+            salt="attendance-initial-password-reset-v1",
+        )
+        return render(
+            request,
+            "management/employee_reset_confirm.html",
+            {"employee": employee, "ticket": ticket},
+        )
+
+    if request.POST.get("confirm") != "yes":
+        return HttpResponseBadRequest("本人確認と再発行の確認が必要です。")
+
+    try:
+        payload = signing.loads(
+            request.POST.get("ticket", ""),
+            salt="attendance-initial-password-reset-v1",
+            max_age=600,
+        )
+    except signing.BadSignature:
+        return HttpResponseBadRequest(
+            "確認操作の有効期限が切れています。画面を開き直してください。"
+        )
+
+    if not isinstance(payload, dict) or (
+        payload.get("employee_id") != employee.pk
+        or payload.get("manager_id") != request.user.pk
+    ):
+        return HttpResponseBadRequest("確認情報が一致しません。")
+
+    with transaction.atomic():
+        # PostgreSQLでは行ロックにより同一チケットの重複再発行を防ぐ。
+        locked_employee = Employee.objects.select_for_update().get(
+            pk=employee.pk
+        )
+        current_version = (
+            locked_employee.initial_password_issued_at.isoformat()
+            if locked_employee.initial_password_issued_at is not None
+            else None
+        )
+        if payload.get("issued_version") != current_version:
+            return HttpResponseBadRequest(
+                "この確認操作は使用済みです。画面を開き直してください。"
+            )
+
+        previous_issued_at = locked_employee.initial_password_issued_at
+        new_password = set_initial_password(locked_employee)
+        # 発行日時を常に新しくし、チケット再利用を無効化する。
+        if (
+            previous_issued_at is not None
+            and locked_employee.initial_password_issued_at <= previous_issued_at
+        ):
+            locked_employee.initial_password_issued_at = (
+                previous_issued_at + timedelta(microseconds=1)
+            )
+            locked_employee.initial_password_expires_at = (
+                locked_employee.initial_password_issued_at
+                + timedelta(hours=72)
+            )
+
+        locked_employee.save(update_fields=[
+            "password",
+            "must_change_password",
+            "initial_password_issued_at",
+            "initial_password_expires_at",
+        ])
+
+        # 監査情報に新しい平文やパスワードハッシュは記録しない。
+        AuditLog.objects.create(
+            actor=request.user,
+            target_employee=locked_employee,
+            action=AuditLog.Action.EMPLOYEE_UPDATE,
+            target_model="Employee",
+            target_id=str(locked_employee.pk),
+            before_data={"credential_reset": False},
+            after_data={"credential_reset": True},
+            reason="本人確認後の初期パスワード再発行",
+            details={},
+        )
+
+    # set_password により以前のログインセッションは次回照合時に失効する。
+    response = render(
+        request,
+        "management/employee_created.html",
+        {
+            "employee": locked_employee,
+            "initial_password": new_password,
+            "expires_at": locked_employee.initial_password_expires_at,
+            "operation_label": "初期パスワード再発行",
+        },
+    )
+    response["Referrer-Policy"] = "no-referrer"
+    response["X-Robots-Tag"] = "noindex, nofollow"
+    return response
 
 
 # 社員の月次勤怠詳細

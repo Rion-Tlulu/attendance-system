@@ -1,7 +1,9 @@
-"""A01 管理者勤怠一覧向けの表示データ。
+"""A01 管理者勤怠一覧の表示データ。
 
-既存の management/views.py を変更せず、
-社員別の月次状況を集計する。
+既存の社員検索、部署検索、状態検索、
+月次集計、ページネーションを維持する。
+
+F11: 日別未完了件数グラフを追加する。
 """
 
 import re
@@ -15,6 +17,9 @@ from django.db.models import Count, Q
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 
+from attendance.chart_data import (
+    build_incomplete_count_chart,
+)
 from attendance.models import MonthlyClosing, WorkSession
 from corrections.models import CorrectionRequest
 
@@ -32,7 +37,7 @@ STATUS_OPTIONS = (
 
 
 def _month_from_query(raw_value):
-    """YYYY-MMを対象月のdateへ変換する。"""
+    """対象月の取得と形式検証。"""
 
     current = timezone.localdate().replace(day=1)
 
@@ -40,13 +45,17 @@ def _month_from_query(raw_value):
         return current, ""
 
     if not re.fullmatch(
-        r"\d{4}-(0[1-9]|1[0-2])",
+        r"[0-9]{4}-(0[1-9]|1[0-2])",
         raw_value,
     ):
         return current, "対象月の形式が正しくありません。"
 
     try:
-        year, month = map(int, raw_value.split("-"))
+        year, month = map(
+            int,
+            raw_value.split("-"),
+        )
+
         return date(year, month, 1), ""
 
     except ValueError:
@@ -59,15 +68,11 @@ def _next_month(value):
     if value.month == 12:
         return date(value.year + 1, 1, 1)
 
-    return date(
-        value.year,
-        value.month + 1,
-        1,
-    )
+    return date(value.year, value.month + 1, 1)
 
 
 def _employee_month_url(employee, target_month):
-    """既存の社員別月次詳細URLを取得する。"""
+    """社員別月次詳細URLを返す。"""
 
     kwargs = {
         "employee_id": employee.pk,
@@ -97,7 +102,7 @@ def _employee_month_url(employee, target_month):
 
 
 def _query_for_page(filters, page_number):
-    """検索条件を保持したページ切替URLを生成。"""
+    """検索条件を引き継いだページURLを作成。"""
 
     params = {
         "month": filters["month"],
@@ -115,14 +120,18 @@ def _query_for_page(filters, page_number):
 
 @register.simple_tag(takes_context=True)
 def a01_snapshot(context):
-    """A01の表示情報を取得する。"""
+    """管理者の勤怠一覧とグラフを集計する。"""
 
     request = context.get("request")
 
-    # 既存ビューの認可に加え、表示側でも確認する
+    # ------------------------------------------
+    # 権限
+    # ------------------------------------------
+
     if (
         request is None
         or not request.user.is_authenticated
+        or not request.user.is_active
         or not getattr(
             request.user,
             "is_business_admin",
@@ -131,12 +140,16 @@ def a01_snapshot(context):
     ):
         return {"allowed": False}
 
+    # ------------------------------------------
+    # 対象月・フィルター
+    # ------------------------------------------
+
     target_month, month_error = _month_from_query(request.GET.get("month", ""))
 
     filters = {
         "month": target_month.strftime("%Y-%m"),
         "q": request.GET.get("q", "").strip()[:100],
-        "department": (request.GET.get("department", "").strip()[:100]),
+        "department": request.GET.get("department", "").strip()[:100],
         "status": request.GET.get("status", "all"),
     }
 
@@ -145,18 +158,33 @@ def a01_snapshot(context):
     if filters["status"] not in allowed_statuses:
         filters["status"] = "all"
 
+    # ------------------------------------------
+    # 社員一覧
+    # ------------------------------------------
+
     Employee = get_user_model()
 
-    # 無効化された社員の過去勤怠も保持・表示する
     employees = list(Employee.objects.all().order_by("employee_number"))
 
-    # 部署の選択肢
     department_names = sorted(
-        {str(getattr(employee, "department", "") or "") for employee in employees}
+        {
+            str(
+                getattr(
+                    employee,
+                    "department",
+                    "",
+                )
+                or ""
+            )
+            for employee in employees
+        }
         - {""}
     )
 
+    # ------------------------------------------
     # 社員番号・氏名検索
+    # ------------------------------------------
+
     q = filters["q"].casefold()
 
     if q:
@@ -173,17 +201,32 @@ def a01_snapshot(context):
             ).casefold()
         ]
 
+    # ------------------------------------------
     # 部署検索
+    # ------------------------------------------
+
     if filters["department"]:
         employees = [
             employee
             for employee in employees
-            if str(getattr(employee, "department", "") or "") == filters["department"]
+            if str(
+                getattr(
+                    employee,
+                    "department",
+                    "",
+                )
+                or ""
+            )
+            == filters["department"]
         ]
 
-    employee_ids = [employee.pk for employee in employees]
+    employee_ids = [item.pk for item in employees]
 
     end_month = _next_month(target_month)
+
+    # ------------------------------------------
+    # 勤怠・申請・月次確定の集計
+    # ------------------------------------------
 
     stats = {}
     pending_counts = {}
@@ -191,7 +234,6 @@ def a01_snapshot(context):
 
     if employee_ids:
 
-        # 対象月の勤務状態を社員別に集計
         session_qs = (
             WorkSession.objects.filter(
                 employee_id__in=employee_ids,
@@ -217,9 +259,8 @@ def a01_snapshot(context):
             )
         )
 
-        stats = {record["employee_id"]: record for record in session_qs}
+        stats = {item["employee_id"]: item for item in session_qs}
 
-        # 審査中の修正申請
         pending_qs = (
             CorrectionRequest.objects.filter(
                 work_session__employee_id__in=employee_ids,
@@ -232,11 +273,9 @@ def a01_snapshot(context):
         )
 
         pending_counts = {
-            record["work_session__employee_id"]: record["total"]
-            for record in pending_qs
+            item["work_session__employee_id"]: item["total"] for item in pending_qs
         }
 
-        # 月次確定済み社員
         finalized_ids = set(
             MonthlyClosing.objects.filter(
                 employee_id__in=employee_ids,
@@ -248,10 +287,13 @@ def a01_snapshot(context):
             )
         )
 
+    # ------------------------------------------
+    # 社員別の一覧行
+    # ------------------------------------------
+
     rows = []
 
     for employee in employees:
-
         employee_stats = stats.get(
             employee.pk,
             {},
@@ -267,7 +309,6 @@ def a01_snapshot(context):
 
         finalized = employee.pk in finalized_ids
 
-        # 重要度が高い状態を優先して表示
         if pending:
             label = "審査待ちあり"
             tone = "warning"
@@ -288,9 +329,6 @@ def a01_snapshot(context):
             label = "記録なし"
             tone = "neutral"
 
-        # 状態による絞り込み
-        selected = filters["status"]
-
         matches = {
             "all": True,
             "attention": bool(pending or incomplete),
@@ -300,7 +338,7 @@ def a01_snapshot(context):
             "unfinalized": not finalized,
         }
 
-        if not matches[selected]:
+        if not matches[filters["status"]]:
             continue
 
         rows.append(
@@ -328,13 +366,30 @@ def a01_snapshot(context):
             }
         )
 
-    # 一度に25人ずつ表示
-    paginator = Paginator(
-        rows,
-        25,
+    # ------------------------------------------
+    # F11: グラフ用データ
+    # ------------------------------------------
+
+    # ページネーション前の検索結果を使用。
+    selected_employee_ids = [row["employee"].pk for row in rows]
+
+    incomplete_chart = build_incomplete_count_chart(
+        target_month,
+        selected_employee_ids,
+        dom_id="f11-a01",
     )
 
+    # ------------------------------------------
+    # ページネーション
+    # ------------------------------------------
+
+    paginator = Paginator(rows, 25)
+
     page_obj = paginator.get_page(request.GET.get("page"))
+
+    # ------------------------------------------
+    # テンプレートへの戻り値
+    # ------------------------------------------
 
     return {
         "allowed": True,
@@ -348,6 +403,7 @@ def a01_snapshot(context):
         "pending_count": sum(row["pending"] for row in rows),
         "incomplete_count": sum(row["incomplete"] for row in rows),
         "finalized_count": sum(1 for row in rows if row["finalized"]),
+        "incomplete_chart": incomplete_chart,
         "previous_query": (
             _query_for_page(
                 filters,

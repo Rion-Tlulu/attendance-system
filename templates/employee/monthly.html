@@ -1,5 +1,5 @@
-
 {% extends "base.html" %}
+{% load f11_charts %}
 {% load static %}
 
 {% block title %}
@@ -147,6 +147,7 @@
         class="e02-kpi-grid"
         aria-label="月次勤怠の集計"
     >
+    
 
         <article class="e02-kpi">
             <div class="e02-kpi__icon e02-kpi__icon--blue">
@@ -214,6 +215,10 @@
 
     </section>
 
+
+    <!-- F11：対象月の日別実働時間。表を初期表示 -->
+    {% f11_employee_chart as work_chart %}
+    {% include "components/attendance_chart.html" with chart=work_chart only %}
 
     <!-- ====================================
          申請中の修正
@@ -530,5 +535,7 @@
     {% endif %}
 
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
 
 {% endblock %}

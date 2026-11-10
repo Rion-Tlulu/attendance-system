@@ -1,6 +1,6 @@
-
 {% extends "base.html" %}
 {% load static %}
+{% load f11_charts %}
 
 {% block title %}
 月次詳細・確定 | 勤怠管理
@@ -9,6 +9,7 @@
 {% block screen_label %}
 管理者｜月次詳細
 {% endblock %}
+
 
 {% block content %}
 
@@ -119,6 +120,10 @@
         </div>
     </section>
 
+
+    <!-- F11：確定状態に関係なく表示できる月次実働グラフ -->
+    {% f11_manager_chart as work_chart %}
+    {% include "components/attendance_chart.html" with chart=work_chart only %}
 
     <!-- 確定条件 -->
     <section class="v2-panel"
@@ -432,5 +437,7 @@
     </section>
 
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
 
 {% endblock %}

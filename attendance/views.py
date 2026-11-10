@@ -39,6 +39,8 @@ from .services import (
     record_clock_action,
 )
 
+from .chart_data import build_work_hours_chart
+
 logger = logging.getLogger(__name__)
 
 
@@ -415,11 +417,17 @@ def monthly_attendance(request):
         status=WorkSession.Status.COMPLETED,
     ).count()
 
+    work_chart = build_work_hours_chart(
+        request.user,
+        target_month,
+    )
+
     context = {
         "form": form,
         "report": report,
         "page_obj": page_obj,
         "completed_work_days": completed_work_days,
+        "work_chart": work_chart,
     }
 
     return render(

@@ -2,18 +2,10 @@
 
 from django import forms
 from django.contrib.auth import get_user_model
-from django.contrib.auth.password_validation import validate_password
-from django.core.exceptions import ValidationError
 
 from .models import EmploymentInfo
 
-# Djangoのカスタム社員モデルを取得
 Employee = get_user_model()
-
-
-# ==========================================
-# 修正申請の審査フォーム
-# ==========================================
 
 
 class ReviewForm(forms.Form):
@@ -27,39 +19,21 @@ class ReviewForm(forms.Form):
         ],
         widget=forms.RadioSelect,
     )
-
     return_reason = forms.CharField(
         label="差戻し理由",
         max_length=500,
         required=False,
-        widget=forms.Textarea(
-            attrs={
-                "rows": 4,
-                "maxlength": 500,
-            }
-        ),
+        widget=forms.Textarea(attrs={"rows": 4, "maxlength": 500}),
     )
 
     def clean(self):
         cleaned_data = super().clean()
-
         action = cleaned_data.get("action")
         return_reason = (cleaned_data.get("return_reason") or "").strip()
-
         if action == "return" and not return_reason:
-            self.add_error(
-                "return_reason",
-                "差戻し理由を入力してください。",
-            )
-
+            self.add_error("return_reason", "差戻し理由を入力してください。")
         cleaned_data["return_reason"] = return_reason
-
         return cleaned_data
-
-
-# ==========================================
-# 月次確定の確認フォーム
-# ==========================================
 
 
 class MonthClosingForm(forms.Form):
@@ -75,59 +49,20 @@ class MonthClosingForm(forms.Form):
     )
 
 
-# ==========================================
-# 社員モデルのフィールド確認
-# ==========================================
-
 employee_field_names = {field.name for field in Employee._meta.fields}
-
 profile_fields = [
     name
-    for name in (
-        "first_name",
-        "last_name",
-        "department",
-    )
+    for name in ("first_name", "last_name", "department")
     if name in employee_field_names
 ]
 
 
-# ==========================================
-# 社員登録フォーム
-# ==========================================
-
-
 class EmployeeCreateForm(forms.ModelForm):
-    """一般社員の新規登録フォーム。"""
-
-    temporary_password = forms.CharField(
-        label="初回ログイン用パスワード",
-        strip=False,
-        widget=forms.PasswordInput,
-    )
+    """社員登録。初期パスワードはサーバー側で生成する。"""
 
     class Meta:
         model = Employee
-        fields = [
-            "employee_number",
-            *profile_fields,
-        ]
-
-    def clean_temporary_password(self):
-        password = self.cleaned_data["temporary_password"]
-
-        try:
-            validate_password(password)
-
-        except ValidationError as exc:
-            raise forms.ValidationError(exc.messages) from exc
-
-        return password
-
-
-# ==========================================
-# 社員情報編集フォーム
-# ==========================================
+        fields = ["employee_number", *profile_fields]
 
 
 class EmployeeEditForm(forms.ModelForm):
@@ -135,24 +70,15 @@ class EmployeeEditForm(forms.ModelForm):
 
     class Meta:
         model = Employee
-        fields = [
-            *profile_fields,
-            "is_active",
-        ]
+        fields = [*profile_fields, "is_active"]
 
 
 class EmploymentInfoForm(forms.ModelForm):
-    """社員の部署・入退社日を編集する"""
+    """社員の部署・入退社日を編集する。"""
 
     class Meta:
         model = EmploymentInfo
-
-        fields = [
-            "department",
-            "hire_date",
-            "leave_date",
-        ]
-
+        fields = ["department", "hire_date", "leave_date"]
         widgets = {
             "department": forms.TextInput(attrs={"maxlength": 100}),
             "hire_date": forms.DateInput(attrs={"type": "date"}),

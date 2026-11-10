@@ -1,5 +1,3 @@
-
-
 # ---- management/tests.py ----
 from django.contrib.auth import get_user_model
 from django.test import TestCase
@@ -2162,3 +2160,96 @@ class V2ManagementTests(TestCase):
                 action=AuditLog.Action.EMPLOYEE_UPDATE,
             ).exists()
         )
+
+
+# ==========================================
+# F11: 管理者のグラフアクセス制御
+# ==========================================
+
+from types import SimpleNamespace
+from unittest.mock import patch
+
+from django.contrib.auth import get_user_model
+from django.test import RequestFactory, TestCase
+
+from attendance.templatetags.f11_charts import (
+    f11_manager_chart,
+)
+
+
+class F11ManagerChartTests(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        Employee = get_user_model()
+
+        cls.manager = Employee.objects.create_user(
+            employee_number="99101",
+            password="TestPassword_2026!",
+            is_business_admin=True,
+        )
+
+        cls.employee = Employee.objects.create_user(
+            employee_number="99102",
+            password="TestPassword_2026!",
+        )
+
+    def make_request(self, user):
+        factory = RequestFactory()
+
+        request = factory.get("/management/employees/1/months/2026/11/")
+
+        request.user = user
+
+        request.resolver_match = SimpleNamespace(
+            view_name="management:employee_month",
+            kwargs={
+                "employee_id": self.employee.pk,
+                "year": 2026,
+                "month": 11,
+            },
+        )
+
+        return request
+
+    def test_regular_employee_is_denied(self):
+        """一般社員には管理者向けデータを返さない。"""
+
+        request = self.make_request(self.employee)
+
+        result = f11_manager_chart({"request": request})
+
+        self.assertIsNone(result)
+
+    @patch("attendance.templatetags.f11_charts.build_work_hours_chart")
+    def test_manager_can_request_chart(self, mock_build):
+        """管理者は対象社員のグラフを取得できる。"""
+
+        mock_build.return_value = {
+            "kind": "work_hours",
+            "rows": [],
+        }
+
+        request = self.make_request(self.manager)
+
+        result = f11_manager_chart({"request": request})
+
+        self.assertIsNotNone(result)
+
+        mock_build.assert_called_once()
+
+        self.assertEqual(
+            mock_build.call_args.args[0].pk,
+            self.employee.pk,
+        )
+
+    def test_inactive_manager_is_denied(self):
+        """無効化された管理者にはデータを返さない。"""
+
+        self.manager.is_active = False
+
+        request = self.make_request(self.manager)
+
+        result = f11_manager_chart({"request": request})
+
+        self.assertIsNone(result)

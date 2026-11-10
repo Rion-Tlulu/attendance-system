@@ -1,0 +1,110 @@
+
+{% if chart %}
+<section
+    id="{{ chart.dom_id }}"
+    class="f11-chart"
+    data-f11-chart
+    aria-labelledby="{{ chart.dom_id }}-heading"
+>
+    <div class="f11-chart__header">
+        <div class="f11-chart__heading">
+            <h2 id="{{ chart.dom_id }}-heading">
+                {{ chart.title }}
+            </h2>
+            <p>
+                {{ chart.month }}・単位：{{ chart.unit }}
+            </p>
+        </div>
+
+        <button
+            type="button"
+            class="f11-chart__toggle"
+            data-f11-toggle
+            aria-controls="{{ chart.dom_id }}-panel"
+            aria-expanded="false"
+        >
+            グラフを表示
+        </button>
+    </div>
+
+    <p class="f11-chart__help">
+        数値表とグラフを切り替えられます。
+        グラフは勤務状況の確認を補助するものです。
+    </p>
+
+    {{ chart|json_script:chart.data_id }}
+
+    <div
+        class="f11-chart__table-wrap"
+        data-f11-table
+        role="region"
+        aria-label="{{ chart.month }}の{{ chart.title }}の数値表"
+        tabindex="0"
+    >
+        <table class="f11-chart__table">
+            <caption>
+                {{ chart.month }} {{ chart.title }}
+            </caption>
+
+            <thead>
+                <tr>
+                    <th scope="col">日付</th>
+                    <th scope="col">
+                        {{ chart.value_header }}
+                    </th>
+
+                    {% if chart.kind == "work_hours" %}
+                    <th scope="col">勤務状態</th>
+                    {% endif %}
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for row in chart.rows %}
+                <tr>
+                    <th scope="row">
+                        {{ row.label }}
+                    </th>
+                    <td>
+                        {{ row.display }}
+                    </td>
+
+                    {% if chart.kind == "work_hours" %}
+                    <td>{{ row.status }}</td>
+                    {% endif %}
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="3">
+                        対象データはありません。
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div
+        id="{{ chart.dom_id }}-panel"
+        class="f11-chart__panel"
+        data-f11-panel
+        hidden
+    >
+        <div class="f11-chart__canvas-wrap">
+            <canvas
+                data-f11-canvas
+                role="img"
+                aria-label="{{ chart.month }}の{{ chart.title }}を示す棒グラフ。数値は表でも確認できます。"
+            ></canvas>
+        </div>
+    </div>
+
+    <p
+        class="f11-chart__message"
+        data-f11-message
+        role="status"
+        aria-live="polite"
+        hidden
+    ></p>
+</section>
+{% endif %}

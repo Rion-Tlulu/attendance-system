@@ -1,5 +1,3 @@
-
-
 /* ---- static/js/auth.js ---- */
 "use strict";
 
@@ -26,9 +24,8 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
-
 /* ---- static/js/clock.js ---- */
-"use strict";
+("use strict");
 
 document.addEventListener("DOMContentLoaded", () => {
   // 日付と時刻は表示用。打刻時刻はDjangoサーバーで決定する。
@@ -84,9 +81,8 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
-
 /* ---- static/js/e01-clock-display.js ---- */
-"use strict";
+("use strict");
 
 /**
  * E01 打刻ホーム
@@ -141,9 +137,8 @@ document.addEventListener("DOMContentLoaded", () => {
   );
 });
 
-
 /* ---- static/js/e03-breaks.js ---- */
-"use strict";
+("use strict");
 
 document.addEventListener("DOMContentLoaded", () => {
   const addButton = document.querySelector("[data-e03-add-break]");
@@ -212,9 +207,8 @@ document.addEventListener("DOMContentLoaded", () => {
   updateButton();
 });
 
-
 /* ---- static/js/step4-password.js ---- */
-"use strict";
+("use strict");
 
 /*
  * STEP 4
@@ -254,3 +248,246 @@ document.addEventListener("click", (event) => {
     label.textContent = shouldShow ? "非表示" : "表示";
   }
 });
+
+/* ==============================================
+   F11_CHARTS_V14
+   E02 / A01 / A04 共通グラフ
+============================================== */
+
+(() => {
+  "use strict";
+
+  function initF11Chart(root) {
+    const toggle = root.querySelector("[data-f11-toggle]");
+
+    const table = root.querySelector("[data-f11-table]");
+
+    const panel = root.querySelector("[data-f11-panel]");
+
+    const canvas = root.querySelector("[data-f11-canvas]");
+
+    const message = root.querySelector("[data-f11-message]");
+
+    const jsonElement = root.querySelector('script[type="application/json"]');
+
+    if (!toggle || !table || !panel || !canvas || !message || !jsonElement) {
+      return;
+    }
+
+    let instance = null;
+    let graphData = null;
+
+    function notify(text) {
+      message.textContent = text;
+      message.hidden = false;
+    }
+
+    function clearNotice() {
+      message.textContent = "";
+      message.hidden = true;
+    }
+
+    function displayTable() {
+      table.hidden = false;
+      panel.hidden = true;
+
+      toggle.textContent = "グラフを表示";
+      toggle.setAttribute("aria-expanded", "false");
+    }
+
+    function parseData() {
+      try {
+        const parsed = JSON.parse(jsonElement.textContent);
+
+        if (!parsed || !Array.isArray(parsed.rows)) {
+          return null;
+        }
+
+        const valid = parsed.rows.every(
+          (row) =>
+            row.value === null ||
+            (typeof row.value === "number" &&
+              Number.isFinite(row.value) &&
+              row.value >= 0),
+        );
+
+        return valid ? parsed : null;
+      } catch (error) {
+        return null;
+      }
+    }
+
+    function reducedMotion() {
+      return (
+        typeof window.matchMedia === "function" &&
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      );
+    }
+
+    function createChart(data) {
+      const color = "#1769c2";
+
+      return new window.Chart(canvas, {
+        type: "bar",
+
+        data: {
+          labels: data.rows.map((row) => row.label),
+
+          datasets: [
+            {
+              label: data.title,
+
+              data: data.rows.map((row) => row.value),
+
+              backgroundColor: color,
+              borderColor: "#124f91",
+              borderWidth: 1,
+              maxBarThickness: 26,
+            },
+          ],
+        },
+
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+
+          animation: reducedMotion()
+            ? false
+            : {
+                duration: 250,
+              },
+
+          plugins: {
+            legend: {
+              display: false,
+            },
+
+            tooltip: {
+              callbacks: {
+                label(context) {
+                  const row = data.rows[context.dataIndex];
+
+                  if (!row) {
+                    return "";
+                  }
+
+                  return row.display;
+                },
+              },
+            },
+          },
+
+          scales: {
+            x: {
+              ticks: {
+                autoSkip: true,
+                maxTicksLimit: 11,
+              },
+            },
+
+            y: {
+              beginAtZero: true,
+
+              title: {
+                display: true,
+                text: data.unit,
+              },
+
+              ticks: data.kind === "incomplete_count" ? { precision: 0 } : {},
+            },
+          },
+        },
+      });
+    }
+
+    function displayGraph() {
+      clearNotice();
+
+      if (typeof window.Chart !== "function") {
+        displayTable();
+
+        notify(
+          "グラフを読み込めませんでした。" + "数値表は引き続き利用できます。",
+        );
+
+        return;
+      }
+
+      if (graphData === null) {
+        graphData = parseData();
+      }
+
+      if (graphData === null) {
+        displayTable();
+
+        notify(
+          "グラフ用データの読み込みに失敗しました。" +
+            "数値表をご確認ください。",
+        );
+
+        return;
+      }
+
+      const hasValue = graphData.rows.some((row) => row.value !== null);
+
+      if (!hasValue) {
+        displayTable();
+
+        notify(
+          "対象期間にグラフで表示できる" +
+            "完了記録がありません。" +
+            "勤務状態は数値表で確認できます。",
+        );
+
+        return;
+      }
+
+      panel.hidden = false;
+
+      try {
+        if (instance === null) {
+          instance = createChart(graphData);
+        } else {
+          instance.resize();
+        }
+
+        table.hidden = true;
+
+        toggle.textContent = "表を表示";
+        toggle.setAttribute("aria-expanded", "true");
+      } catch (error) {
+        if (instance !== null) {
+          instance.destroy();
+          instance = null;
+        }
+
+        displayTable();
+
+        notify(
+          "グラフの描画に失敗しました。" + "数値表は引き続き確認できます。",
+        );
+      }
+    }
+
+    toggle.addEventListener("click", () => {
+      if (panel.hidden) {
+        displayGraph();
+      } else {
+        clearNotice();
+        displayTable();
+      }
+    });
+
+    displayTable();
+  }
+
+  function initialize() {
+    document.querySelectorAll("[data-f11-chart]").forEach(initF11Chart);
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initialize, { once: true });
+  } else {
+    initialize();
+  }
+})();

@@ -1,5 +1,3 @@
-
-
 # ---- attendance/tests.py ----
 
 from datetime import date, datetime
@@ -36,12 +34,20 @@ class Phase2ModelTests(TestCase):
         jst = ZoneInfo("Asia/Tokyo")
 
         self.clock_in = datetime(
-            2026, 10, 15, 9, 0,
+            2026,
+            10,
+            15,
+            9,
+            0,
             tzinfo=jst,
         )
 
         self.clock_out = datetime(
-            2026, 10, 15, 18, 0,
+            2026,
+            10,
+            15,
+            18,
+            0,
             tzinfo=jst,
         )
 
@@ -70,22 +76,26 @@ class Phase2ModelTests(TestCase):
             "TestOnly_2026!Password",
         )
 
-        self.assertTrue(
-            self.employee.check_password(
-                "TestOnly_2026!Password"
-            )
-        )
+        self.assertTrue(self.employee.check_password("TestOnly_2026!Password"))
 
     def test_work_duration(self):
         jst = ZoneInfo("Asia/Tokyo")
 
         break_start = datetime(
-            2026, 10, 15, 12, 0,
+            2026,
+            10,
+            15,
+            12,
+            0,
             tzinfo=jst,
         )
 
         break_end = datetime(
-            2026, 10, 15, 13, 0,
+            2026,
+            10,
+            15,
+            13,
+            0,
             tzinfo=jst,
         )
 
@@ -96,14 +106,10 @@ class Phase2ModelTests(TestCase):
         )
 
         work_seconds = (
-            self.session.clock_out_at
-            - self.session.clock_in_at
+            self.session.clock_out_at - self.session.clock_in_at
         ).total_seconds()
 
-        break_seconds = (
-            rest.ended_at
-            - rest.started_at
-        ).total_seconds()
+        break_seconds = (rest.ended_at - rest.started_at).total_seconds()
 
         actual_seconds = work_seconds - break_seconds
 
@@ -1530,3 +1536,206 @@ class E03UiTests(TestCase):
             response,
             "この日の修正を申請する",
         )
+
+
+from datetime import date
+
+from django.contrib.auth import get_user_model
+from django.test import TestCase
+
+from attendance.chart_data import (
+    build_work_hours_chart,
+    build_incomplete_count_chart,
+    format_seconds,
+)
+from attendance.models import WorkSession
+
+
+class F11ChartTests(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        Employee = get_user_model()
+
+        cls.employee = Employee.objects.create_user(
+            employee_number="99801",
+            password="TestPassword_2026!",
+        )
+
+        cls.month = date(2026, 11, 1)
+
+    def test_no_record_is_null(self):
+        data = build_work_hours_chart(
+            self.employee,
+            self.month,
+        )
+
+        self.assertIsNone(data["rows"][0]["value"])
+
+    def test_zero_is_not_missing(self):
+        self.assertEqual(
+            format_seconds(0),
+            "0時間00分",
+        )
+
+        self.assertEqual(
+            format_seconds(None),
+            "—",
+        )
+
+    def test_incomplete_count(self):
+        WorkSession.objects.create(
+            employee=self.employee,
+            work_date=date(2026, 11, 5),
+            status=WorkSession.Status.WORKING,
+        )
+
+        data = build_incomplete_count_chart(
+            self.month,
+            [self.employee.pk],
+        )
+
+        self.assertEqual(
+            data["rows"][4]["value"],
+            1,
+        )
+
+
+# ==========================================
+# F11: Chart.js用データのテスト
+# ==========================================
+
+from datetime import date
+from types import SimpleNamespace
+from unittest.mock import patch
+
+from django.test import SimpleTestCase
+
+from attendance.chart_data import (
+    month_bounds,
+    iter_month_days,
+    work_result,
+)
+from attendance.models import WorkSession
+
+
+class F11ChartUnitTests(SimpleTestCase):
+
+    def test_month_bounds(self):
+        """対象月の範囲を確認。"""
+
+        start, end = month_bounds(date(2026, 11, 1))
+
+        self.assertEqual(
+            start,
+            date(2026, 11, 1),
+        )
+
+        self.assertEqual(
+            end,
+            date(2026, 12, 1),
+        )
+
+    def test_december_next_year(self):
+        """12月の翌月は翌年1月。"""
+
+        _, end = month_bounds(date(2026, 12, 1))
+
+        self.assertEqual(
+            end,
+            date(2027, 1, 1),
+        )
+
+    def test_leap_year(self):
+        """うるう年の2月は29日。"""
+
+        days = list(iter_month_days(date(2028, 2, 1)))
+
+        self.assertEqual(len(days), 29)
+
+    def test_no_record(self):
+        """勤務記録なしはNone。"""
+
+        status, seconds = work_result(
+            None,
+            [],
+        )
+
+        self.assertEqual(
+            status,
+            "記録なし",
+        )
+        self.assertIsNone(seconds)
+
+    def test_incomplete(self):
+        """出勤中は未完了。"""
+
+        session = SimpleNamespace(status=WorkSession.Status.WORKING)
+
+        status, seconds = work_result(
+            session,
+            [],
+        )
+
+        self.assertEqual(
+            status,
+            "未完了",
+        )
+        self.assertIsNone(seconds)
+
+    @patch("attendance.chart_data.calculate_duration")
+    def test_completed_eight_hours(self, mock_calc):
+        """完了勤務の8時間を確認。"""
+
+        mock_calc.return_value = SimpleNamespace(
+            complete=True,
+            work_seconds=28800,
+        )
+
+        session = SimpleNamespace(status=WorkSession.Status.COMPLETED)
+
+        status, seconds = work_result(
+            session,
+            [],
+        )
+
+        self.assertEqual(status, "完了")
+        self.assertEqual(seconds, 28800)
+
+    @patch("attendance.chart_data.calculate_duration")
+    def test_completed_zero_seconds(self, mock_calc):
+        """0秒を記録なしと区別する。"""
+
+        mock_calc.return_value = SimpleNamespace(
+            complete=True,
+            work_seconds=0,
+        )
+
+        session = SimpleNamespace(status=WorkSession.Status.COMPLETED)
+
+        status, seconds = work_result(
+            session,
+            [],
+        )
+
+        self.assertEqual(status, "完了")
+        self.assertEqual(seconds, 0)
+
+    @patch("attendance.chart_data.calculate_duration")
+    def test_invalid_completed_record(self, mock_calc):
+        """不整合な勤務は未完了として扱う。"""
+
+        mock_calc.return_value = SimpleNamespace(
+            complete=False,
+            work_seconds=None,
+        )
+
+        session = SimpleNamespace(status=WorkSession.Status.COMPLETED)
+
+        status, seconds = work_result(
+            session,
+            [],
+        )
+
+        self.assertEqual(status, "未完了")
+        self.assertIsNone(seconds)
