@@ -460,3 +460,213 @@
     font-size: 1.05rem;
   }
 }
+
+/* =========================================
+   STEP 4-3
+   C02 アカウント・使い方 V2
+========================================= */
+
+.account-page--v2 {
+  width: 100%;
+  max-width: 1280px;
+  min-width: 0;
+  margin-inline: auto;
+}
+
+/* 2カラム本体 */
+
+.account-page--v2 .account-layout-v2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  align-items: start;
+  margin-top: 22px;
+}
+
+/* 各カラム内のカード */
+
+.account-page--v2 .account-layout-v2__column {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+/* カード */
+
+.account-page--v2 .account-section {
+  min-width: 0;
+  margin: 0;
+  padding: 22px;
+  background: #ffffff;
+  border: 1px solid #d7e2f0;
+  border-radius: 12px;
+  box-shadow: 0 3px 12px rgb(18 45 80 / 5%);
+}
+
+.account-page--v2 .account-section-heading {
+  margin-bottom: 14px;
+}
+
+.account-page--v2 .account-section-heading h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  color: #142c50;
+  font-size: 1.1rem;
+  font-weight: 800;
+  line-height: 1.5;
+}
+
+.account-page--v2 .account-section-heading h2 > i {
+  color: #075be8;
+}
+
+.account-page--v2 .account-section-description {
+  margin: 0 0 16px;
+  color: #52637b;
+  line-height: 1.8;
+}
+
+/* 社員情報 */
+
+.account-page--v2 .v2-data-list {
+  margin: 0;
+}
+
+.account-page--v2 .v2-data-list > div {
+  display: grid;
+  grid-template-columns:
+    minmax(90px, 120px)
+    minmax(0, 1fr);
+  gap: 12px;
+  padding: 13px 0;
+  border-bottom: 1px solid #e2eaf4;
+}
+
+.account-page--v2 .v2-data-list dt {
+  color: #52637b;
+  font-weight: 700;
+}
+
+.account-page--v2 .v2-data-list dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* 説明 */
+
+.account-page--v2 .account-section p {
+  line-height: 1.85;
+}
+
+.account-page--v2 .account-section-note {
+  margin-top: 16px;
+  padding: 13px 15px;
+  background: #f0f5fc;
+  border-radius: 8px;
+  color: #435571;
+  font-size: 0.88rem;
+}
+
+/* ガイド項目 */
+
+.account-page--v2 .account-guide-grid {
+  display: grid;
+  gap: 10px;
+  margin: 18px 0;
+}
+
+.account-page--v2 .account-guide-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 50px;
+  padding: 12px 14px;
+  border: 1px solid #d7e2f0;
+  border-radius: 9px;
+  background: #f7faff;
+  color: #18365f;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.account-page--v2 .account-guide-link span {
+  flex: 1;
+  min-width: 0;
+}
+
+.account-page--v2 .account-guide-link:hover {
+  background: #e9f2ff;
+  border-color: #8fb9f4;
+}
+
+/* ボタン */
+
+.account-page--v2 .account-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 46px;
+  padding: 10px 16px;
+  text-align: center;
+  font-weight: 700;
+}
+
+/* 利用上の注意 */
+
+.account-page--v2 .account-notice-v2 {
+  padding: 15px;
+  background: #edf5ff;
+  border: 1px solid #c6daf8;
+  border-radius: 9px;
+}
+
+.account-page--v2 .account-notice-v2 p {
+  margin: 0 0 12px;
+}
+
+.account-page--v2 .account-notice-v2 p:last-child {
+  margin-bottom: 0;
+}
+
+/* フォーカスの可視化 */
+
+.account-page--v2 a:focus-visible {
+  outline: 3px solid #d17a00;
+  outline-offset: 3px;
+}
+
+/* スマートフォン・小型タブレット */
+
+@media (max-width: 767px) {
+  .account-page--v2 .account-layout-v2 {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    margin-top: 16px;
+  }
+
+  .account-page--v2 .account-layout-v2__column {
+    gap: 14px;
+  }
+
+  .account-page--v2 .account-section {
+    padding: 16px;
+  }
+
+  .account-page--v2 .account-action {
+    width: 100%;
+  }
+}
+
+/* 320pxなど小さい端末 */
+
+@media (max-width: 360px) {
+  .account-page--v2 .v2-data-list > div {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+}

@@ -103,7 +103,7 @@ def account_overview(request):
     )
 
     if not display_name:
-        display_name = employee.get_full_name() or employee.empoyee_number
+        display_name = employee.get_full_name() or employee.employee_number
 
     context = {
         "employee_number": employee.employee_number,

@@ -15,6 +15,8 @@ from corrections.models import CorrectionRequest
 
 from auditlog.models import AuditLog
 
+from notifications.services import notify_correction_submitted
+
 
 class CorrectionError(Exception):
     """修正申請の業務ルール違反。"""
@@ -303,6 +305,8 @@ def submit_correction(
             "original_version": session.version,
         },
     )
+
+    notify_correction_submitted(correction)
 
     return correction
 

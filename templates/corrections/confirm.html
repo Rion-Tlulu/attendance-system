@@ -2,89 +2,112 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}申請内容の確認 | 勤怠管理{% endblock %}
-{% block screen_label %}申請内容の確認{% endblock %}
+{% block title %}
+修正申請の内容確認 | 勤怠管理
+{% endblock %}
+
+{% block screen_label %}
+社員画面｜修正申請
+{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet"
-      href="{% static 'css/corrections.css' %}">
+      href="{% static 'css/daily-record-correction.css' %}">
 {% endblock %}
 
 {% block content %}
 
-<div class="correction-page">
+<div class="v2-page e03-page">
 
-    <div class="page-heading">
-        <h1>申請内容の確認</h1>
-        <p>
-            {{ work_day|date:"Y年n月j日" }}
-            の修正内容です。
-        </p>
-    </div>
+    <header class="e03-heading">
+        <div>
+            <h1>申請内容の確認</h1>
+            <p class="e03-date">
+                {{ work_day|date:"Y年n月j日（D）" }}
+            </p>
+            <p>
+                内容を確認してから提出してください。
+            </p>
+        </div>
+    </header>
 
-    <div class="correction-notice">
-        まだ申請は送信されていません。
-        内容を確認してから確定してください。
-    </div>
+    <ol class="e03-steps"
+        aria-label="修正申請の進行状況">
+        <li>1. 入力</li>
+        <li aria-current="step">2. 内容確認</li>
+        <li>3. 提出完了</li>
+    </ol>
 
-    <section class="ui-card correction-section">
-        <h2>修正案</h2>
+    <section class="e03-card"
+             aria-labelledby="e03-confirm-values-title">
+        <h2 id="e03-confirm-values-title">
+            申請する修正内容
+        </h2>
 
-        <dl class="correction-review-list">
+        <dl class="e03-data-list">
             <div>
-                <dt>出勤日時</dt>
+                <dt>出勤</dt>
                 <dd>{{ proposal_display.clock_in }}</dd>
             </div>
 
             <div>
-                <dt>退勤日時</dt>
+                <dt>退勤</dt>
                 <dd>{{ proposal_display.clock_out }}</dd>
             </div>
         </dl>
-    </section>
 
-    <section class="ui-card correction-section">
-        <h2>休憩</h2>
+        <h3 class="e03-history-title">
+            修正後の休憩
+        </h3>
 
-        {% for item in proposal_display.breaks %}
-        <div class="correction-review-break">
-            <strong>休憩{{ item.number }}</strong>
-            <span>{{ item.start }}</span>
-            <span>〜</span>
-            <span>{{ item.end }}</span>
-        </div>
+        {% for rest in proposal_display.breaks %}
+        <p class="e03-break-summary">
+            休憩 {{ rest.number }}：
+            {{ rest.start }} 〜 {{ rest.end }}
+        </p>
         {% empty %}
-        <p>休憩の設定はありません。</p>
+        <p class="e03-empty">
+            休憩の設定はありません。
+        </p>
         {% endfor %}
     </section>
 
-    <section class="ui-card correction-section">
-        <h2>申請理由</h2>
+    <section class="e03-card">
+        <h2>修正理由</h2>
         <p>{{ reason|linebreaksbr }}</p>
     </section>
 
-    <form method="post"
-          action="{% url 'corrections:create' work_day.year work_day.month work_day.day %}">
+    <div class="e03-notice e03-notice--warning">
+        <i class="fa-solid fa-triangle-exclamation"
+           aria-hidden="true"></i>
+        提出後は管理者の審査待ちになります。
+        提出だけでは勤怠の有効値は変更されません。
+    </div>
 
-        {% csrf_token %}
+    <div class="e03-form-actions">
+        <a
+            class="v2-button v2-button--outline"
+            href="{% url 'corrections:create' work_day.year work_day.month work_day.day %}">
+            入力へ戻る
+        </a>
 
-        <input type="hidden"
-               name="confirm_token"
-               value="{{ confirm_token }}">
+        <form
+            method="post"
+            action="{% url 'corrections:create' work_day.year work_day.month work_day.day %}">
+            {% csrf_token %}
 
-        <div class="correction-actions">
-            <a href="{% url 'corrections:create' work_day.year work_day.month work_day.day %}"
-               class="ui-button ui-button--secondary">
-                入力画面へ戻る
-            </a>
+            <input type="hidden"
+                   name="confirm_token"
+                   value="{{ confirm_token }}">
 
             <button type="submit"
-                    class="ui-button ui-button--primary">
+                    class="v2-button">
+                <i class="fa-solid fa-paper-plane"
+                   aria-hidden="true"></i>
                 この内容で申請する
             </button>
-        </div>
-
-    </form>
+        </form>
+    </div>
 
 </div>
 

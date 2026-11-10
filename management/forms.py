@@ -5,6 +5,8 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 
+from .models import EmploymentInfo
+
 # Djangoのカスタム社員モデルを取得
 Employee = get_user_model()
 
@@ -137,3 +139,22 @@ class EmployeeEditForm(forms.ModelForm):
             *profile_fields,
             "is_active",
         ]
+
+
+class EmploymentInfoForm(forms.ModelForm):
+    """社員の部署・入退社日を編集する"""
+
+    class Meta:
+        model = EmploymentInfo
+
+        fields = [
+            "department",
+            "hire_date",
+            "leave_date",
+        ]
+
+        widgets = {
+            "department": forms.TextInput(attrs={"maxlength": 100}),
+            "hire_date": forms.DateInput(attrs={"type": "date"}),
+            "leave_date": forms.DateInput(attrs={"type": "date"}),
+        }

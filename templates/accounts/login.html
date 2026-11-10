@@ -1,5 +1,4 @@
 
-
 {% extends "base.html" %}
 {% load static %}
 
@@ -9,87 +8,162 @@
 
 {% block content %}
 
-<section class="auth-layout"
-         aria-labelledby="login-title">
+<section
+    class="auth-layout auth-layout--v2"
+    aria-labelledby="login-title"
+>
+    <div class="auth-card auth-card--v2">
 
-    <div class="auth-card">
+        <!-- ブランド -->
+        <div class="auth-heading auth-heading--v2">
 
-        <div class="auth-heading">
-             <img src="{% static 'img/attendance-icon.png' %}" alt="勤怠チェックのカレンダーアイコン">
+            <div class="auth-brand">
+                <img
+                    src="{% static 'img/attendance-icon.png' %}"
+                    alt=""
+                    class="auth-brand__icon"
+                    width="64"
+                    height="64"
+                >
+
+                <span class="auth-brand__name">
+                    勤怠管理
+                </span>
+            </div>
 
             <h1 id="login-title">
-                勤怠管理システム
+                ログイン
             </h1>
 
-            <p>社員番号とパスワードでログイン</p>
+            <p>
+                社員番号とパスワードを入力してください。
+            </p>
+
         </div>
 
+        <!-- 認証エラー -->
         {% if form.non_field_errors %}
-        <div class="notice error"
-             role="alert">
-            {% for error in form.non_field_errors %}
-                <p>{{ error }}</p>
-            {% endfor %}
+        <div
+            class="notice error auth-error--v2"
+            role="alert"
+            id="login-form-errors"
+        >
+            <i
+                class="fa-solid fa-circle-exclamation"
+                aria-hidden="true"
+            ></i>
+
+            <div>
+                {% for error in form.non_field_errors %}
+                    <p>{{ error }}</p>
+                {% endfor %}
+            </div>
         </div>
         {% endif %}
 
-        <form method="post" class="auth-form">
+        <!-- ログインフォーム -->
+        <form
+            method="post"
+            class="auth-form auth-form--v2"
+        >
             {% csrf_token %}
 
             {% if next %}
-            <input type="hidden"
-                   name="next"
-                   value="{{ next }}">
+            <input
+                type="hidden"
+                name="next"
+                value="{{ next }}"
+            >
             {% endif %}
 
+            <!-- 社員番号 -->
             <div class="form-group">
                 {{ form.username.label_tag }}
+
                 {{ form.username }}
 
-                {% for error in form.username.errors %}
-                <p class="field-error">
-                    {{ error }}
+                {% if form.username.help_text %}
+                <p class="auth-field-help">
+                    {{ form.username.help_text }}
                 </p>
-                {% endfor %}
+                {% endif %}
+
+                {% if form.username.errors %}
+                <div
+                    class="field-error"
+                    role="alert"
+                    id="username-errors"
+                >
+                    {% for error in form.username.errors %}
+                        <p>{{ error }}</p>
+                    {% endfor %}
+                </div>
+                {% endif %}
             </div>
 
+            <!-- パスワード -->
             <div class="form-group">
+
                 {{ form.password.label_tag }}
 
-                <div class="password-control">
+                <div class="password-control password-control--v2">
+
                     {{ form.password }}
 
                     <button
                         type="button"
                         class="password-toggle"
-                        data-toggle-password="id_password"
+                        data-toggle-password="{{ form.password.id_for_label }}"
+                        aria-controls="{{ form.password.id_for_label }}"
                         aria-pressed="false"
-                        aria-controls="id_password">
+                    >
                         表示
                     </button>
+
                 </div>
 
-                {% for error in form.password.errors %}
-                <p class="field-error">
-                    {{ error }}
-                </p>
-                {% endfor %}
+                {% if form.password.errors %}
+                <div
+                    class="field-error"
+                    role="alert"
+                    id="password-errors"
+                >
+                    {% for error in form.password.errors %}
+                        <p>{{ error }}</p>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
             </div>
 
-            <button type="submit"
-                    class="btn btn-primary btn-block">
-                <i class="fa-solid fa-right-to-bracket"
-                   aria-hidden="true"></i>
-                ログイン
+            <!-- ログイン -->
+            <button
+                type="submit"
+                class="btn btn-primary btn-block auth-submit--v2"
+            >
+                <i
+                    class="fa-solid fa-right-to-bracket"
+                    aria-hidden="true"
+                ></i>
+
+                <span>ログイン</span>
             </button>
 
         </form>
 
-        <div class="auth-help">
+        <!-- 問い合わせ -->
+        <div class="auth-help auth-help--v2">
+
+            <i
+                class="fa-regular fa-circle-question"
+                aria-hidden="true"
+            ></i>
+
             <p>
                 パスワードを忘れた場合は、
                 社内の管理担当者にお問い合わせください。
             </p>
+
         </div>
 
     </div>

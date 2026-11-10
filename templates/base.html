@@ -38,24 +38,11 @@
     <link rel="stylesheet"
           href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.3.1/css/all.min.css">
 
-    <!-- Phase 3〜5の既存CSS -->
-    <link rel="stylesheet"
-          href="{% static 'css/auth.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app.css' %}">
 
-    <link rel="stylesheet"
-          href="{% static 'css/app.css' %}">
+    {% block extra_css %}
 
-    <link rel="stylesheet"
-          href="{% static 'css/compact.css' %}">
-
-    <link rel="stylesheet"
-          href="{% static 'css/header.css' %}">
-
-    <!-- 今回の最新共通CSS -->
-    <link rel="stylesheet"
-          href="{% static 'css/latest-layout.css' %}">
-
-    {% block extra_css %}{% endblock %}
+    {% endblock %}
 </head>
 
 <body class="app-v6">
@@ -95,6 +82,30 @@
             </div>
 
             <div class="app-topbar__user">
+
+                {% if request.user.is_authenticated %}
+
+<a
+    href="{% url 'notifications:list' %}"
+    class="app-notification-link"
+    aria-label="お知らせ・通知。未読{{ notification_unread_count }}件"
+>
+    <i
+        class="fa-solid fa-bell"
+        aria-hidden="true"
+    ></i>
+
+    <span>通知</span>
+
+    {% if notification_unread_count > 0 %}
+    <span class="app-notification-count"
+          aria-hidden="true">
+        {{ notification_unread_count }}
+    </span>
+    {% endif %}
+</a>
+
+{% endif %}
 
                 <i class="fa-solid fa-user"
                    aria-hidden="true"></i>
@@ -205,7 +216,7 @@
 {% endif %}
 
 
-<script src="{% static 'js/auth.js' %}"
+<script src="{% static 'js/app.js' %}"
         defer></script>
 
 {% block extra_js %}{% endblock %}

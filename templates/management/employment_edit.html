@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+雇用情報の編集 | 勤怠管理
+{% endblock %}
+
+{% block screen_label %}
+管理者｜社員管理
+{% endblock %}
+
+{% block content %}
+
+<div class="v2-page">
+
+    <header class="v2-heading">
+        <div>
+            <h1>雇用情報の編集</h1>
+            <p>
+                {{ employee.get_full_name }}
+                （{{ employee.employee_number }}）
+            </p>
+        </div>
+    </header>
+
+    <section class="v2-panel">
+
+        <h2>基本情報</h2>
+
+        <p>
+            社員番号：{{ employee.employee_number }}
+        </p>
+
+        <form method="post">
+            {% csrf_token %}
+
+            {{ form.non_field_errors }}
+
+            {% for field in form %}
+
+            <div class="v2-field"
+                 style="margin-bottom: 16px;">
+
+                {{ field.label_tag }}
+                {{ field }}
+
+                {% if field.errors %}
+                <div role="alert">
+                    {{ field.errors }}
+                </div>
+                {% endif %}
+
+            </div>
+
+            {% endfor %}
+
+            <p class="v2-notice">
+                退職日を設定しても、過去の勤怠記録は
+                削除されません。
+                アカウントの利用停止は
+                既存の社員編集画面で行ってください。
+            </p>
+
+            <div class="v2-actions"
+                 style="margin-top: 16px;">
+
+                <button
+                    type="submit"
+                    class="v2-button"
+                >
+                    変更を保存する
+                </button>
+
+                <a
+                    href="{% url 'management:employees' %}"
+                    class="v2-button v2-button--outline"
+                >
+                    社員一覧へ戻る
+                </a>
+
+            </div>
+        </form>
+
+    </section>
+
+</div>
+
+{% endblock %}

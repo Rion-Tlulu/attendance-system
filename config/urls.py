@@ -31,4 +31,8 @@ urlpatterns = [
         "admin/",
         admin.site.urls,
     ),
+    path(
+        "notifications/",
+        include("notifications.urls"),
+    ),
 ]

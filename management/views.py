@@ -57,6 +57,10 @@ from .services import (
     validate_target_month,
 )
 
+from corrections.services import (
+    current_values as correction_current_values,
+)
+
 logger = logging.getLogger(__name__)
 Employee = get_user_model()
 
@@ -250,7 +254,7 @@ def correction_queue(request):
 @never_cache
 @business_admin_required
 def correction_review_detail(request, pk):
-    """管理者用の申請詳細画面。"""
+    """修正前後を比較して申請を審査する画面。"""
 
     correction = get_object_or_404(
         CorrectionRequest.objects.select_related(
@@ -260,9 +264,35 @@ def correction_review_detail(request, pk):
         pk=pk,
     )
 
+    session = correction.work_session
+
+    # 現在の有効値
+    current_record = correction_current_values(session)
+
+    # 対象月が確定済みか
+    target_month = session.work_date.replace(day=1)
+
+    month_finalized = MonthlyClosing.objects.filter(
+        employee_id=session.employee_id,
+        target_month=target_month,
+        status=MonthlyClosing.Status.FINALIZED,
+    ).exists()
+
+    # 申請時と勤務データ版が一致するか
+    version_matches = correction.original_version == session.version
+
+    # 自分自身の申請・勤務は審査不可
+    is_self_request = (
+        correction.requested_by_id == request.user.pk
+        or session.employee_id == request.user.pk
+    )
+
+    # UIで審査ボタンを表示してよいか
     can_review = (
         correction.status == CorrectionRequest.Status.PENDING
-        and correction.requested_by_id != request.user.pk
+        and not is_self_request
+        and not month_finalized
+        and version_matches
     )
 
     return render(
@@ -270,7 +300,11 @@ def correction_review_detail(request, pk):
         "management/correction_review.html",
         {
             "correction": correction,
+            "current_values": current_record,
             "can_review": can_review,
+            "month_finalized": month_finalized,
+            "version_matches": version_matches,
+            "is_self_request": is_self_request,
             "form": ReviewForm(),
         },
     )
@@ -342,7 +376,9 @@ def employee_list(request):
 
     keyword = request.GET.get("q", "").strip()[:100]
 
-    queryset = Employee.objects.all().order_by("employee_number")
+    queryset = Employee.objects.select_related("employement_info").order_by(
+        "employee_number"
+    )
 
     if keyword:
         queryset = queryset.filter(
@@ -523,6 +559,19 @@ def employee_month(request, employee_id, year, month):
         target_month,
     )
 
+    # 対象月が終了済みか
+    month_is_past = target_month < timezone.localdate().replace(day=1)
+
+    # UI上で確定可能か判定
+    # 最終判定は既存のfinalize_month()が行う
+    can_finalize = (
+        employee.pk != request.user.pk
+        and not report.is_finalized
+        and month_is_past
+        and report.incomplete_count == 0
+        and report.pending_count == 0
+    )
+
     no_record_count = sum(row.record_key == "no_record" for row in report.rows)
 
     page_obj = Paginator(report.rows, 7).get_page(request.GET.get("page"))
@@ -536,6 +585,8 @@ def employee_month(request, employee_id, year, month):
             "page_obj": page_obj,
             "no_record_count": no_record_count,
             "closing_form": MonthClosingForm(),
+            "month_is_past": month_is_past,
+            "can_finalize": can_finalize,
         },
     )
 
@@ -693,6 +744,7 @@ def month_csv(request, employee_id, year, month):
             "休憩秒数",
             "実働秒数",
             "休憩時間",
+            "実働時間",
             "記録状態",
             "修正状態",
             "確定状態",

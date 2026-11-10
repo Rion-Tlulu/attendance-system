@@ -21,6 +21,8 @@ from corrections.services import (
     validate_proposal,
 )
 
+from notifications.services import notify_correction_reviewed
+
 
 class AdminActionError(Exception):
     """管理者操作で業務ルールを満たさない場合。"""
@@ -258,6 +260,8 @@ def review_correction(
             "correction_id": correction.pk,
         },
     )
+
+    notify_correction_reviewed(correction)
 
     return correction
 

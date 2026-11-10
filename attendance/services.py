@@ -124,15 +124,6 @@ def record_clock_action(
         if _is_finalized(employee, today):
             raise ClockActionError("確定済みの月には打刻できません。")
 
-        if WorkSession.objects.filter(
-            employee=employee,
-            work_date=today,
-        ).exists():
-            raise ClockActionError(
-                "この勤務日の記録は既に存在します。"
-                "必要な場合は修正申請を行ってください。"
-            )
-
         existing_today = (
             WorkSession.objects
             .select_for_update()

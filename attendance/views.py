@@ -189,6 +189,28 @@ def home(request):
     ]
 
     # ----------------------------------------------
+    # 新UI表示用：操作種類ごとに整理
+    # ----------------------------------------------
+
+    action_buttons = {button["kind"]: button for button in buttons}
+
+    # ----------------------------------------------
+    # 現在の勤務に紐づく原打刻履歴
+    # ----------------------------------------------
+
+    clock_events = []
+
+    if session is not None:
+        clock_events = list(
+            ClockEvent.objects.filter(
+                work_session=session,
+            ).order_by(
+                "recorded_at",
+                "pk",
+            )
+        )
+
+    # ----------------------------------------------
     # テンプレートへ渡す情報
     # ----------------------------------------------
 
@@ -196,6 +218,8 @@ def home(request):
         "now": now,
         "today": today,
         "session": session,
+        "action_buttons": action_buttons,
+        "clock_events": clock_events,
         "breaks": breaks,
         "last_event": last_event,
         "buttons": buttons,
@@ -372,10 +396,30 @@ def monthly_attendance(request):
 
     page_obj = paginator.get_page(request.GET.get("page"))
 
+    # 新UI用：対象月の勤務完了日数
+    # 所定勤務日数や出勤予定日数ではない
+
+    if target_month.month == 12:
+        next_month = date(target_month.year + 1, 1, 1)
+    else:
+        next_month = date(
+            target_month.year,
+            target_month.month + 1,
+            1,
+        )
+
+    completed_work_days = WorkSession.objects.filter(
+        employee=request.user,
+        work_date__gte=target_month,
+        work_date__lt=next_month,
+        status=WorkSession.Status.COMPLETED,
+    ).count()
+
     context = {
         "form": form,
         "report": report,
         "page_obj": page_obj,
+        "completed_work_days": completed_work_days,
     }
 
     return render(
@@ -445,6 +489,23 @@ def daily_attendance(request, year, month, day):
     breaks = get_breaks(session)
 
     corrections = get_corrections(session)
+
+    # 新UI用：審査中の修正申請を取得
+    pending_correction = next(
+        (
+            item
+            for item in corrections
+            if item.status == CorrectionRequest.Status.PENDING
+        ),
+        None,
+    )
+
+    # 新UI用：新規修正申請を開始できるか
+    is_future_day = work_day > timezone.localdate()
+
+    can_submit_correction = (
+        not is_future_day and not is_finalized and pending_correction is None
+    )
 
     # ----------------------------------------------
     # 原打刻の取得
@@ -532,6 +593,10 @@ def daily_attendance(request, year, month, day):
         "corrections": corrections,
         "month_query": month_start.strftime("%Y-%m"),
         "return_page": return_page,
+        "is_finalized": is_finalized,
+        "pending_correction": pending_correction,
+        "is_future_day": is_future_day,
+        "can_submit_correction": can_submit_correction,
     }
 
     return render(

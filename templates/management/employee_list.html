@@ -13,7 +13,7 @@
 {% block extra_css %}
 <link
     rel="stylesheet"
-    href="{% static 'css/a03-v2.css' %}"
+    href="{% static 'css/manager-employee-directory.css' %}"
 >
 {% endblock %}
 
@@ -173,7 +173,7 @@
 
         <form
             method="get"
-            action="{% url 'management:employee_list' %}"
+            action="/management/employees/"
             class="a03-search-form"
             role="search"
         >
@@ -316,7 +316,7 @@
                 </button>
 
                 <a
-                    href="{% url 'management:employee_list' %}"
+                    href="/management/employees/"
                     class="a03-button a03-button--outline"
                 >
                     条件をクリア

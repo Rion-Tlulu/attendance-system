@@ -1,3 +1,61 @@
+from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import F, Q
 
-# Create your models here.
+
+class EmploymentInfo(models.Model):
+    """社員の所属・入退社情報"""
+
+    employee = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="employement_info",
+        verbose_name="社員",
+    )
+
+    department = models.CharField(
+        "部署",
+        max_length=100,
+        blank=True,
+    )
+
+    hire_date = models.DateField(
+        "入社日",
+        null=True,
+        blank=True,
+    )
+
+    leave_date = models.DateField(
+        "退職日",
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        verbose_name = "雇用情報"
+        verbose_name_plural = "雇用情報"
+
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    Q(hire_date__isnull=True)
+                    | Q(leave_date__isnull=True)
+                    | Q(leave_date__gte=F("hire_date"))
+                ),
+                name="employement_valid_dates",
+            )
+        ]
+
+    def clean(self):
+        super().clean()
+
+        if self.hire_date and self.leave_date and self.leave_date < self.hire_date:
+            raise ValidationError(
+                {
+                    "leave_date": "退職日は入社日以降にしてください",
+                }
+            )
+
+    def __str__(self):
+        return f"{self.employee.employee_number}" f"/{self.department or "部署未設定"}"

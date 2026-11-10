@@ -1,115 +1,284 @@
 
 {% extends "base.html" %}
-{% load static %}
+{% load static attendance_ui %}
 
-{% block title %}修正申請の審査 | 勤怠管理{% endblock %}
-{% block screen_label %}管理者｜申請審査{% endblock %}
+{% block title %}
+修正申請の確認 | 勤怠管理
+{% endblock %}
 
-{% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/management-phase9.css' %}">
+{% block screen_label %}
+管理者｜修正申請
 {% endblock %}
 
 {% block content %}
 
-<div class="admin-page">
+<div class="v2-page">
 
-    <header class="admin-heading">
-        <h1>修正申請の審査</h1>
-        <p>
-            {{ correction.requested_by.get_full_name }}
-            （{{ correction.requested_by.employee_number }}）
-            ／{{ correction.work_session.work_date|date:"Y/m/d" }}
-        </p>
+    <header class="v2-heading">
+        <div>
+            <h1>修正申請の確認</h1>
+            <p>
+                現在の有効値と修正案を比較して
+                審査してください。
+            </p>
+        </div>
     </header>
 
-    <section class="ui-card admin-section">
+
+    <!-- 申請情報 -->
+    <section class="v2-panel">
         <h2>申請情報</h2>
 
-        <dl class="admin-detail-list">
+        <dl class="v2-data-list">
+
+            <div>
+                <dt>申請者</dt>
+                <dd>
+                    {{ correction.requested_by.get_full_name }}
+                    （{{ correction.requested_by.employee_number }}）
+                </dd>
+            </div>
+
+            <div>
+                <dt>勤務日</dt>
+                <dd>
+                    {{ correction.work_session.work_date|date:"Y/m/d" }}
+                </dd>
+            </div>
+
+            <div>
+                <dt>申請日時</dt>
+                <dd>
+                    {{ correction.created_at|date:"Y/m/d H:i" }}
+                </dd>
+            </div>
+
             <div>
                 <dt>申請状態</dt>
-                <dd>{{ correction.get_status_display }}</dd>
+                <dd>
+                    <span class="v2-state v2-state--warning">
+                        {{ correction.get_status_display }}
+                    </span>
+                </dd>
             </div>
 
-            <div>
-                <dt>申請理由</dt>
-                <dd>{{ correction.reason|linebreaksbr }}</dd>
-            </div>
-
-            <div>
-                <dt>勤務データ版</dt>
-                <dd>{{ correction.original_version }}</dd>
-            </div>
         </dl>
     </section>
 
-    <section class="ui-card admin-section">
-        <h2>申請された修正案</h2>
 
-        <dl class="admin-detail-list">
-            <div>
-                <dt>出勤</dt>
-                <dd>{{ correction.proposal.clock_in_at|default:"未設定" }}</dd>
+    <!-- 比較 -->
+    <section class="v2-panel">
+
+        <h2>申請内容の比較</h2>
+
+        <div class="v2-comparison">
+
+            <!-- 現在の有効値 -->
+            <div class="v2-comparison__item">
+
+                <h3>現在の有効値</h3>
+
+                <dl class="v2-data-list">
+                    <div>
+                        <dt>出勤</dt>
+                        <dd>
+                            {{ current_values.clock_in_at|jst_datetime }}
+                        </dd>
+                    </div>
+
+                    <div>
+                        <dt>退勤</dt>
+                        <dd>
+                            {{ current_values.clock_out_at|jst_datetime }}
+                        </dd>
+                    </div>
+                </dl>
+
+                <h4>休憩</h4>
+
+                {% for rest in current_values.breaks %}
+                <p>
+                    {{ rest.started_at|jst_datetime }}
+                    〜
+                    {{ rest.ended_at|jst_datetime }}
+                </p>
+                {% empty %}
+                <p>休憩記録なし</p>
+                {% endfor %}
+
             </div>
-            <div>
-                <dt>退勤</dt>
-                <dd>{{ correction.proposal.clock_out_at|default:"未設定" }}</dd>
+
+
+            <!-- 修正案 -->
+            <div class="v2-comparison__item v2-comparison__item--proposed">
+
+                <h3>修正案</h3>
+
+                <dl class="v2-data-list">
+                    <div>
+                        <dt>出勤</dt>
+                        <dd>
+                            {{ correction.proposal.clock_in_at|jst_datetime }}
+                        </dd>
+                    </div>
+
+                    <div>
+                        <dt>退勤</dt>
+                        <dd>
+                            {{ correction.proposal.clock_out_at|jst_datetime }}
+                        </dd>
+                    </div>
+                </dl>
+
+                <h4>休憩</h4>
+
+                {% for rest in correction.proposal.breaks %}
+                <p>
+                    {{ rest.started_at|jst_datetime }}
+                    〜
+                    {{ rest.ended_at|jst_datetime }}
+                </p>
+                {% empty %}
+                <p>休憩設定なし</p>
+                {% endfor %}
+
             </div>
-        </dl>
+        </div>
 
-        <h3>休憩</h3>
+        <p class="v2-notice"
+           style="margin-top: 16px;">
+            承認後に変更されるのは現在の有効値です。
+            原打刻の記録は保持されます。
+        </p>
 
-        {% for rest in correction.proposal.breaks %}
+    </section>
+
+
+    <!-- 申請理由 -->
+    <section class="v2-panel">
+
+        <h2>申請理由</h2>
+
+        <p>{{ correction.reason|linebreaksbr }}</p>
+
+        {% if correction.return_reason %}
+        <h3>差戻し理由</h3>
         <p>
-            休憩{{ forloop.counter }}：
-            {{ rest.started_at }} 〜 {{ rest.ended_at }}
+            {{ correction.return_reason|linebreaksbr }}
         </p>
-        {% empty %}
-        <p>休憩の設定はありません。</p>
-        {% endfor %}
+        {% endif %}
+
     </section>
 
-    {% if can_review %}
 
-    <section class="ui-card admin-section">
-        <h2>審査操作</h2>
+    <!-- 審査 -->
+    <section class="v2-panel">
 
-        <p class="admin-warning">
-            承認すると勤務の有効値が変更されます。
-            原打刻は変更されません。
+        <h2>審査アクション</h2>
+
+        {% if can_review %}
+
+        <p>
+            申請内容を確認してから、
+            承認または差戻しを選択してください。
         </p>
 
-        <form method="post"
-              action="{% url 'management:correction_review' correction.pk %}">
+        <!-- 承認 -->
+        <form
+            method="post"
+            action="{% url 'management:correction_review' correction.pk %}"
+        >
             {% csrf_token %}
 
-            <fieldset class="admin-review-options">
-                <legend>審査結果</legend>
-                {{ form.action }}
-            </fieldset>
+            <input
+                type="hidden"
+                name="action"
+                value="approve"
+            >
 
-            <div class="admin-field">
-                {{ form.return_reason.label_tag }}
-                {{ form.return_reason }}
-                <p>差戻しを選ぶ場合は理由が必須です（500文字以内）。</p>
-            </div>
-
-            <button type="submit"
-                    class="ui-button ui-button--primary">
-                審査結果を確定する
+            <button
+                class="v2-button"
+                type="submit"
+            >
+                <i class="fa-solid fa-circle-check"
+                   aria-hidden="true"></i>
+                この申請を承認する
             </button>
         </form>
+
+        <hr>
+
+        <!-- 差戻し -->
+        <form
+            method="post"
+            action="{% url 'management:correction_review' correction.pk %}"
+        >
+            {% csrf_token %}
+
+            <input
+                type="hidden"
+                name="action"
+                value="return"
+            >
+
+            <div class="v2-field">
+                <label for="return-reason">
+                    差戻し理由（必須）
+                </label>
+
+                <textarea
+                    id="return-reason"
+                    name="return_reason"
+                    maxlength="500"
+                    rows="4"
+                    required
+                    aria-describedby="return-reason-help"
+                ></textarea>
+
+                <p id="return-reason-help">
+                    500文字以内で理由を入力してください。
+                </p>
+            </div>
+
+            <div class="v2-actions"
+                 style="margin-top: 12px;">
+
+                <button
+                    class="v2-button v2-button--outline"
+                    type="submit"
+                >
+                    理由を添えて差し戻す
+                </button>
+            </div>
+        </form>
+
+        {% else %}
+
+        <p class="v2-notice v2-notice--warning">
+
+            この申請は現在、審査できません。
+
+            {% if is_self_request %}
+            自分自身の申請は審査できません。
+            {% elif month_finalized %}
+            対象月は確定済みです。
+            {% elif not version_matches %}
+            申請後に勤務データが変更されています。
+            {% else %}
+            すでに処理済み、または取下げ済みです。
+            {% endif %}
+
+        </p>
+
+        {% endif %}
+
     </section>
 
-    {% elif correction.requested_by_id == request.user.pk %}
 
-    <p class="admin-warning">
-        自分自身の修正申請は承認・差戻しできません。
-    </p>
-
-    {% endif %}
-
-    <a href="{% url 'management:corrections' %}">
+    <a
+        class="v2-button v2-button--outline"
+        href="{% url 'management:corrections' %}"
+    >
         申請一覧へ戻る
     </a>
 

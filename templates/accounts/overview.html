@@ -11,18 +11,24 @@
 {% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet"
-      href="{% static 'css/account-guide.css' %}">
+<link
+    rel="stylesheet"
+    href="{% static 'css/account-pages.css' %}"
+>
 {% endblock %}
 
 {% block content %}
 
-<div class="account-page">
+<div class="account-page account-page--v2">
 
+    <!-- ページタイトル -->
     <header class="account-page-heading">
+
         <h1>
-            <i class="fa-solid fa-user-gear"
-               aria-hidden="true"></i>
+            <i
+                class="fa-solid fa-user-gear"
+                aria-hidden="true"
+            ></i>
             アカウントと使い方
         </h1>
 
@@ -30,188 +36,334 @@
             登録されている社員情報の確認と、
             勤怠管理システムの使い方を確認できます。
         </p>
+
     </header>
 
 
-    <!-- アカウント情報 -->
-    <section class="ui-card account-section"
-             aria-labelledby="account-info-title">
+    <!-- 2カラムレイアウト -->
+    <div class="account-layout-v2">
 
-        <div class="account-section-heading">
-            <h2 id="account-info-title">
-                <i class="fa-solid fa-id-card"
-                   aria-hidden="true"></i>
-                アカウント情報
-            </h2>
+        <!-- ===========================
+             左カラム
+        ============================ -->
+        <div class="account-layout-v2__column">
 
-            {% if account_active %}
-            <span class="account-status account-status--active">
-                利用中
-            </span>
-            {% else %}
-            <span class="account-status account-status--inactive">
-                利用停止中
-            </span>
-            {% endif %}
+            <!-- アカウント情報 -->
+            <section
+                class="ui-card account-section"
+                aria-labelledby="account-info-title"
+            >
+
+                <div class="account-section-heading">
+
+                    <h2 id="account-info-title">
+                        <i
+                            class="fa-solid fa-user"
+                            aria-hidden="true"
+                        ></i>
+                        アカウント情報
+                    </h2>
+
+                </div>
+
+                <p class="account-section-description">
+                    現在ログインしている
+                    アカウントの登録情報です。
+                </p>
+
+                <dl class="v2-data-list">
+
+                    <div>
+                        <dt>氏名</dt>
+                        <dd>
+                            {{ request.user.get_full_name|default:"未設定" }}
+                        </dd>
+                    </div>
+
+                    <div>
+                        <dt>社員番号</dt>
+                        <dd>
+                            {{ request.user.employee_number }}
+                        </dd>
+                    </div>
+
+                    <div>
+                        <dt>利用状態</dt>
+                        <dd>
+
+                            {% if request.user.is_active %}
+
+                            <span class="v2-state v2-state--success">
+                                <i
+                                    class="fa-solid fa-circle-check"
+                                    aria-hidden="true"
+                                ></i>
+                                有効
+                            </span>
+
+                            {% else %}
+
+                            <span class="v2-state v2-state--danger">
+                                <i
+                                    class="fa-solid fa-circle-xmark"
+                                    aria-hidden="true"
+                                ></i>
+                                無効
+                            </span>
+
+                            {% endif %}
+
+                        </dd>
+                    </div>
+
+<!-- アカウントの権限 -->
+<div>
+    <dt>権限</dt>
+    <dd>
+        {% if request.user.is_business_admin %}
+
+        <span class="v2-state v2-state--info">
+            <i
+                class="fa-solid fa-shield-halved"
+                aria-hidden="true"
+            ></i>
+            管理者権限あり
+        </span>
+
+        {% else %}
+
+        <span class="v2-state">
+            <i
+                class="fa-solid fa-user"
+                aria-hidden="true"
+            ></i>
+            一般社員
+        </span>
+
+        {% endif %}
+    </dd>
+</div>
+
+
+                </dl>
+
+                <p class="account-section-note">
+                    登録内容に誤りがある場合は、
+                    社内の管理担当者に確認してください。
+                </p>
+
+            </section>
+
+
+            <!-- セキュリティ -->
+            <section
+                class="ui-card account-section"
+                aria-labelledby="account-security-title"
+            >
+
+                <div class="account-section-heading">
+
+                    <h2 id="account-security-title">
+                        <i
+                            class="fa-solid fa-shield-halved"
+                            aria-hidden="true"
+                        ></i>
+                        セキュリティ
+                    </h2>
+
+                </div>
+
+                <p>
+                    アカウントを安全に利用するため、
+                    パスワードは適切に管理してください。
+                </p>
+
+                <p class="account-section-note">
+                    パスワードはこの画面には表示されません。
+                    変更する場合は専用画面を利用します。
+                </p>
+
+                <a
+                    href="{% url 'accounts:password_change' %}"
+                    class="ui-button ui-button--primary account-action"
+                >
+                    <i
+                        class="fa-solid fa-key"
+                        aria-hidden="true"
+                    ></i>
+
+                    パスワードを変更する
+                </a>
+
+            </section>
+
         </div>
 
-        <p class="account-section-note">
-            現在ログインしている社員の登録情報です。
-        </p>
 
-        <dl class="account-info-list">
+        <!-- ===========================
+             右カラム
+        ============================ -->
+        <div class="account-layout-v2__column">
 
-            <div>
-                <dt>社員番号</dt>
-                <dd>{{ employee_number }}</dd>
-            </div>
+            <!-- 使い方ガイド -->
+            <section
+                class="ui-card account-section"
+                aria-labelledby="account-guide-title"
+            >
 
-            <div>
-                <dt>氏名</dt>
-                <dd>{{ display_name }}</dd>
-            </div>
+                <div class="account-section-heading">
 
-            <div>
-                <dt>所属部署</dt>
-                <dd>{{ department_label }}</dd>
-            </div>
+                    <h2 id="account-guide-title">
+                        <i
+                            class="fa-solid fa-book-open"
+                            aria-hidden="true"
+                        ></i>
+                        使い方ガイド
+                    </h2>
 
-            <div>
-                <dt>利用権限</dt>
-                <dd>{{ account_role }}</dd>
-            </div>
+                </div>
 
-        </dl>
+                <p>
+                    打刻や勤怠確認、修正申請の方法を
+                    手順に沿って説明します。
+                </p>
 
-        <p class="account-help-text">
-            社員番号・氏名・所属部署に誤りがある場合は、
-            社内の管理担当者へ確認してください。
-        </p>
+                <nav
+                    class="account-guide-grid"
+                    aria-label="使い方ガイドの項目"
+                >
 
-    </section>
+                    <!-- 打刻方法 -->
+                    <a
+                        href="{% url 'accounts:guide' %}#clocking"
+                        class="account-guide-link"
+                    >
+                        <i
+                            class="fa-regular fa-clock"
+                            aria-hidden="true"
+                        ></i>
+
+                        <span>打刻の方法</span>
+
+                        <i
+                            class="fa-solid fa-chevron-right"
+                            aria-hidden="true"
+                        ></i>
+                    </a>
 
 
-    <!-- セキュリティ -->
-    <section class="ui-card account-section"
-             aria-labelledby="account-security-title">
+                    <!-- 月次勤怠 -->
+                    <a
+                        href="{% url 'accounts:guide' %}#monthly"
+                        class="account-guide-link"
+                    >
+                        <i
+                            class="fa-solid fa-calendar-days"
+                            aria-hidden="true"
+                        ></i>
 
-        <div class="account-section-heading">
-            <h2 id="account-security-title">
-                <i class="fa-solid fa-shield-halved"
-                   aria-hidden="true"></i>
-                セキュリティ
-            </h2>
+                        <span>自分の勤怠の確認</span>
+
+                        <i
+                            class="fa-solid fa-chevron-right"
+                            aria-hidden="true"
+                        ></i>
+                    </a>
+
+
+                    <!-- 修正申請 -->
+                    <a
+                        href="{% url 'accounts:guide' %}#correction"
+                        class="account-guide-link"
+                    >
+                        <i
+                            class="fa-solid fa-file-pen"
+                            aria-hidden="true"
+                        ></i>
+
+                        <span>修正申請の方法</span>
+
+                        <i
+                            class="fa-solid fa-chevron-right"
+                            aria-hidden="true"
+                        ></i>
+                    </a>
+
+
+                    <!-- 困ったとき -->
+                    <a
+                        href="{% url 'accounts:guide' %}#troubleshoot"
+                        class="account-guide-link"
+                    >
+                        <i
+                            class="fa-solid fa-circle-question"
+                            aria-hidden="true"
+                        ></i>
+
+                        <span>困ったとき</span>
+
+                        <i
+                            class="fa-solid fa-chevron-right"
+                            aria-hidden="true"
+                        ></i>
+                    </a>
+
+                </nav>
+
+                <a
+                    href="{% url 'accounts:guide' %}"
+                    class="ui-button ui-button--secondary account-action"
+                >
+                    <i
+                        class="fa-solid fa-book-open-reader"
+                        aria-hidden="true"
+                    ></i>
+
+                    使い方をすべて見る
+                </a>
+
+            </section>
+
+
+            <!-- 利用上の注意 -->
+            <section
+                class="ui-card account-section"
+                aria-labelledby="account-notice-title"
+            >
+
+                <div class="account-section-heading">
+
+                    <h2 id="account-notice-title">
+                        <i
+                            class="fa-solid fa-circle-info"
+                            aria-hidden="true"
+                        ></i>
+                        利用上の注意
+                    </h2>
+
+                </div>
+
+                <div class="account-notice-v2">
+
+                    <p>
+                        勤怠情報には社員の勤務状況が
+                        含まれます。
+                        共用端末を使用した場合は、
+                        作業後にログアウトしてください。
+                    </p>
+
+                    <p>
+                        打刻や申請の内容に誤りがある場合は、
+                        勤怠詳細と申請履歴を確認してください。
+                    </p>
+
+                </div>
+
+            </section>
+
         </div>
 
-        <p>
-            パスワードは安全なアカウント管理に
-            重要な情報です。
-        </p>
-
-        <p class="account-section-note">
-            パスワードはこの画面に表示されません。
-            変更する場合は専用画面を使用してください。
-        </p>
-
-        <a href="{% url 'accounts:password_change' %}"
-           class="ui-button ui-button--primary account-action">
-
-            <i class="fa-solid fa-key"
-               aria-hidden="true"></i>
-
-            パスワードを変更する
-        </a>
-
-    </section>
-
-
-    <!-- 使い方 -->
-    <section class="ui-card account-section"
-             aria-labelledby="account-guide-title">
-
-        <div class="account-section-heading">
-            <h2 id="account-guide-title">
-                <i class="fa-solid fa-book-open"
-                   aria-hidden="true"></i>
-                使い方ガイド
-            </h2>
-        </div>
-
-        <p>
-            打刻や勤怠確認、修正申請の方法を
-            手順に沿って説明します。
-        </p>
-
-        <div class="account-guide-grid">
-
-            <a href="{% url 'accounts:guide' %}#clocking"
-               class="account-guide-link">
-                <i class="fa-regular fa-clock"
-                   aria-hidden="true"></i>
-                <span>打刻の方法</span>
-                <i class="fa-solid fa-chevron-right"
-                   aria-hidden="true"></i>
-            </a>
-
-            <a href="{% url 'accounts:guide' %}#monthly"
-               class="account-guide-link">
-                <i class="fa-solid fa-calendar-days"
-                   aria-hidden="true"></i>
-                <span>自分の勤怠の確認</span>
-                <i class="fa-solid fa-chevron-right"
-                   aria-hidden="true"></i>
-            </a>
-
-            <a href="{% url 'accounts:guide' %}#correction"
-               class="account-guide-link">
-                <i class="fa-solid fa-file-pen"
-                   aria-hidden="true"></i>
-                <span>修正申請の方法</span>
-                <i class="fa-solid fa-chevron-right"
-                   aria-hidden="true"></i>
-            </a>
-
-            <a href="{% url 'accounts:guide' %}#troubleshoot"
-               class="account-guide-link">
-                <i class="fa-solid fa-circle-question"
-                   aria-hidden="true"></i>
-                <span>困ったとき</span>
-                <i class="fa-solid fa-chevron-right"
-                   aria-hidden="true"></i>
-            </a>
-
-        </div>
-
-        <a href="{% url 'accounts:guide' %}"
-           class="ui-button ui-button--secondary account-action">
-            使い方をすべて見る
-        </a>
-
-    </section>
-
-
-    <!-- 利用上の注意 -->
-    <section class="ui-card account-section"
-             aria-labelledby="account-notice-title">
-
-        <h2 id="account-notice-title">
-            <i class="fa-solid fa-circle-info"
-               aria-hidden="true"></i>
-            利用上の注意
-        </h2>
-
-        <p>
-            勤怠情報には社員の勤務状況が含まれます。
-            共用端末を使用した場合は、作業後に
-            ログアウトしてください。
-        </p>
-
-        <p class="account-section-note">
-            打刻や申請の内容に誤りがある場合は、
-            勤怠詳細と申請履歴を確認してください。
-        </p>
-
-    </section>
+    </div>
 
 </div>
 

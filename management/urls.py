@@ -1,6 +1,10 @@
+from . import bulk_exports
+
 from django.urls import path
 
 from . import views
+
+from . import employee_details
 
 app_name = "management"
 
@@ -82,5 +86,16 @@ urlpatterns = [
         "audit/<int:pk>/",
         views.audit_detail,
         name="audit_detail",
+    ),
+    path(
+        "employees/<int:employee_id>/employment/",
+        employee_details.employement_edit,
+        name="employment_edit",
+    ),
+    # 全社員・部署別・個人別のCSV出力
+    path(
+        "exports/",
+        bulk_exports.bulk_export,
+        name="bulk_export",
     ),
 ]

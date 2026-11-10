@@ -2,335 +2,329 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}日別詳細 | 勤怠管理{% endblock %}
-{% block screen_label %}日別詳細{% endblock %}
+{% block title %}
+日別勤怠詳細 | 勤怠管理
+{% endblock %}
+
+{% block screen_label %}
+社員画面｜日別詳細
+{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet"
-      href="{% static 'css/monthly.css' %}">
+<link
+    rel="stylesheet"
+    href="{% static 'css/daily-record-correction.css' %}"
+>
 {% endblock %}
 
 {% block content %}
 
-<div class="daily-page">
+<div class="v2-page e03-page">
 
-    <nav class="daily-breadcrumb"
-         aria-label="パンくずリスト">
+    <!-- ページ見出し -->
+    <header class="e03-heading">
+        <div>
+            <p class="e03-breadcrumb">
+                <a href="/employee/monthly/?month={{ month_query }}&amp;page={{ return_page }}">
+                    自分の勤怠
+                </a>
+                <span aria-hidden="true"> / </span>
+                日別詳細
+            </p>
 
-        <a href="{% url 'attendance:monthly' %}?month={{ month_query }}&amp;page={{ return_page }}">
-            自分の勤怠
-        </a>
-
-        <i class="fa-solid fa-chevron-right"
-           aria-hidden="true"></i>
-
-        <span aria-current="page">日別詳細</span>
-
-    </nav>
-
-
-    <div class="daily-title-row">
-
-        <h1>
-            {{ work_day|date:"Y年n月j日" }}
-            （{{ summary.day_label }}）
-        </h1>
-
-        <div class="daily-title-actions">
-
-            <a href="{% url 'attendance:monthly' %}?month={{ month_query }}&amp;page={{ return_page }}"
-               class="ui-button ui-button--secondary">
-                月次一覧へ戻る
-            </a>
-
-            <span class="daily-planned-action">
-                {% if summary.closing_key != "finalized" and not summary.has_pending %}
-
-<a href="{% url 'corrections:create' work_day.year work_day.month work_day.day %}"
-   class="ui-button ui-button--primary">
-
-    <i class="fa-solid fa-pen-to-square"
-       aria-hidden="true"></i>
-
-    修正を申請する
-</a>
-
-{% endif %}
-
-<a href="{% url 'corrections:list' %}"
-   class="ui-button ui-button--secondary">
-    申請履歴を見る
-</a>
-            </span>
-
+            <h1>日別勤怠詳細</h1>
+            <p class="e03-date">
+                {{ work_day|date:"Y年n月j日（D）" }}
+            </p>
         </div>
+
+        <div class="e03-status-list">
+            {% if not session %}
+                <span class="v2-state">
+                    記録なし
+                </span>
+            {% elif session.status == "completed" %}
+                <span class="v2-state v2-state--success">
+                    勤務完了
+                </span>
+            {% elif session.status == "working" %}
+                <span class="v2-state v2-state--info">
+                    勤務中
+                </span>
+            {% elif session.status == "on_break" %}
+                <span class="v2-state v2-state--warning">
+                    休憩中
+                </span>
+            {% else %}
+                <span class="v2-state v2-state--warning">
+                    {{ session.get_status_display }}
+                </span>
+            {% endif %}
+
+            {% if pending_correction %}
+                <span class="v2-state v2-state--warning">
+                    修正申請中
+                </span>
+            {% endif %}
+
+            {% if is_finalized %}
+                <span class="v2-state v2-state--success">
+                    月次確定済み
+                </span>
+            {% else %}
+                <span class="v2-state">
+                    月次未確定
+                </span>
+            {% endif %}
+        </div>
+    </header>
+
+    <!-- 状態案内 -->
+    {% if is_finalized %}
+    <div class="e03-notice" role="status">
+        <i class="fa-solid fa-lock" aria-hidden="true"></i>
+        対象月は確定済みです。修正申請を行う場合は、
+        管理者による確定解除が必要です。
+    </div>
+    {% elif pending_correction %}
+    <div class="e03-notice e03-notice--warning" role="status">
+        <i class="fa-solid fa-file-circle-question"
+           aria-hidden="true"></i>
+        この勤務には審査中の修正申請があります。
+        新たな申請や追加打刻はできません。
+    </div>
+    {% endif %}
+
+    <!-- 原記録と有効値 -->
+    <div class="e03-comparison">
+
+        <section class="e03-card"
+                 aria-labelledby="e03-original-title">
+            <h2 id="e03-original-title">
+                <i class="fa-solid fa-clock-rotate-left"
+                   aria-hidden="true"></i>
+                原打刻の記録
+            </h2>
+
+            <p class="e03-card-description">
+                実際に記録した打刻履歴です。
+                この記録は修正申請によって書き換えません。
+            </p>
+
+            {% if original_events %}
+            <ol class="e03-event-list">
+                {% for event in original_events %}
+                <li>
+                    <span class="e03-event-kind">
+                        {{ event.get_kind_display }}
+                    </span>
+                    <time datetime="{{ event.recorded_at|date:'c' }}">
+                        {{ event.recorded_at|date:"Y/m/d H:i:s" }}
+                    </time>
+                </li>
+                {% endfor %}
+            </ol>
+            {% else %}
+            <p class="e03-empty">
+                原打刻の記録はありません。
+            </p>
+            {% endif %}
+        </section>
+
+        <section class="e03-card e03-card--effective"
+                 aria-labelledby="e03-effective-title">
+            <h2 id="e03-effective-title">
+                <i class="fa-solid fa-circle-check"
+                   aria-hidden="true"></i>
+                現在の有効値
+            </h2>
+
+            <p class="e03-card-description">
+                勤怠集計に使用する現在の記録です。
+                承認済みの修正内容が反映されます。
+            </p>
+
+            <dl class="e03-data-list">
+                <div>
+                    <dt>出勤</dt>
+                    <dd>
+                        {% if session.clock_in_at %}
+                            {{ session.clock_in_at|date:"Y/m/d H:i:s" }}
+                        {% else %}
+                            未記録
+                        {% endif %}
+                    </dd>
+                </div>
+
+                <div>
+                    <dt>退勤</dt>
+                    <dd>
+                        {% if session.clock_out_at %}
+                            {{ session.clock_out_at|date:"Y/m/d H:i:s" }}
+                        {% else %}
+                            未記録
+                        {% endif %}
+                    </dd>
+                </div>
+
+                <div>
+                    <dt>休憩合計</dt>
+                    <dd>
+                        {{ summary.break_display|default:"—" }}
+                    </dd>
+                </div>
+
+                <div>
+                    <dt>実働</dt>
+                    <dd>
+                        {{ summary.work_display|default:"—" }}
+                    </dd>
+                </div>
+            </dl>
+
+            <p class="e03-inline-help">
+                勤怠の修正は、申請の承認後に有効値へ
+                反映されます。
+            </p>
+        </section>
 
     </div>
 
-
-    <!-- 3種類の状態 -->
-    <section class="daily-status-row"
-             aria-label="勤務の状態">
-
-        <div>
-            <strong>記録状態：</strong>
-            <span class="attendance-label attendance-label--{{ summary.record_key }}">
-                {{ summary.record_label }}
+    <!-- 休憩 -->
+    <section class="e03-card"
+             aria-labelledby="e03-breaks-title">
+        <div class="e03-section-heading">
+            <h2 id="e03-breaks-title">
+                <i class="fa-solid fa-mug-hot" aria-hidden="true"></i>
+                休憩の一覧
+            </h2>
+            <span class="e03-subtle">
+                複数回の休憩に対応
             </span>
         </div>
-
-        <div>
-            <strong>修正状態：</strong>
-            <span class="attendance-label attendance-label--{{ summary.correction_key }}">
-                {{ summary.correction_label }}
-            </span>
-        </div>
-
-        <div>
-            <strong>確定状態：</strong>
-            <span class="attendance-label attendance-label--{{ summary.closing_key }}">
-                {{ summary.closing_label }}
-            </span>
-        </div>
-
-    </section>
-
-
-    <!-- 原記録と現在の有効値 -->
-    <section class="ui-card daily-section"
-             aria-labelledby="daily-values-title">
-
-        <h2 id="daily-values-title">
-            原記録と現在の有効値
-        </h2>
-
-        <div class="table-scroll"
-             role="region"
-             aria-label="原記録と現在の有効値の比較"
-             tabindex="0">
-
-            <table class="ui-table daily-comparison">
-
-                <thead>
-                    <tr>
-                        <th scope="col">項目</th>
-                        <th scope="col">原記録</th>
-                        <th scope="col">現在の有効値</th>
-                    </tr>
-                </thead>
-
-                <tbody>
-
-                {% for row in comparison_rows %}
-
-                    <tr>
-                        <th scope="row">{{ row.label }}</th>
-                        <td>{{ row.original }}</td>
-                        <td>{{ row.effective }}</td>
-                    </tr>
-
-                {% endfor %}
-
-                </tbody>
-
-            </table>
-
-        </div>
-
-        <div class="daily-totals">
-
-            <div>
-                <span>休憩合計</span>
-                <strong>{{ summary.break_display }}</strong>
-            </div>
-
-            <div>
-                <span>実働時間</span>
-                <strong>{{ summary.work_display }}</strong>
-            </div>
-
-        </div>
-
-    </section>
-
-
-    <!-- 休憩詳細 -->
-    <section class="ui-card daily-section"
-             aria-labelledby="daily-break-title">
-
-        <h2 id="daily-break-title">
-            休憩の詳細
-        </h2>
 
         {% if break_rows %}
-
-        <div class="table-scroll"
-             role="region"
-             aria-label="休憩記録の詳細"
-             tabindex="0">
-
-            <table class="ui-table">
-
+        <div class="e03-table-scroll" tabindex="0"
+             role="region" aria-label="休憩の記録一覧">
+            <table class="e03-table">
                 <thead>
                     <tr>
-                        <th scope="col">休憩</th>
-                        <th scope="col">開始</th>
-                        <th scope="col">終了</th>
-                        <th scope="col">時間</th>
+                        <th scope="col">No.</th>
+                        <th scope="col">休憩開始</th>
+                        <th scope="col">休憩終了</th>
+                        <th scope="col">休憩時間</th>
                     </tr>
                 </thead>
-
                 <tbody>
-
-                {% for item in break_rows %}
-
+                    {% for rest in break_rows %}
                     <tr>
-                        <th scope="row">休憩{{ item.number }}</th>
-                        <td>{{ item.start }}</td>
-                        <td>{{ item.end }}</td>
-                        <td>{{ item.duration }}</td>
+                        <th scope="row">{{ rest.number }}</th>
+                        <td>{{ rest.start }}</td>
+                        <td>{{ rest.end }}</td>
+                        <td>{{ rest.duration }}</td>
                     </tr>
-
-                {% endfor %}
-
+                    {% endfor %}
                 </tbody>
-
             </table>
-
         </div>
-
         {% else %}
-
-        <p class="daily-empty">
-            有効な休憩記録はありません。
+        <p class="e03-empty">
+            休憩の記録はありません。
         </p>
-
         {% endif %}
-
     </section>
 
-
-    <!-- 原打刻 -->
-    <section class="ui-card daily-section"
-             aria-labelledby="original-title">
-
-        <h2 id="original-title">
-            原打刻（変更されません）
-        </h2>
-
-        {% if original_events %}
-
-        <div class="table-scroll"
-             role="region"
-             aria-label="原打刻一覧"
-             tabindex="0">
-
-            <table class="ui-table">
-
-                <thead>
-                    <tr>
-                        <th scope="col">打刻種別</th>
-                        <th scope="col">記録日時</th>
-                    </tr>
-                </thead>
-
-                <tbody>
-
-                {% for event in original_events %}
-
-                    <tr>
-                        <td>{{ event.get_kind_display }}</td>
-                        <td>
-                            {{ event.recorded_at|date:"Y/m/d H:i:s" }}
-                        </td>
-                    </tr>
-
-                {% endfor %}
-
-                </tbody>
-
-            </table>
-
+    <!-- 修正申請 -->
+    <section class="e03-card"
+             aria-labelledby="e03-corrections-title">
+        <div class="e03-section-heading">
+            <h2 id="e03-corrections-title">
+                <i class="fa-solid fa-file-pen"
+                   aria-hidden="true"></i>
+                修正申請
+            </h2>
         </div>
 
-        {% else %}
-
-        <p class="daily-empty">
-            原打刻はありません。
+        {% if can_submit_correction %}
+        <p>
+            出勤・退勤・休憩などの記録に誤りがある場合は、
+            修正内容と理由を入力して申請してください。
         </p>
 
+        <a class="v2-button"
+           href="{% url 'corrections:create' work_day.year work_day.month work_day.day %}">
+            <i class="fa-solid fa-pen-to-square"
+               aria-hidden="true"></i>
+            この日の修正を申請する
+        </a>
+
+        {% elif pending_correction %}
+        <p>
+            現在の申請を確認できます。
+            必要な場合は、申請詳細から取り下げてください。
+        </p>
+
+        <a class="v2-button v2-button--outline"
+           href="{% url 'corrections:detail' pending_correction.pk %}">
+            申請中の内容を確認する
+        </a>
+
+        {% elif is_future_day %}
+        <p class="e03-inline-help">
+            未来の勤務日は修正申請できません。
+        </p>
+
+        {% else %}
+        <p class="e03-inline-help">
+            現在、この勤務日の新しい修正申請はできません。
+        </p>
         {% endif %}
 
-    </section>
-
-
-    <!-- 修正申請履歴 -->
-    <section class="ui-card daily-section"
-             aria-labelledby="correction-title">
-
-        <h2 id="correction-title">
-            申請履歴
-        </h2>
+        <h3 class="e03-history-title">この日の申請履歴</h3>
 
         {% if corrections %}
-
-        <div class="daily-correction-list">
-
+        <div class="e03-history-list">
             {% for correction in corrections %}
-
-            <article class="daily-correction-item">
-
-                <div class="daily-correction-heading">
-
+            <article class="e03-history-item">
+                <div>
                     <strong>
                         {{ correction.created_at|date:"Y/m/d H:i" }}
                     </strong>
 
-                    <span class="attendance-label attendance-label--{{ correction.status }}">
+                    <span class="v2-state">
                         {{ correction.get_status_display }}
                     </span>
-
                 </div>
 
                 <p>
-                    <strong>申請理由：</strong>
-                    {{ correction.reason }}
+                    {{ correction.reason|truncatechars:100 }}
                 </p>
 
-                <p>
-                    <strong>元データ版：</strong>
-                    {{ correction.original_version }}
-                </p>
-
-                {% if correction.return_reason %}
-
-                <p>
-                    <strong>差戻し理由：</strong>
-                    {{ correction.return_reason }}
-                </p>
-
-                {% endif %}
-
+                <a href="{% url 'corrections:detail' correction.pk %}">
+                    申請内容を確認する
+                    <i class="fa-solid fa-chevron-right"
+                       aria-hidden="true"></i>
+                </a>
             </article>
-
             {% endfor %}
-
         </div>
-
         {% else %}
-
-        <p class="daily-empty">
-            この勤務の修正申請はありません。
+        <p class="e03-empty">
+            修正申請の履歴はありません。
         </p>
-
         {% endif %}
-
-        <p class="daily-info">
-            原打刻は変更されません。
-            修正は申請後、管理者の承認で反映されます。
-        </p>
-
     </section>
+
+    <!-- 戻る -->
+    <nav class="e03-bottom-actions"
+         aria-label="日別詳細の操作">
+        <a class="v2-button v2-button--outline"
+           href="{% url 'attendance:monthly' %}?month={{ month_query }}&amp;page={{ return_page }}">
+            <i class="fa-solid fa-arrow-left"
+               aria-hidden="true"></i>
+            自分の勤怠一覧へ戻る
+        </a>
+    </nav>
 
 </div>
 

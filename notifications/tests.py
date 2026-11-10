@@ -1,0 +1,315 @@
+
+
+# ---- notifications/tests.py ----
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
+
+from django.contrib.auth import get_user_model
+from django.test import TestCase
+from django.urls import reverse
+
+from attendance.models import WorkSession
+from corrections.models import CorrectionRequest
+
+from .models import Notification
+from .services import (
+    create_notification,
+    notify_correction_submitted,
+    notify_correction_reviewed,
+)
+
+
+class NotificationTests(TestCase):
+
+    def setUp(self):
+        Employee = get_user_model()
+
+        self.employee = Employee.objects.create_user(
+            employee_number="97001",
+            password="NotifyEmployee_2026!",
+            first_name="一般",
+            last_name="社員",
+        )
+
+        self.manager = Employee.objects.create_user(
+            employee_number="97002",
+            password="NotifyManager_2026!",
+            first_name="管理",
+            last_name="担当",
+            is_business_admin=True,
+        )
+
+        jst = ZoneInfo("Asia/Tokyo")
+
+        self.work = WorkSession.objects.create(
+            employee=self.employee,
+            work_date=date(2026, 10, 15),
+            clock_in_at=datetime(
+                2026,
+                10,
+                15,
+                9,
+                tzinfo=jst,
+            ),
+            clock_out_at=datetime(
+                2026,
+                10,
+                15,
+                18,
+                tzinfo=jst,
+            ),
+            status=WorkSession.Status.COMPLETED,
+        )
+
+        self.correction = CorrectionRequest.objects.create(
+            work_session=self.work,
+            requested_by=self.employee,
+            original_version=self.work.version,
+            proposal={},
+            reason="時刻を修正するため",
+            status=CorrectionRequest.Status.PENDING,
+        )
+
+    def make_user_notification(self, target_path=None):
+        return create_notification(
+            recipient=self.employee,
+            kind=Notification.Kind.GENERAL,
+            title="テスト通知",
+            body="確認用のお知らせです。",
+            target_path=(
+                target_path if target_path is not None else reverse("attendance:home")
+            ),
+        )
+
+    def test_01_anonymous_redirect(self):
+        response = self.client.get(reverse("notifications:list"))
+
+        self.assertEqual(response.status_code, 302)
+
+    def test_02_submission_notifies_manager_once(self):
+        notify_correction_submitted(self.correction)
+        notify_correction_submitted(self.correction)
+
+        self.assertEqual(
+            Notification.objects.filter(
+                recipient=self.manager,
+                kind=Notification.Kind.CORRECTION_SUBMITTED,
+            ).count(),
+            1,
+        )
+
+    def test_03_approval_notifies_employee(self):
+        self.correction.status = CorrectionRequest.Status.APPROVED
+
+        notify_correction_reviewed(self.correction)
+
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.employee,
+                kind=Notification.Kind.CORRECTION_APPROVED,
+            ).exists()
+        )
+
+    def test_04_other_user_cannot_open_notification(self):
+        notify_correction_submitted(self.correction)
+
+        notification = Notification.objects.get(
+            recipient=self.manager,
+        )
+
+        self.client.force_login(self.employee)
+
+        response = self.client.post(
+            reverse(
+                "notifications:open",
+                args=[notification.pk],
+            )
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_05_open_marks_as_read(self):
+        notification = self.make_user_notification()
+
+        self.client.force_login(self.employee)
+
+        response = self.client.post(
+            reverse(
+                "notifications:open",
+                args=[notification.pk],
+            )
+        )
+
+        self.assertEqual(response.status_code, 302)
+
+        notification.refresh_from_db()
+
+        self.assertIsNotNone(notification.read_at)
+
+    def test_06_external_redirect_rejected(self):
+        notification = self.make_user_notification(target_path="//example.invalid/")
+
+        self.client.force_login(self.employee)
+
+        response = self.client.post(
+            reverse(
+                "notifications:open",
+                args=[notification.pk],
+            )
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("notifications:list"),
+        )
+
+    def test_07_read_all_only_affects_owner(self):
+        own = self.make_user_notification()
+
+        other = create_notification(
+            recipient=self.manager,
+            kind=Notification.Kind.GENERAL,
+            title="管理者向け",
+            body="管理者向けの通知です。",
+        )
+
+        self.client.force_login(self.employee)
+
+        self.client.post(reverse("notifications:read_all"))
+
+        own.refresh_from_db()
+        other.refresh_from_db()
+
+        self.assertIsNotNone(own.read_at)
+        self.assertIsNone(other.read_at)
+
+
+# ---- notifications/tests_incomplete.py ----
+"""未完了勤務通知のテスト。"""
+
+from datetime import timedelta
+from io import StringIO
+
+from django.contrib.auth import get_user_model
+from django.core.management import call_command
+from django.test import TestCase
+from django.utils import timezone
+
+from attendance.models import (
+    MonthlyClosing,
+    WorkSession,
+)
+from corrections.models import CorrectionRequest
+from notifications.models import Notification
+
+
+class IncompleteNotificationTests(TestCase):
+
+    def setUp(self):
+        Employee = get_user_model()
+
+        self.employee = Employee.objects.create_user(
+            employee_number="99701",
+            password="NoticeTest_2026!",
+        )
+
+        self.manager = Employee.objects.create_user(
+            employee_number="99702",
+            password="NoticeManager_2026!",
+            is_business_admin=True,
+        )
+
+        self.work_day = timezone.localdate() - timedelta(days=3)
+
+    def create_working_session(self):
+        return WorkSession.objects.create(
+            employee=self.employee,
+            work_date=self.work_day,
+            clock_in_at=(timezone.now() - timedelta(days=3)),
+            status=WorkSession.Status.WORKING,
+        )
+
+    def execute(self, **options):
+        output = StringIO()
+
+        call_command(
+            "notify_incomplete",
+            stdout=output,
+            **options,
+        )
+
+        return output.getvalue()
+
+    def test_01_incomplete_creates_notification(self):
+        self.create_working_session()
+
+        self.execute(days=2)
+
+        self.assertEqual(
+            Notification.objects.filter(
+                recipient=self.employee,
+            ).count(),
+            1,
+        )
+
+    def test_02_repeat_does_not_duplicate(self):
+        self.create_working_session()
+
+        self.execute(days=2)
+        self.execute(days=2)
+
+        self.assertEqual(
+            Notification.objects.count(),
+            1,
+        )
+
+    def test_03_dry_run_does_not_save(self):
+        self.create_working_session()
+
+        self.execute(
+            days=2,
+            dry_run=True,
+        )
+
+        self.assertFalse(Notification.objects.exists())
+
+    def test_04_pending_request_is_excluded(self):
+        session = self.create_working_session()
+
+        CorrectionRequest.objects.create(
+            work_session=session,
+            requested_by=self.employee,
+            original_version=session.version,
+            proposal={},
+            reason="勤務時刻を確認するため",
+            status=CorrectionRequest.Status.PENDING,
+        )
+
+        self.execute(days=2)
+
+        self.assertFalse(Notification.objects.exists())
+
+    def test_05_inactive_user_is_excluded(self):
+        self.create_working_session()
+
+        self.employee.is_active = False
+        self.employee.save(update_fields=["is_active"])
+
+        self.execute(days=2)
+
+        self.assertFalse(Notification.objects.exists())
+
+    def test_06_finalized_month_is_excluded(self):
+        self.create_working_session()
+
+        MonthlyClosing.objects.create(
+            employee=self.employee,
+            target_month=(self.work_day.replace(day=1)),
+            status=MonthlyClosing.Status.FINALIZED,
+            finalized_by=self.manager,
+            finalized_at=timezone.now(),
+        )
+
+        self.execute(days=2)
+
+        self.assertFalse(Notification.objects.exists())
