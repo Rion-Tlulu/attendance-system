@@ -50,6 +50,6 @@ def audit_role_change(sender, instance, created, update_fields=None, **kwargs):
         target_id=str(instance.pk),
         before_data={"is_business_admin": previous},
         after_data={"is_business_admin": instance.is_business_admin},
-        reason="業務管理者権限の変更",
+        reason=getattr(instance, "_role_change_reason", "業務管理者権限の変更"),
         details={},
     )

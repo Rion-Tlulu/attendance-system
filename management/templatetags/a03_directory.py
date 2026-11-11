@@ -142,7 +142,7 @@ def a03_directory(context):
 
     inactive_count = queryset.filter(is_active=False).count()
 
-    manager_count = queryset.filter(is_business_admin=True).count()
+    manager_count = queryset.filter(is_business_admin=True, is_active=True).count()
 
     # 既存の在籍情報から部署選択肢を取得。
     departments = list(

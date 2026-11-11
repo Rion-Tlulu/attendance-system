@@ -91,6 +91,31 @@ class EmployeeEditForm(forms.ModelForm):
         return cleaned
 
 
+class BusinessAdminRoleForm(forms.Form):
+    """業務管理者権限だけを変更する確認フォーム。"""
+
+    expected_role = forms.ChoiceField(
+        choices=[("employee", "一般社員"), ("admin", "業務管理者")],
+        widget=forms.HiddenInput,
+    )
+    desired_role = forms.ChoiceField(
+        label="変更後の権限",
+        choices=[("employee", "一般社員"), ("admin", "業務管理者")],
+        widget=forms.RadioSelect,
+    )
+    change_reason = forms.CharField(
+        label="変更理由",
+        max_length=500,
+        widget=forms.Textarea(attrs={"rows": 3, "maxlength": 500}),
+    )
+
+    def clean_change_reason(self):
+        reason = self.cleaned_data["change_reason"].strip()
+        if not reason:
+            raise forms.ValidationError("変更理由を入力してください。")
+        return reason
+
+
 class EmploymentInfoForm(forms.ModelForm):
     """社員の部署・入退社日を編集する。"""
 

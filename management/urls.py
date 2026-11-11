@@ -7,6 +7,7 @@ from . import views
 from . import employee_details
 from . import proxy_corrections
 from . import export_batches
+from . import role_views
 
 app_name = "management"
 
@@ -54,6 +55,11 @@ urlpatterns = [
         "employees/<int:employee_id>/edit/",
         views.employee_edit,
         name="employee_edit",
+    ),
+    path(
+        "employees/<int:employee_id>/role/",
+        role_views.employee_role,
+        name="employee_role",
     ),
     # 社員別月次詳細
     path(

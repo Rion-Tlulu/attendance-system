@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}業務管理者権限の変更 | 勤怠管理{% endblock %}
+{% block screen_label %}管理者｜社員管理{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/manager-pages.css' %}">{% endblock %}
+{% block content %}
+<div class="admin-page">
+  <header class="admin-heading">
+    <h1 id="role-title">業務管理者権限の変更</h1>
+    <p>対象: {{ employee.get_full_name }}（{{ employee.employee_number }}）</p>
+    <p>現在: {% if employee.is_business_admin %}業務管理者{% else %}一般社員{% endif %}
+      ／ 利用状態: {% if employee.is_active %}有効{% else %}停止中{% endif %}</p>
+  </header>
+  <section class="ui-card admin-section admin-form-card" aria-labelledby="role-title">
+    <p>業務管理者は社員情報・勤怠・修正申請を扱えます。付与先と理由を確認してください。</p>
+    <p>停止中の社員には付与できません。有効な業務管理者が2人未満になる取消は拒否します。</p>
+    <form method="post" autocomplete="off">
+      {% csrf_token %}
+      {{ form.expected_role }}
+      {% if form.expected_role.errors %}<div class="admin-warning" role="alert">{{ form.expected_role.errors }}画面を再読み込みしてください。</div>{% endif %}
+      {% if form.non_field_errors %}<div class="admin-warning" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+      <div class="admin-field">
+        <fieldset>
+          <legend>{{ form.desired_role.label }}</legend>
+          {{ form.desired_role }}
+        </fieldset>
+        {% if form.desired_role.errors %}<div class="admin-warning" role="alert">{{ form.desired_role.errors }}</div>{% endif %}
+      </div>
+      <div class="admin-field">
+        {{ form.change_reason.label_tag }}
+        {{ form.change_reason }}
+        {% if form.change_reason.errors %}<div class="admin-warning" role="alert">{{ form.change_reason.errors }}</div>{% endif %}
+      </div>
+      <div class="admin-actions">
+        <a class="ui-button ui-button--secondary" href="{% url 'management:employee_edit' employee.pk %}">戻る</a>
+        <button class="ui-button ui-button--primary" type="submit">権限を変更する</button>
+      </div>
+    </form>
+  </section>
+</div>
+{% endblock %}

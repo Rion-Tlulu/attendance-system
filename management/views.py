@@ -12,6 +12,7 @@ from datetime import timedelta
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.core import signing
+from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db import IntegrityError, transaction
 from django.db.models import Q
@@ -510,6 +511,14 @@ def employee_edit(request, employee_id):
             else:
                 try:
                     with transaction.atomic():
+                        active_admin_ids = list(
+                            Employee.objects.select_for_update().filter(
+                                is_active=True, is_business_admin=True,
+                            ).order_by("pk").values_list("pk", flat=True)
+                        )
+                        actor = Employee.objects.select_for_update().get(pk=request.user.pk)
+                        if not actor.is_active or not actor.is_business_admin:
+                            raise PermissionDenied("この管理機能を利用する権限がありません。")
                         employee = Employee.objects.select_for_update().get(pk=employee_id)
 
                         before = _employee_snapshot(employee)
@@ -517,11 +526,6 @@ def employee_edit(request, employee_id):
                         if not wants_active and employee.pk == request.user.pk:
                             form.add_error("is_active", "自分自身を利用停止にはできません。")
                         elif not wants_active and employee.is_business_admin:
-                            active_admin_ids = list(
-                                Employee.objects.select_for_update().filter(
-                                    is_active=True, is_business_admin=True,
-                                ).order_by("pk").values_list("pk", flat=True)
-                            )
                             if employee.pk in active_admin_ids and len(active_admin_ids) <= 2:
                                 form.add_error("is_active", "有効な管理者は2人以上必要です。")
                         elif wants_active and not employee.is_active and CorrectionRequest.objects.filter(

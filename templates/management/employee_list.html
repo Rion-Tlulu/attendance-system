@@ -141,7 +141,7 @@
             </div>
 
             <div>
-                <h2>業務管理者</h2>
+                <h2>有効な業務管理者</h2>
                 <p>
                     <strong>{{ a03.manager_count }}</strong>
                     <span>人</span>
@@ -460,6 +460,13 @@
                                     部署・在籍情報
                                 </a>
 
+                                {% if not row.employee.is_staff and not row.employee.is_superuser %}
+                                <a href="{% url 'management:employee_role' row.employee.pk %}"
+                                   class="a03-action-link a03-action-link--outline">
+                                    管理者権限
+                                </a>
+                                {% endif %}
+
                             </div>
                         </td>
 
@@ -566,6 +573,11 @@
                     >
                         部署・在籍情報
                     </a>
+
+                    {% if not row.employee.is_staff and not row.employee.is_superuser %}
+                    <a href="{% url 'management:employee_role' row.employee.pk %}"
+                       class="a03-button a03-button--outline">管理者権限</a>
+                    {% endif %}
 
                 </div>
 
