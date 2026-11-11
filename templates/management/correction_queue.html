@@ -68,7 +68,7 @@
                         <td>{{ item.created_at|date:"Y/m/d H:i" }}</td>
                         <td>{{ item.requested_by.employee_number }}</td>
                         <td>{{ item.requested_by.get_full_name }}</td>
-                        <td>{{ item.work_session.work_date|date:"Y/m/d" }}</td>
+                        <td>{{ item.work_date|date:"Y/m/d" }}</td>
                         <td>{{ item.get_status_display }}</td>
                         <td>
                             <a href="{% url 'management:correction_detail' item.pk %}">

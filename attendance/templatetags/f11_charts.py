@@ -17,6 +17,7 @@ from django.utils import timezone
 from attendance.chart_data import (
     build_work_hours_chart,
 )
+from attendance.models import MonthlyClosing
 
 register = template.Library()
 
@@ -156,8 +157,15 @@ def f11_manager_chart(context):
         return None
 
     # 既存の管理者ビューでもアクセス権を確認すること
+    closing = MonthlyClosing.objects.filter(
+        employee=employee, target_month=target_month,
+        status=MonthlyClosing.Status.FINALIZED,
+    ).first()
+    if closing and not closing.snapshot:
+        return None
     return build_work_hours_chart(
         employee,
         target_month,
         dom_id="f11-a04",
+        snapshot=closing.snapshot if closing and closing.snapshot else None,
     )

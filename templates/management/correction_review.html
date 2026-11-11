@@ -38,11 +38,13 @@
                     （{{ correction.requested_by.employee_number }}）
                 </dd>
             </div>
+            <div><dt>対象社員</dt><dd>{{ correction.employee.get_full_name }}（{{ correction.employee.employee_number }}）</dd></div>
+            <div><dt>申請種別</dt><dd>{% if correction.is_proxy %}代理申請{% else %}本人申請{% endif %}</dd></div>
 
             <div>
                 <dt>勤務日</dt>
                 <dd>
-                    {{ correction.work_session.work_date|date:"Y/m/d" }}
+                    {{ correction.work_date|date:"Y/m/d" }}
                 </dd>
             </div>
 
@@ -159,6 +161,10 @@
         <h2>申請理由</h2>
 
         <p>{{ correction.reason|linebreaksbr }}</p>
+        {% if correction.is_proxy %}
+        <h3>本人申請ができない理由</h3><p>{{ correction.proxy_reason|linebreaksbr }}</p>
+        <h3>確認資料・確認方法</h3><p>{{ correction.evidence|linebreaksbr }}</p>
+        {% endif %}
 
         {% if correction.return_reason %}
         <h3>差戻し理由</h3>
@@ -168,6 +174,20 @@
         {% endif %}
 
     </section>
+
+    {% if can_proxy_withdraw %}
+    <section class="v2-panel">
+      <h2>代理申請を取り下げる</h2>
+      <form method="post" action="{% url 'management:proxy_withdraw' correction.pk %}">
+        {% csrf_token %}
+        {% if proxy_author_invalid %}
+        <label for="withdraw-reason">申請者失効による取下げ理由</label>
+        <textarea id="withdraw-reason" name="reason" maxlength="500" required></textarea>
+        {% endif %}
+        <button class="v2-button v2-button--outline" type="submit">取り下げる</button>
+      </form>
+    </section>
+    {% endif %}
 
 
     <!-- 審査 -->

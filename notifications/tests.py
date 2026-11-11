@@ -128,7 +128,7 @@ class NotificationTests(TestCase):
 
         self.assertEqual(response.status_code, 404)
 
-    def test_05_open_marks_as_read(self):
+    def test_05_open_marks_as_read_after_destination_loads(self):
         notification = self.make_user_notification()
 
         self.client.force_login(self.employee)
@@ -143,7 +143,9 @@ class NotificationTests(TestCase):
         self.assertEqual(response.status_code, 302)
 
         notification.refresh_from_db()
-
+        self.assertIsNone(notification.read_at)
+        self.client.get(response.url)
+        notification.refresh_from_db()
         self.assertIsNotNone(notification.read_at)
 
     def test_06_external_redirect_rejected(self):
@@ -158,10 +160,10 @@ class NotificationTests(TestCase):
             )
         )
 
-        self.assertRedirects(
-            response,
-            reverse("notifications:list"),
-        )
+        self.assertTrue(response.url.startswith(reverse("notifications:list")))
+        self.client.get(response.url)
+        notification.refresh_from_db()
+        self.assertIsNone(notification.read_at)
 
     def test_07_read_all_only_affects_owner(self):
         own = self.make_user_notification()
@@ -291,6 +293,12 @@ class IncompleteNotificationTests(TestCase):
         self.assertTrue(notice.is_management)
         self.client.force_login(self.manager)
         self.assertEqual(self.client.get(reverse("notifications:panel")).json()["unread_count"], 1)
+        Employee = get_user_model()
+        for number in ("9901", "9902"):
+            Employee.objects.create_user(
+                employee_number=number, password="TestPassword_2026!",
+                is_business_admin=True,
+            )
         self.manager.is_business_admin = False
         self.manager.save(update_fields=["is_business_admin"])
         self.assertEqual(self.client.get(reverse("notifications:panel")).json()["unread_count"], 0)
@@ -310,10 +318,13 @@ class IncompleteNotificationTests(TestCase):
         session.clock_out_at = timezone.now()
         session.incomplete_notified_version = None
         session.save(update_fields=["status", "clock_out_at", "incomplete_notified_version"])
+        from attendance.incomplete import sync_incomplete_occurrences
+        sync_incomplete_occurrences(session)
         session.status = WorkSession.Status.WORKING
         session.clock_out_at = None
         session.version += 1
         session.save(update_fields=["status", "clock_out_at", "version"])
+        sync_incomplete_occurrences(session)
         self.execute()
         self.assertEqual(Notification.objects.count(), 2)
 
@@ -332,7 +343,7 @@ class IncompleteNotificationTests(TestCase):
         self.assertTrue(Notification.objects.filter(pk=recent.pk).exists())
 
     def test_03_dry_run_does_not_save(self):
-        self.create_working_session()
+        session = self.create_working_session()
 
         self.execute(
             days=2,
@@ -340,8 +351,10 @@ class IncompleteNotificationTests(TestCase):
         )
 
         self.assertFalse(Notification.objects.exists())
+        from attendance.models import IncompleteOccurrence
+        self.assertFalse(IncompleteOccurrence.objects.filter(work_session=session).exists())
 
-    def test_04_pending_request_is_excluded(self):
+    def test_04_pending_request_does_not_hide_open_occurrence(self):
         session = self.create_working_session()
 
         CorrectionRequest.objects.create(
@@ -355,9 +368,9 @@ class IncompleteNotificationTests(TestCase):
 
         self.execute(days=2)
 
-        self.assertFalse(Notification.objects.exists())
+        self.assertEqual(Notification.objects.count(), 2)
 
-    def test_05_inactive_user_is_excluded(self):
+    def test_05_inactive_subject_notifies_manager_only(self):
         self.create_working_session()
 
         self.employee.is_active = False
@@ -365,9 +378,10 @@ class IncompleteNotificationTests(TestCase):
 
         self.execute(days=2)
 
-        self.assertFalse(Notification.objects.exists())
+        self.assertEqual(Notification.objects.filter(recipient=self.manager).count(), 1)
+        self.assertFalse(Notification.objects.filter(recipient=self.employee).exists())
 
-    def test_06_finalized_month_is_excluded(self):
+    def test_06_legacy_inconsistent_finalized_month_is_reported(self):
         self.create_working_session()
 
         MonthlyClosing.objects.create(
@@ -380,4 +394,4 @@ class IncompleteNotificationTests(TestCase):
 
         self.execute(days=2)
 
-        self.assertFalse(Notification.objects.exists())
+        self.assertEqual(Notification.objects.count(), 2)

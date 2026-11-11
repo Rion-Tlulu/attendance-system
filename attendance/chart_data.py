@@ -95,32 +95,35 @@ def build_work_hours_chart(
     target_month,
     *,
     dom_id="f11-work",
+    snapshot=None,
 ):
     """E02/A04: 社員1人の対象月の実働時間。"""
 
     start, end = month_bounds(target_month)
 
-    queryset = WorkSession.objects.filter(
-        employee=employee,
-        work_date__gte=start,
-        work_date__lt=end,
-    )
-
-    sessions, breaks_by_session = load_sessions_and_breaks(queryset)
-
-    sessions_by_date = {item.work_date: item for item in sessions}
+    if snapshot is None:
+        queryset = WorkSession.objects.filter(
+            employee=employee,
+            work_date__gte=start,
+            work_date__lt=end,
+        )
+        sessions, breaks_by_session = load_sessions_and_breaks(queryset)
+        sessions_by_date = {item.work_date: item for item in sessions}
+    else:
+        frozen_by_date = {item["day"]: item for item in snapshot["daily"]}
 
     rows = []
 
     for work_day in iter_month_days(start):
-        session = sessions_by_date.get(work_day)
-
-        breaks = breaks_by_session.get(session.pk, []) if session is not None else []
-
-        status, seconds = work_result(
-            session,
-            breaks,
-        )
+        if snapshot is None:
+            session = sessions_by_date.get(work_day)
+            breaks = breaks_by_session.get(session.pk, []) if session is not None else []
+            status, seconds = work_result(session, breaks)
+        else:
+            frozen = frozen_by_date.get(work_day.isoformat())
+            seconds = frozen["work_seconds"] if frozen else None
+            status = ("完了" if seconds is not None else
+                      frozen["record_state"] if frozen else "記録なし")
 
         rows.append(
             {

@@ -45,12 +45,12 @@
         <dl class="v2-data-list">
             <div>
                 <dt>社員番号</dt>
-                <dd>{{ employee.employee_number }}</dd>
+                <dd>{{ display_employee_number }}</dd>
             </div>
 
             <div>
                 <dt>氏名</dt>
-                <dd>{{ employee.get_full_name }}</dd>
+                <dd>{{ display_employee_name }}</dd>
             </div>
 
             <div>
@@ -188,7 +188,14 @@
                 <dt>記録なしの日</dt>
                 <dd>{{ no_record_count }}日</dd>
             </div>
+            <div><dt>勤務の不整合</dt><dd>{{ integrity_issues|length }}件</dd></div>
         </dl>
+
+        {% if integrity_issues %}
+        <ul>
+          {% for day, reason in integrity_issues %}<li>{{ day|date:"Y/m/d" }}: {{ reason }}</li>{% endfor %}
+        </ul>
+        {% endif %}
 
         <p class="v2-notice">
             記録がない日は、欠勤と断定しません。
@@ -335,6 +342,7 @@
                         <th scope="col">実働</th>
                         <th scope="col">記録状態</th>
                         <th scope="col">修正状態</th>
+                        {% if not employee.is_active %}<th scope="col">訂正</th>{% endif %}
                     </tr>
                 </thead>
 
@@ -350,10 +358,13 @@
                         <td>{{ row.work_display }}</td>
                         <td>{{ row.record_label }}</td>
                         <td>{{ row.correction_label }}</td>
+                        {% if not employee.is_active %}
+                        <td><a href="{% url 'management:proxy_correction' employee.pk row.day.year row.day.month row.day.day %}">代理で修正を申請</a></td>
+                        {% endif %}
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="7">
+                        <td colspan="{% if employee.is_active %}7{% else %}8{% endif %}">
                             表示できる記録がありません。
                         </td>
                     </tr>
@@ -402,6 +413,9 @@
                         <dt>修正状態</dt>
                         <dd>{{ row.correction_label }}</dd>
                     </div>
+                    {% if not employee.is_active %}
+                    <a href="{% url 'management:proxy_correction' employee.pk row.day.year row.day.month row.day.day %}">代理で修正を申請</a>
+                    {% endif %}
                 </dl>
 
             </article>

@@ -13,11 +13,16 @@ from attendance.models import (
     WorkSession,
 )
 from attendance.reporting import build_monthly_report
+from attendance.validation import employed_during_month, is_employed_on, month_integrity_issues, overlapping_sessions
+from attendance.incomplete import sync_incomplete_occurrences
+from attendance.snapshots import build_closing_snapshot
 from auditlog.models import AuditLog
 from corrections.models import CorrectionRequest
 from corrections.services import (
     CorrectionError,
     current_values,
+    pending_for_month,
+    proposal_work_day,
     validate_proposal,
 )
 
@@ -33,7 +38,7 @@ def _manager(manager_id):
 
     Employee = get_user_model()
 
-    manager = Employee.objects.get(pk=manager_id)
+    manager = Employee.objects.select_for_update().get(pk=manager_id)
 
     if not manager.is_active or not manager.is_business_admin:
         raise AdminActionError("この操作を行う管理者権限がありません。")
@@ -119,43 +124,55 @@ def review_correction(
     manager = _manager(manager_id)
 
     # 最初に対象社員IDを取得
-    reference = CorrectionRequest.objects.select_related("work_session").get(
+    reference = CorrectionRequest.objects.get(
         pk=correction_id
     )
 
-    target_id = reference.work_session.employee_id
+    target_id = reference.employee_id
 
-    if manager.pk == target_id:
-        raise AdminActionError("自分自身の修正申請は審査できません。")
+    if manager.pk in (target_id, reference.requested_by_id):
+        raise AdminActionError("対象社員または申請者は審査できません。")
 
     # Phase 7と同じく対象社員を先にロック
     employee = _employee_locked(target_id)
 
-    session = WorkSession.objects.select_for_update().get(pk=reference.work_session_id)
+    session = (
+        WorkSession.objects.select_for_update().get(pk=reference.work_session_id)
+        if reference.work_session_id else
+        WorkSession.objects.select_for_update().filter(
+            employee_id=target_id, work_date=reference.work_date,
+        ).first()
+    )
 
     correction = CorrectionRequest.objects.select_for_update().get(pk=correction_id)
 
     if correction.status != CorrectionRequest.Status.PENDING:
         raise AdminActionError("審査中の申請だけ処理できます。")
 
-    if correction.requested_by_id != employee.pk:
-        raise AdminActionError("申請者と勤務対象者が一致しません。")
+    if manager.pk in (employee.pk, correction.requested_by_id):
+        raise AdminActionError("対象社員または申請者は審査できません。")
+
+    if correction.is_proxy:
+        author = correction.requested_by
+        if employee.is_active or not author.is_active or not author.is_business_admin:
+            raise AdminActionError("代理申請の対象または申請者の状態が変わりました。")
 
     if MonthlyClosing.objects.filter(
         employee=employee,
-        target_month=session.work_date.replace(day=1),
+        target_month=correction.work_date.replace(day=1),
         status=MonthlyClosing.Status.FINALIZED,
     ).exists():
         raise AdminActionError("確定済みの勤務月は変更できません。")
 
-    if session.version != correction.original_version:
+    if ((session is None) != (correction.original_version is None) or
+            session is not None and session.version != correction.original_version):
         raise AdminActionError(
             "申請後に勤務記録が変更されています。" "内容を確認し直してください。"
         )
 
     before = {
-        "status": session.status,
-        "version": session.version,
+        "status": session.status if session else WorkSession.Status.NO_RECORD,
+        "version": session.version if session else None,
         "effective_values": current_values(session),
     }
 
@@ -175,7 +192,7 @@ def review_correction(
         try:
             proposal = validate_proposal(
                 correction.proposal,
-                session.work_date,
+                correction.work_date,
             )
         except CorrectionError as exc:
             raise AdminActionError(str(exc)) from exc
@@ -183,6 +200,43 @@ def review_correction(
         start = _as_datetime(proposal["clock_in_at"])
         end = _as_datetime(proposal["clock_out_at"])
         breaks = proposal["breaks"]
+        target_day = proposal_work_day(proposal, correction.work_date)
+        destination = None
+        if target_day != correction.work_date:
+            if MonthlyClosing.objects.filter(
+                employee=employee, target_month=target_day.replace(day=1),
+                status=MonthlyClosing.Status.FINALIZED,
+            ).exists():
+                raise AdminActionError("移動先の勤務月は確定済みです。")
+            destination = WorkSession.objects.select_for_update().filter(
+                employee=employee, work_date=target_day,
+            ).first()
+            if destination and destination.status != WorkSession.Status.NO_RECORD:
+                raise AdminActionError("移動先に有効な勤務があります。")
+            if destination and CorrectionRequest.objects.filter(
+                employee=employee, work_date=target_day,
+                status=CorrectionRequest.Status.PENDING,
+            ).exclude(pk=correction.pk).exists():
+                raise AdminActionError("移動先に審査中の申請があります。")
+            for other in CorrectionRequest.objects.filter(
+                employee=employee,
+                status=CorrectionRequest.Status.PENDING,
+            ).exclude(pk=correction.pk):
+                try:
+                    other_target = proposal_work_day(other.proposal, other.work_date)
+                except (KeyError, CorrectionError):
+                    other_target = other.work_date
+                if target_day in (other.work_date, other_target):
+                    raise AdminActionError("移動先に別の審査中申請があります。")
+
+        if start is not None:
+            if not is_employed_on(employee, target_day):
+                raise AdminActionError("在籍期間外の勤務は承認できません。")
+            if overlapping_sessions(
+                employee, start, end,
+                exclude_session_id=session.pk if session else None,
+            ):
+                raise AdminActionError("別の勤務と時間が重複しています。")
 
         if start is None:
             new_status = WorkSession.Status.NO_RECORD
@@ -204,32 +258,66 @@ def review_correction(
                         WorkSession.Status.ON_BREAK,
                     ],
                 )
-                .exclude(pk=session.pk)
+                .exclude(pk=session.pk if session else None)
                 .exists()
             )
 
             if already_active:
                 raise AdminActionError("別の進行中勤務があるため承認できません。")
 
-        # 有効な勤務だけを更新する
-        session.clock_in_at = start
-        session.clock_out_at = end
-        session.status = new_status
-        if new_status not in (WorkSession.Status.WORKING, WorkSession.Status.ON_BREAK):
-            session.incomplete_notified_version = None
-        session.version += 1
-        session.save()
+        if session is None:
+            session = WorkSession.objects.create(
+                employee=employee, work_date=correction.work_date,
+                status=WorkSession.Status.NO_RECORD,
+            )
 
-        # 有効な休憩を再構築する
+        if target_day != session.work_date:
+            session.clock_in_at = None
+            session.clock_out_at = None
+            session.status = WorkSession.Status.NO_RECORD
+            session.incomplete_notified_version = None
+            session.version += 1
+            session.save()
+            BreakInterval.objects.filter(work_session=session).delete()
+            if destination is None:
+                destination = WorkSession.objects.create(
+                    employee=employee, work_date=target_day,
+                    clock_in_at=start, clock_out_at=end, status=new_status,
+                )
+            else:
+                destination.clock_in_at = start
+                destination.clock_out_at = end
+                destination.status = new_status
+                destination.moved_to = None
+                destination.version += 1
+                destination.save()
+            session.moved_to = destination
+            session.save(update_fields=["moved_to", "updated_at"])
+            effective_session = destination
+        else:
+            session.clock_in_at = start
+            session.clock_out_at = end
+            session.status = new_status
+            session.moved_to = None
+            if new_status not in (WorkSession.Status.WORKING, WorkSession.Status.ON_BREAK):
+                session.incomplete_notified_version = None
+            session.version += 1
+            session.save()
+            effective_session = session
+
         # 原打刻ClockEventは変更しない
-        BreakInterval.objects.filter(work_session=session).delete()
+        BreakInterval.objects.filter(work_session=effective_session).delete()
 
         for item in breaks:
             BreakInterval.objects.create(
-                work_session=session,
+                work_session=effective_session,
                 started_at=_as_datetime(item["started_at"]),
                 ended_at=_as_datetime(item["ended_at"]),
             )
+
+        sync_incomplete_occurrences(session)
+        if effective_session.pk != session.pk:
+            sync_incomplete_occurrences(effective_session)
 
         correction.status = CorrectionRequest.Status.APPROVED
         correction.return_reason = ""
@@ -243,10 +331,13 @@ def review_correction(
 
     after = {
         "review_status": correction.status,
-        "status": session.status,
-        "version": session.version,
+        "status": session.status if session else WorkSession.Status.NO_RECORD,
+        "version": session.version if session else None,
         "effective_values": current_values(session),
+        "target_work_date": (target_day.isoformat() if action == "approve" else correction.work_date.isoformat()),
     }
+    if action == "approve" and effective_session.pk != session.pk:
+        after["destination_values"] = current_values(effective_session)
 
     _audit(
         actor=manager,
@@ -258,7 +349,7 @@ def review_correction(
         after=after,
         reason=reason,
         details={
-            "work_date": session.work_date.isoformat(),
+            "work_date": correction.work_date.isoformat(),
             "correction_id": correction.pk,
         },
     )
@@ -340,9 +431,12 @@ def finalize_month(
         raise AdminActionError("対象月の終了後に確定してください。")
 
     if not checked_no_record:
-        raise AdminActionError("記録なしの日の照合確認が必要です。")
+        raise AdminActionError("別管理資料との照合確認が必要です。")
 
     employee = _employee_locked(employee_id)
+
+    if not employed_during_month(employee, target_month):
+        raise AdminActionError("対象月に在籍日がありません。")
 
     # 勤務レコードをロック
     list(
@@ -377,6 +471,15 @@ def finalize_month(
 
     if report.pending_count:
         raise AdminActionError("審査中の修正申請があるため確定できません。")
+    if pending_for_month(employee, target_month):
+        raise AdminActionError("関係する勤務日の修正申請が審査中です。")
+
+    issues = month_integrity_issues(employee, target_month)
+    if issues:
+        first_day, first_reason = issues[0]
+        raise AdminActionError(
+            f"勤務の不整合が{len(issues)}件あります。最初の対象: {first_day}（{first_reason}）。"
+        )
 
     no_record_count = sum(row.record_key == "no_record" for row in report.rows)
 
@@ -398,6 +501,19 @@ def finalize_month(
         closing.version += 1
         closing.save()
 
+    closing.reconciled_by = manager
+    closing.reconciled_at = closing.finalized_at
+    closing.integrity_check_result = {
+        "data_version": closing.version,
+        "checked_at": closing.finalized_at.isoformat(),
+        "issue_count": 0,
+        "checked_no_record": True,
+    }
+    closing.snapshot = build_closing_snapshot(employee, target_month, report, closing)
+    closing.save(update_fields=[
+        "reconciled_by", "reconciled_at", "integrity_check_result", "snapshot",
+    ])
+
     notify_month_changed(closing)
 
     _audit(
@@ -412,7 +528,7 @@ def finalize_month(
             "work_seconds": report.total_work_seconds,
             "break_seconds": report.total_break_seconds,
         },
-        reason="記録なしの日を別途照合して月次確定",
+        reason="別管理資料と照合して月次確定",
         details={
             "target_month": target_month.isoformat(),
             "no_record_count": no_record_count,
@@ -463,6 +579,8 @@ def reopen_month(
         raise AdminActionError("対象の月は確定済みではありません。")
 
     previous_status = closing.status
+    previous_snapshot = closing.snapshot
+    previous_integrity_result = closing.integrity_check_result
     open_status = _open_closing_status()
 
     closing.status = open_status
@@ -471,6 +589,8 @@ def reopen_month(
     closing.unlocked_at = timezone.now()
     closing.unlock_reason = reason
     closing.version += 1
+    closing.snapshot = {}
+    closing.integrity_check_result = {}
     closing.save()
 
     notify_month_changed(closing)
@@ -481,7 +601,11 @@ def reopen_month(
         action=AuditLog.Action.MONTH_REOPEN,
         model="MonthlyClosing",
         record_id=closing.pk,
-        before={"status": previous_status},
+        before={
+            "status": previous_status,
+            "snapshot": previous_snapshot,
+            "integrity_check_result": previous_integrity_result,
+        },
         after={"status": open_status},
         reason=reason,
         details={

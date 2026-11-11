@@ -25,6 +25,7 @@
             <p class="e03-date">
                 {{ work_day|date:"Y年n月j日（D）" }}
             </p>
+            {% if target_day != work_day %}<p>移動先の勤務日: {{ target_day|date:"Y年n月j日（D）" }}</p>{% endif %}
             <p>
                 内容を確認してから提出してください。
             </p>

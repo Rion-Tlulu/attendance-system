@@ -40,11 +40,7 @@ class MonthClosingForm(forms.Form):
     """記録なしの日の照合確認。"""
 
     checked_no_record = forms.BooleanField(
-        label=(
-            "記録なしの日について、"
-            "勤務予定や休暇等の情報と"
-            "照合したことを確認しました"
-        ),
+        label="別管理資料との照合を確認した",
         required=True,
     )
 
@@ -60,6 +56,12 @@ profile_fields = [
 class EmployeeCreateForm(forms.ModelForm):
     """社員登録。初期パスワードはサーバー側で生成する。"""
 
+    hire_date = forms.DateField(
+        label="入社日",
+        required=True,
+        widget=forms.DateInput(attrs={"type": "date"}),
+    )
+
     class Meta:
         model = Employee
         fields = ["employee_number", *profile_fields]
@@ -68,13 +70,41 @@ class EmployeeCreateForm(forms.ModelForm):
 class EmployeeEditForm(forms.ModelForm):
     """社員の基本情報を編集するフォーム。"""
 
+    change_reason = forms.CharField(
+        label="変更理由",
+        max_length=500,
+        required=False,
+        widget=forms.Textarea(attrs={"rows": 3}),
+    )
+
     class Meta:
         model = Employee
-        fields = [*profile_fields, "is_active"]
+        fields = ["employee_number", *profile_fields, "is_active"]
+
+    def clean(self):
+        cleaned = super().clean()
+        if self.instance.pk and (
+            cleaned.get("employee_number") != self.instance.employee_number
+            or cleaned.get("is_active") != self.instance.is_active
+        ) and not (cleaned.get("change_reason") or "").strip():
+            self.add_error("change_reason", "社員番号・利用状態の変更理由を入力してください。")
+        return cleaned
 
 
 class EmploymentInfoForm(forms.ModelForm):
     """社員の部署・入退社日を編集する。"""
+
+    hire_date = forms.DateField(
+        label="入社日",
+        required=True,
+        widget=forms.DateInput(attrs={"type": "date"}),
+    )
+    change_reason = forms.CharField(
+        label="変更理由",
+        max_length=500,
+        required=False,
+        widget=forms.Textarea(attrs={"rows": 3}),
+    )
 
     class Meta:
         model = EmploymentInfo
@@ -84,3 +114,12 @@ class EmploymentInfoForm(forms.ModelForm):
             "hire_date": forms.DateInput(attrs={"type": "date"}),
             "leave_date": forms.DateInput(attrs={"type": "date"}),
         }
+
+    def clean(self):
+        cleaned = super().clean()
+        if self.instance.pk and (
+            cleaned.get("hire_date") != self.instance.hire_date
+            or cleaned.get("leave_date") != self.instance.leave_date
+        ) and not (cleaned.get("change_reason") or "").strip():
+            self.add_error("change_reason", "在籍日の変更理由を入力してください。")
+        return cleaned

@@ -5,6 +5,8 @@ from django.urls import path
 from . import views
 
 from . import employee_details
+from . import proxy_corrections
+from . import export_batches
 
 app_name = "management"
 
@@ -73,7 +75,7 @@ urlpatterns = [
     # CSV出力
     path(
         "employees/<int:employee_id>/months/<int:year>/<int:month>/csv/",
-        views.month_csv,
+        export_batches.single_month_batch,
         name="month_csv",
     ),
     # 操作履歴
@@ -92,12 +94,21 @@ urlpatterns = [
         employee_details.employement_edit,
         name="employment_edit",
     ),
+    path(
+        "employees/<int:employee_id>/months/<int:year>/<int:month>/proxy-correction/<int:day>/",
+        proxy_corrections.proxy_correction,
+        name="proxy_correction",
+    ),
+    path("corrections/<int:pk>/withdraw/", proxy_corrections.proxy_withdraw, name="proxy_withdraw"),
     # 全社員・部署別・個人別のCSV出力
     path(
         "exports/",
         bulk_exports.bulk_export,
         name="bulk_export",
     ),
+    path("exports/<uuid:output_id>/", export_batches.batch_detail, name="batch_detail"),
+    path("exports/<uuid:output_id>/<str:output_format>/", export_batches.batch_download,
+         name="batch_download"),
     # 社員の初期パスワード再発行URL
     path(
         "employees/<int:employee_id>/reset-password/",

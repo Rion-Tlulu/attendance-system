@@ -76,6 +76,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 
     "accounts.middleware.InitialPasswordRequiredMiddleware",
+    "notifications.middleware.NotificationDestinationMiddleware",
     "axes.middleware.AxesMiddleware"
 ]
 

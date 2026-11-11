@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}CSV出力ID | 勤怠管理{% endblock %}
+{% block screen_label %}管理者｜CSV出力{% endblock %}
+{% block content %}
+<div class="v2-page">
+  <header class="v2-heading"><div><h1>確定版CSV出力</h1>
+    <p>対象月 {{ batch.target_month|date:"Y年n月" }}　出力ID {{ batch.output_id }}</p></div></header>
+  {% if error %}<div class="v2-notice v2-notice--warning" role="alert">{{ error }}</div>{% endif %}
+  <section class="v2-panel">
+    <p>日次明細と月次集計は同じ出力IDの組で受け渡してください。</p>
+    <form method="post" action="{% url 'management:batch_download' batch.output_id 'daily' %}">
+      {% csrf_token %}<button class="v2-button" type="submit">日次明細CSVを取得</button>
+    </form>
+    <form method="post" action="{% url 'management:batch_download' batch.output_id 'monthly' %}">
+      {% csrf_token %}<button class="v2-button" type="submit">月次集計CSVを取得</button>
+    </form>
+    <a class="v2-button v2-button--outline" href="{% url 'management:bulk_export' %}">新しい出力IDを作る</a>
+  </section>
+</div>
+{% endblock %}

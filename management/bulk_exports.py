@@ -15,22 +15,26 @@
 """
 
 import csv
+from calendar import monthrange
 from datetime import date
 
 from django import forms
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.http import HttpResponse
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
 
 from attendance.models import MonthlyClosing, WorkSession
 from attendance.reporting import build_monthly_report
+from attendance.validation import employed_during_month, month_integrity_issues
 from auditlog.models import AuditLog
 from django.utils import timezone
 
 from .access import business_admin_required
+from .csv_format import csv_safe
+from .export_batches import create_export_batch
 from .models import EmploymentInfo
 
 Employee = get_user_model()
@@ -42,25 +46,6 @@ MAX_EXPORT_EMPLOYEES = 500
 # ============================================
 # 1. CSVの安全対策
 # ============================================
-
-
-def csv_safe(value):
-    """
-    Excel等で文字列が数式として解釈される
-    リスクを低減する。
-    """
-
-    if value is None:
-        return ""
-
-    text = str(value)
-
-    stripped = text.lstrip(" \t\r\n\ufeff")
-
-    if stripped.startswith(("=", "+", "-", "@")) or text.startswith(("\t", "\r", "\n")):
-        return "'" + text
-
-    return text
 
 
 def csv_datetime(value):
@@ -133,6 +118,7 @@ class BulkExportForm(forms.Form):
             ("monthly", "月次集計CSV"),
         ],
         widget=forms.RadioSelect,
+        required=False,
     )
 
     def __init__(self, *args, **kwargs):
@@ -202,7 +188,9 @@ def select_employees(data):
     is_active=Trueで限定しない。
     """
 
-    queryset = Employee.objects.select_related("employement_info").all()
+    queryset = Employee.objects.select_related("employement_info").filter(
+        is_staff=False, is_superuser=False,
+    )
 
     scope = data["scope"]
 
@@ -214,9 +202,9 @@ def select_employees(data):
 
         queryset = queryset.filter(employee_number=employee_number)
 
-    # 上限を超えたか検出できるように
-    # 1件多く取得する
-    return list(queryset.order_by("pk")[: MAX_EXPORT_EMPLOYEES + 1])
+    # 在籍月で絞り込む前に件数制限すると、先頭の対象外社員によって
+    # 後続の対象社員が欠落するため、ここでは全候補を返す。
+    return list(queryset.order_by("pk"))
 
 
 # ============================================
@@ -496,7 +484,11 @@ def bulk_export(request):
     if request.method == "GET":
         return render_export_form(
             request,
-            BulkExportForm(),
+            BulkExportForm(initial={
+                "month": request.GET.get("month") or timezone.localdate().strftime("%Y-%m"),
+                "scope": request.GET.get("scope") or "all",
+                "employee_number": request.GET.get("employee_number") or "",
+            }),
         )
 
     return process_bulk_export(request)
@@ -522,7 +514,26 @@ def process_bulk_export(request):
 
     target_month = date.fromisoformat(data["month"] + "-01")
 
-    employees = select_employees(data)
+    candidates = select_employees(data)
+    closings_by_employee = {
+        item.employee_id: item for item in MonthlyClosing.objects.filter(
+            employee_id__in=[employee.pk for employee in candidates],
+            target_month=target_month,
+        )
+    }
+    employees = []
+    for employee in candidates:
+        closing = closings_by_employee.get(employee.pk)
+        if closing and closing.status == MonthlyClosing.Status.FINALIZED and closing.snapshot:
+            hire = date.fromisoformat(closing.snapshot["hire_date"]) if closing.snapshot.get("hire_date") else None
+            leave = date.fromisoformat(closing.snapshot["leave_date"]) if closing.snapshot.get("leave_date") else None
+            last_day = date(target_month.year, target_month.month, 1)
+            last_day = last_day.replace(day=monthrange(target_month.year, target_month.month)[1])
+            eligible = (hire is None or hire <= last_day) and (leave is None or leave >= target_month)
+        else:
+            eligible = employed_during_month(employee, target_month)
+        if eligible:
+            employees.append(employee)
 
     # 対象社員が存在するか
     if not employees:
@@ -578,7 +589,7 @@ def process_bulk_export(request):
     # ダウンロード
     # ------------------------------
 
-    if mode != "download":
+    if mode not in {"download", "create"}:
         form.add_error(
             None,
             "操作を選択してください。",
@@ -591,6 +602,16 @@ def process_bulk_export(request):
             "対象社員に未確定の勤怠があります。" "すべて確定してから出力してください。",
         )
 
+    invalid = [
+        employee.employee_number for employee in employees
+        if month_integrity_issues(employee, target_month)
+    ]
+    if invalid:
+        form.add_error(
+            None,
+            "勤務の不整合がある社員は出力できません: " + ", ".join(invalid[:10]),
+        )
+
     if form.errors:
         return render_export_form(
             request,
@@ -599,50 +620,9 @@ def process_bulk_export(request):
             status=400,
         )
 
-    response = HttpResponse(content_type=("text/csv; charset=utf-8"))
-
-    # 個人情報を含むCSVのキャッシュを抑制
-    response["Cache-Control"] = "no-store"
-
-    filename = (
-        f'attendance_{data["month"]}_'
-        f'{data["scope"]}_'
-        f'{data["output_format"]}.csv'
-    )
-
-    response["Content-Disposition"] = f'attachment; filename="{filename}"'
-
-    row_count = write_csv(
-        response,
-        employees,
-        target_month,
-        data["output_format"],
-    )
-
-    # ------------------------------
-    # CSV出力の監査履歴
-    # ------------------------------
-
-    AuditLog.objects.create(
-        actor=request.user,
-        target_employee=None,
-        action=AuditLog.Action.CSV_EXPORT,
-        target_model="MonthlyClosing",
-        target_id=(f"bulk:{target_month.isoformat()}"),
-        before_data={},
-        after_data={
-            "exported": True,
-            "employee_count": len(employees),
-            "row_count": row_count,
-        },
-        reason=("確定済み勤怠の一括CSV出力"),
-        details={
-            "month": data["month"],
-            "scope": data["scope"],
-            "department": (data.get("department") or ""),
-            "employee_number": (data.get("employee_number") or ""),
-            "format": data["output_format"],
-        },
-    )
-
-    return response
+    try:
+        batch = create_export_batch(request.user, employees, target_month)
+    except ValueError as exc:
+        form.add_error(None, str(exc))
+        return render_export_form(request, form, summary=summary, status=400)
+    return redirect("management:batch_detail", output_id=batch.output_id)

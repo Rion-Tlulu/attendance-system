@@ -36,6 +36,8 @@ from .services import (
     current_values,
     is_month_finalized,
     make_proposal,
+    pending_for_day,
+    proposal_work_day,
     submit_correction,
     validate_proposal,
     withdraw_correction,
@@ -279,23 +281,17 @@ def correction_create(request, year, month, day):
         )
 
     # 同じ勤務に審査中の申請がある場合
-    if session is not None:
+    pending = CorrectionRequest.objects.filter(
+        employee=employee, work_date=work_day,
+        status=CorrectionRequest.Status.PENDING,
+    ).first()
+    if pending is not None:
+        messages.info(request, "この勤務には審査中の申請があります。")
+        return redirect("corrections:detail", pk=pending.pk)
 
-        pending = CorrectionRequest.objects.filter(
-            work_session=session,
-            status=CorrectionRequest.Status.PENDING,
-        ).first()
-
-        if pending is not None:
-            messages.info(
-                request,
-                "この勤務には審査中の申請があります。",
-            )
-
-            return redirect(
-                "corrections:detail",
-                pk=pending.pk,
-            )
+    if pending_for_day(employee, work_day):
+        messages.info(request, "この勤務日には審査中の申請があります。")
+        return redirect("attendance:daily", year=year, month=month, day=day)
 
     # --------------------------------------
     # 申請の最終確定
@@ -440,6 +436,7 @@ def correction_create(request, year, month, day):
                     "corrections/confirm.html",
                     {
                         "work_day": work_day,
+                        "target_day": proposal_work_day(proposal, work_day),
                         "proposal_display": (_display_proposal(proposal)),
                         "reason": (form.cleaned_data["reason"]),
                         "confirm_token": token,
@@ -503,7 +500,7 @@ def correction_list(request):
 
     queryset = (
         CorrectionRequest.objects.filter(requested_by=request.user)
-        .select_related("work_session")
+        .select_related("employee", "work_session")
         .order_by(
             "-created_at",
             "-pk",
@@ -541,7 +538,7 @@ def correction_detail(request, pk):
     """ログイン社員本人の修正申請詳細。"""
 
     correction = get_object_or_404(
-        CorrectionRequest.objects.select_related("work_session"),
+        CorrectionRequest.objects.select_related("employee", "work_session"),
         pk=pk,
         requested_by=request.user,
     )

@@ -1,5 +1,6 @@
 from django.contrib import messages
 from django.contrib.auth import update_session_auth_hash
+from django.contrib.auth import get_user_model, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import (
     LoginView,
@@ -61,6 +62,17 @@ class EmployeePasswordChangeView(PasswordChangeView):
 
     def form_valid(self, form):
         with transaction.atomic():
+            current = get_user_model().objects.select_for_update().get(pk=self.request.user.pk)
+            expires_at = current.initial_password_expires_at
+            if (current.must_change_password and expires_at is not None
+                    and timezone.now() >= expires_at):
+                logout(self.request)
+                messages.error(self.request, "初期パスワードの期限が切れています。再発行を依頼してください。")
+                return HttpResponseRedirect(reverse("accounts:login"))
+            if current.password != self.request.user.password:
+                logout(self.request)
+                messages.error(self.request, "認証情報が更新されました。もう一度ログインしてください。")
+                return HttpResponseRedirect(reverse("accounts:login"))
             user = form.save()
             user.must_change_password = False
             user.initial_password_issued_at = None

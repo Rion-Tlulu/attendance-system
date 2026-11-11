@@ -9,6 +9,8 @@ from django.shortcuts import (
 from django.views.decorators.cache import never_cache
 
 from auditlog.models import AuditLog
+from attendance.models import WorkSession
+from corrections.models import CorrectionRequest
 
 from .access import business_admin_required
 from .forms import EmploymentInfoForm
@@ -66,6 +68,36 @@ def employement_edit(request, employee_id):
             if form.is_valid():
                 updated = form.save(commit=False)
                 updated.employee = employee
+                dates_changed = (
+                    (updated.hire_date.isoformat() if updated.hire_date else None) != before.get("hire_date")
+                    or (updated.leave_date.isoformat() if updated.leave_date else None) != before.get("leave_date")
+                )
+                if dates_changed and CorrectionRequest.objects.filter(
+                    employee=employee,
+                    status=CorrectionRequest.Status.PENDING,
+                ).exists():
+                    form.add_error(None, "審査中の申請を処理してから在籍日を変更してください。")
+
+                invalid_work = WorkSession.objects.filter(
+                    employee=employee,
+                    clock_in_at__isnull=False,
+                ).exclude(status=WorkSession.Status.NO_RECORD)
+                if updated.hire_date:
+                    invalid_work = invalid_work.filter(work_date__lt=updated.hire_date)
+                if not invalid_work.exists() and updated.leave_date:
+                    invalid_work = WorkSession.objects.filter(
+                        employee=employee,
+                        clock_in_at__isnull=False,
+                        work_date__gt=updated.leave_date,
+                    ).exclude(status=WorkSession.Status.NO_RECORD)
+                if dates_changed and invalid_work.exists():
+                    form.add_error(None, "在籍期間外に有効な勤務が残ります。勤怠を訂正してください。")
+
+                if form.errors:
+                    return render(request, "management/employment_edit.html", {
+                        "employee": employee, "form": form,
+                    })
+
                 updated.save()
 
                 AuditLog.objects.create(
@@ -76,7 +108,7 @@ def employement_edit(request, employee_id):
                     target_id=str(updated.pk),
                     before_data=before,
                     after_data=snapshot(updated),
-                    reason="社員の雇用情報の更新",
+                    reason=form.cleaned_data.get("change_reason") or "社員の雇用情報の更新",
                     details={},
                 )
 

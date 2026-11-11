@@ -2,6 +2,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import F, Q
+import uuid
 
 
 class EmploymentInfo(models.Model):
@@ -58,4 +59,14 @@ class EmploymentInfo(models.Model):
             )
 
     def __str__(self):
-        return f"{self.employee.employee_number}" f"/{self.department or "部署未設定"}"
+        return f"{self.employee.employee_number}/{self.department or '部署未設定'}"
+
+
+class ExportBatch(models.Model):
+    """A pair of CSVs tied to the same closing versions."""
+
+    output_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    target_month = models.DateField()
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    created_at = models.DateTimeField(auto_now_add=True)
+    manifest = models.JSONField(default=list)

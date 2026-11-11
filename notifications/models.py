@@ -122,9 +122,13 @@ class Notification(models.Model):
         if not self.event_key:
             return False
         if self.kind == self.Kind.INCOMPLETE:
-            from attendance.models import WorkSession
+            from attendance.models import IncompleteOccurrence, WorkSession
 
             parts = self.event_key.split(":")
+            if len(parts) >= 4 and not parts[1].isdigit():
+                return not IncompleteOccurrence.objects.filter(
+                    occurrence_id=parts[1], ended_at__isnull=True,
+                ).exists()
             if len(parts) >= 2 and parts[1].isdigit():
                 return not WorkSession.objects.filter(
                     pk=int(parts[1]),

@@ -523,7 +523,10 @@ class Phase9Tests(TestCase):
                 args=[self.employee.pk, 2026, 9],
             )
         )
-
+        self.assertEqual(response.status_code, 302)
+        from management.models import ExportBatch
+        batch = ExportBatch.objects.latest("pk")
+        response = self.client.post(reverse("management:batch_download", args=[batch.output_id, "daily"]))
         self.assertEqual(response.status_code, 200)
 
         # UTF-8 BOM
@@ -545,7 +548,7 @@ class Phase9Tests(TestCase):
             )
         )
 
-        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.status_code, 400)
 
     def test_regular_employee_cannot_download_csv(self):
         self.client.force_login(self.employee)
@@ -1074,7 +1077,7 @@ class Phase10RegressionTests(TestCase):
 
         response = self.client.post(self.csv_url())
 
-        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.status_code, 400)
 
         self.assertFalse(
             AuditLog.objects.filter(action=AuditLog.Action.CSV_EXPORT).exists()
@@ -1101,7 +1104,10 @@ class Phase10RegressionTests(TestCase):
         self.client.force_login(self.manager)
 
         response = self.client.post(self.csv_url())
-
+        self.assertEqual(response.status_code, 302)
+        from management.models import ExportBatch
+        batch = ExportBatch.objects.latest("pk")
+        response = self.client.post(reverse("management:batch_download", args=[batch.output_id, "daily"]))
         self.assertEqual(response.status_code, 200)
 
         self.assertIn(
@@ -1123,7 +1129,7 @@ class Phase10RegressionTests(TestCase):
             AuditLog.objects.filter(
                 action=AuditLog.Action.CSV_EXPORT,
                 actor=self.manager,
-                target_employee=self.employee,
+                target_model="ExportBatch",
             ).exists()
         )
 
@@ -1132,10 +1138,13 @@ class Phase10RegressionTests(TestCase):
         self.client.force_login(self.manager)
 
         response = self.client.post(self.csv_url())
+        from management.models import ExportBatch
+        batch = ExportBatch.objects.latest("pk")
+        response = self.client.post(reverse("management:batch_download", args=[batch.output_id, "daily"]))
         rows = list(csv.reader(io.StringIO(response.content.decode("utf-8-sig"))))
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(rows[0][8], "実働時間")
+        self.assertEqual(rows[0][7], "実働秒数")
         self.assertTrue(all(len(row) == len(rows[0]) for row in rows[1:]))
 
     # ======================================
@@ -1156,7 +1165,7 @@ class Phase10RegressionTests(TestCase):
             with self.subTest(sample=sample):
                 result = _csv_safe(sample)
 
-                self.assertTrue(result.startswith("'"))
+                self.assertTrue(result.startswith("TXT_"))
 
         self.assertEqual(
             _csv_safe("一般社員"),
@@ -2036,12 +2045,11 @@ class V2ManagementTests(TestCase):
         }
 
     def finalize_employee(self, employee):
-        MonthlyClosing.objects.create(
-            employee=employee,
+        finalize_month(
+            manager_id=self.manager.pk,
+            employee_id=employee.pk,
             target_month=date(2026, 9, 1),
-            status=MonthlyClosing.Status.FINALIZED,
-            finalized_by=self.manager,
-            finalized_at=timezone.now(),
+            checked_no_record=True,
         )
 
     def test_01_employee_cannot_export(self):
@@ -2097,6 +2105,10 @@ class V2ManagementTests(TestCase):
             self.csv_data(scope="department"),
         )
 
+        self.assertEqual(response.status_code, 302)
+        from management.models import ExportBatch
+        batch = ExportBatch.objects.latest("pk")
+        response = self.client.post(reverse("management:batch_download", args=[batch.output_id, "monthly"]))
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.content.startswith(b"\xef\xbb\xbf"))
 

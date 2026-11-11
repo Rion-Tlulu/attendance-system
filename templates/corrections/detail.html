@@ -24,7 +24,7 @@
             <h1>修正申請の詳細</h1>
             <p>
                 勤務日：
-                {{ correction.work_session.work_date|date:"Y年n月j日（D）" }}
+                {{ correction.work_date|date:"Y年n月j日（D）" }}
             </p>
         </div>
 
@@ -141,7 +141,7 @@
     <nav class="e03-bottom-actions"
          aria-label="申請詳細の操作">
         <a class="v2-button v2-button--outline"
-           href="{% url 'attendance:daily' correction.work_session.work_date.year correction.work_session.work_date.month correction.work_session.work_date.day %}">
+           href="{% url 'attendance:daily' correction.work_date.year correction.work_date.month correction.work_date.day %}">
             日別詳細に戻る
         </a>
     </nav>

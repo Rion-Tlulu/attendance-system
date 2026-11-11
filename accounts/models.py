@@ -1,7 +1,7 @@
 from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import models, transaction
 
 
 class EmployeeManager(BaseUserManager):
@@ -81,6 +81,32 @@ class Employee(AbstractUser):
             raise ValidationError(
                 {"retirement_date": "退職日は入社日以降にしてください。"}
             )
+
+    def save(self, *args, **kwargs):
+        """Keep two active business managers when an account loses that role."""
+        update_fields = kwargs.get("update_fields")
+        checks_role = update_fields is None or bool(
+            {"is_active", "is_business_admin"} & set(update_fields)
+        )
+        if self.pk and checks_role:
+            using = kwargs.get("using") or self._state.db or "default"
+            with transaction.atomic(using=using):
+                previous = type(self).objects.using(using).select_for_update().get(pk=self.pk)
+                new_active = self.is_active if update_fields is None or "is_active" in update_fields else previous.is_active
+                new_admin = (self.is_business_admin if update_fields is None or
+                             "is_business_admin" in update_fields else previous.is_business_admin)
+                if previous.is_active and previous.is_business_admin and not (
+                    new_active and new_admin
+                ):
+                    active_ids = list(
+                        type(self).objects.using(using).select_for_update()
+                        .filter(is_active=True, is_business_admin=True)
+                        .order_by("pk").values_list("pk", flat=True)
+                    )
+                    if len(active_ids) <= 2:
+                        raise ValidationError("有効な業務管理者は2人以上必要です。")
+                return super().save(*args, **kwargs)
+        return super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.employee_number} - {self.display_name}"

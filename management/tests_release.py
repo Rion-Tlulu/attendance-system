@@ -12,7 +12,7 @@ from django.utils import timezone
 
 from attendance.models import MonthlyClosing, WorkSession
 from auditlog.models import AuditLog
-from management.models import EmploymentInfo
+from management.models import EmploymentInfo, ExportBatch
 from management.services import finalize_month, reopen_month
 from notifications.models import Notification
 
@@ -33,6 +33,7 @@ class ReleaseAcceptanceTests(TestCase):
         create = self.client.post(reverse("management:employee_create"), {
             "employee_number": "91003", "first_name": "太郎", "last_name": "佐藤",
             "department": "営業部",
+            "hire_date": "2026-04-01",
         })
         self.assertEqual(create.status_code, 200)
         self.assertContains(create, "初期パスワード")
@@ -78,15 +79,16 @@ class ReleaseAcceptanceTests(TestCase):
             employee=self.employee, department="営業部",
             hire_date=date(2026, 9, 15), leave_date=date(2026, 9, 20),
         )
-        MonthlyClosing.objects.create(
-            employee=self.employee, target_month=month,
-            status=MonthlyClosing.Status.FINALIZED,
-            finalized_by=self.manager, finalized_at=timezone.now(),
-        )
+        finalize_month(manager_id=self.manager.pk, employee_id=self.employee.pk,
+                       target_month=month, checked_no_record=True)
         base = {"month": "2026-09", "scope": "employee", "department": "",
                 "employee_number": self.employee.employee_number, "mode": "download"}
-        daily = self.client.post(reverse("management:bulk_export"),
-                                 {**base, "output_format": "daily"})
+        created = self.client.post(reverse("management:bulk_export"),
+                                   {**base, "output_format": "daily"})
+        self.assertEqual(created.status_code, 302)
+        batch = ExportBatch.objects.get()
+        daily = self.client.post(reverse("management:batch_download",
+                                         args=[batch.output_id, "daily"]))
         self.assertEqual(daily.status_code, 200)
         self.assertTrue(daily.content.startswith(b"\xef\xbb\xbf"))
         self.assertIn(b"\r\n", daily.content)
@@ -96,13 +98,19 @@ class ReleaseAcceptanceTests(TestCase):
         self.assertEqual(len(daily_rows), 7)
         self.assertEqual(daily_rows[1][4:6], ["2026-09-15 09:00:00", "2026-09-15 18:00:00"])
         self.assertEqual(daily_rows[1][7], "32400")
-        monthly = self.client.post(reverse("management:bulk_export"),
-                                   {**base, "output_format": "monthly"})
+        monthly = self.client.post(reverse("management:batch_download",
+                                           args=[batch.output_id, "monthly"]))
         self.assertEqual(monthly.status_code, 200)
         monthly_rows = list(csv.reader(StringIO(monthly.content.decode("utf-8-sig"))))
         self.assertEqual(monthly_rows[0], ["社員番号", "氏名", "部署", "対象月", "勤務記録日数",
             "実働秒数", "休憩秒数", "未完了件数", "確定日時", "データ版"])
         self.assertEqual(monthly_rows[1][4:8], ["1", "32400", "0", "0"])
+        exports = list(AuditLog.objects.filter(
+            action=AuditLog.Action.CSV_EXPORT,
+            target_model="ExportBatch", target_id=str(batch.output_id),
+        ).order_by("pk"))
+        self.assertEqual([item.details["format"] for item in exports], ["daily", "monthly"])
+        self.assertTrue(all(item.details["output_id"] == str(batch.output_id) for item in exports))
 
     def test_role_change_and_login_failure_are_audited(self):
         self.employee.is_business_admin = True

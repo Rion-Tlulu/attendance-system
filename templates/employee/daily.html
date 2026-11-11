@@ -79,6 +79,13 @@
         </div>
     </header>
 
+    {% if moved_to %}
+    <div class="e03-notice" role="status">
+      この日の有効勤務は {{ moved_to.work_date|date:"Y年n月j日" }} に移動しました。
+      原打刻と申請履歴はこの日にも残ります。
+    </div>
+    {% endif %}
+
     <!-- 状態案内 -->
     {% if is_finalized %}
     <div class="e03-notice" role="status">

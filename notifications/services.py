@@ -60,7 +60,7 @@ def notify_correction_submitted(correction):
         is_active=True,
         is_business_admin=True,
     ).exclude(
-        pk=correction.requested_by_id,
+        pk__in=[correction.requested_by_id, correction.employee_id],
     )
 
     target = reverse(
@@ -73,7 +73,11 @@ def notify_correction_submitted(correction):
             recipient=manager,
             kind=Notification.Kind.CORRECTION_SUBMITTED,
             title="新しい修正申請があります",
-            body=("社員から勤怠修正申請が提出されました" "内容を確認してください"),
+            body=(
+                f"{correction.employee.get_full_name()}"
+                f"（{correction.employee.employee_number}）の"
+                f"{correction.work_date:%Y/%m/%d}の修正申請を確認してください。"
+            ),
             target_path=target,
             event_key=(f"correction:{correction.pk}:" f"submitted:{manager.pk}"),
             is_management=True,
@@ -100,19 +104,37 @@ def notify_correction_reviewed(correction):
     else:
         return None
 
-    return create_notification(
-        recipient=correction.requested_by,
-        kind=kind,
-        title=title,
-        body=body,
-        target_path=reverse(
-            "corrections:detail",
-            args=[correction.pk],
-        ),
-        event_key=(
-            f"correction:{correction.pk}" f"{status}:{correction.requested_by_id}"
-        ),
-    )
+    target_employee = correction.employee
+    if correction.is_proxy:
+        recipients = [correction.requested_by] if correction.requested_by.is_active else []
+        target_path = reverse("management:employee_month", args=[
+            target_employee.pk, correction.work_date.year,
+            correction.work_date.month,
+        ])
+        management = True
+    elif target_employee.is_active:
+        recipients = [target_employee]
+        target_path = reverse("corrections:detail", args=[correction.pk])
+        management = False
+    else:
+        Employee = get_user_model()
+        recipients = Employee.objects.filter(is_active=True, is_business_admin=True)
+        target_path = reverse("management:employee_month", args=[
+            target_employee.pk, correction.work_date.year,
+            correction.work_date.month,
+        ])
+        management = True
+    for recipient in recipients:
+        management_body = (
+            f"{target_employee.get_full_name()}（{target_employee.employee_number}）の"
+            f"{correction.work_date:%Y/%m/%d}の申請結果を確認してください。"
+        ) if management else body
+        create_notification(
+            recipient=recipient, kind=kind, title=title, body=management_body,
+            target_path=target_path,
+            event_key=f"correction:{correction.pk}:{status}:{recipient.pk}",
+            is_management=management,
+        )
 
 
 def notify_month_changed(closing):
@@ -125,11 +147,28 @@ def notify_month_changed(closing):
         if finalized else Notification.Kind.MONTH_REOPENED
     )
     month = closing.target_month
-    return create_notification(
-        recipient=closing.employee,
-        kind=kind,
-        title="月次勤怠が確定しました" if finalized else "月次勤怠の確定が解除されました",
-        body=f"{month:%Y年%m月}の勤怠を確認してください。",
-        target_path=reverse("attendance:monthly") + f"?month={month:%Y-%m}",
-        event_key=f"closing:{closing.pk}:{closing.version}:{closing.employee_id}",
-    )
+    if closing.employee.is_active:
+        recipients = [closing.employee]
+        target_path = reverse("attendance:monthly") + f"?month={month:%Y-%m}"
+        management = False
+    else:
+        Employee = get_user_model()
+        recipients = Employee.objects.filter(is_active=True, is_business_admin=True).exclude(pk=closing.employee_id)
+        target_path = reverse("management:employee_month", args=[
+            closing.employee_id, month.year, month.month,
+        ])
+        management = True
+    for recipient in recipients:
+        create_notification(
+            recipient=recipient,
+            kind=kind,
+            title="月次勤怠が確定しました" if finalized else "月次勤怠の確定が解除されました",
+            body=(
+                f"{closing.employee.get_full_name()}（{closing.employee.employee_number}）の"
+                f"{month:%Y年%m月}の勤怠を確認してください。"
+                if management else f"{month:%Y年%m月}の勤怠を確認してください。"
+            ),
+            target_path=target_path,
+            event_key=f"closing:{closing.pk}:{closing.version}:{recipient.pk}",
+            is_management=management,
+        )

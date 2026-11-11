@@ -26,6 +26,13 @@
         </p>
     </header>
 
+    {% if not creating and employee.is_active %}
+    <div class="admin-warning" role="note">
+      利用停止後も未完了 {{ incomplete_count }}件、審査中 {{ pending_count }}件を保持します。
+      停止中の訂正は月次詳細から代理申請してください。
+    </div>
+    {% endif %}
+
     <section class="ui-card admin-section admin-form-card"
              aria-labelledby="employee-form-title">
         <form method="post" autocomplete="off">
@@ -35,13 +42,6 @@
             <div class="admin-warning" role="alert">
                 {{ form.non_field_errors }}
             </div>
-            {% endif %}
-
-            {% if not creating %}
-            <p>
-                <strong>社員番号：</strong>
-                {{ employee.employee_number }}
-            </p>
             {% endif %}
 
             {% for field in form %}

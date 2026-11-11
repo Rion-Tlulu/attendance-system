@@ -1,7 +1,7 @@
 import calendar
 
-from dataclasses import dataclass
-from datetime import date
+from dataclasses import dataclass, replace
+from datetime import date, datetime
 
 from django.db.models import Prefetch
 from django.utils import timezone
@@ -79,7 +79,7 @@ def calculate_duration(session, breaks):
     start = session.clock_in_at
     end = session.clock_out_at
 
-    if start is None or end is None or end <= start:
+    if start is None or end is None or end < start:
         return DurationResult(False)
 
     # 勤務日が出勤した日の日本日付であること
@@ -132,8 +132,12 @@ def get_breaks(session):
     return list(session.break_intervals.order_by("started_at", "pk"))
 
 
-def get_corrections(session):
+def get_corrections(session, employee=None, work_day=None):
     """勤務に関連する申請履歴を取得する。"""
+    if employee is not None and work_day is not None:
+        return list(CorrectionRequest.objects.filter(
+            employee=employee, work_date=work_day,
+        ).order_by("-created_at", "-pk"))
     if session is None:
         return []
 
@@ -190,11 +194,11 @@ class DailyRow:
     has_pending: bool
 
 
-def build_daily_row(day, session, is_finalized=False):
+def build_daily_row(day, session, is_finalized=False, corrections=None):
     """1日分の勤怠表示データを生成する。"""
 
     breaks = get_breaks(session)
-    corrections = get_corrections(session)
+    corrections = get_corrections(session) if corrections is None else corrections
 
     duration = calculate_duration(session, breaks)
 
@@ -318,6 +322,11 @@ def build_monthly_report(employee, target_month):
     )
 
     session_map = {session.work_date: session for session in sessions}
+    correction_map = {}
+    for correction in CorrectionRequest.objects.filter(
+        employee=employee, work_date__range=(first_day, last_day),
+    ).order_by("-created_at", "-pk"):
+        correction_map.setdefault(correction.work_date, []).append(correction)
 
     closing = MonthlyClosing.objects.filter(
         employee=employee,
@@ -340,6 +349,7 @@ def build_monthly_report(employee, target_month):
             day,
             session_map.get(day),
             is_finalized,
+            corrections=correction_map.get(day, []),
         )
 
         rows.append(row)
@@ -356,7 +366,7 @@ def build_monthly_report(employee, target_month):
 
     # 完了勤務0件の場合も、月次集計の値は0
     # 記録なしの日別表示とは区別する
-    return MonthlyReport(
+    report = MonthlyReport(
         month=first_day,
         month_label=(f"{first_day.year}年{first_day.month}月"),
         month_query=first_day.strftime("%Y-%m"),
@@ -372,6 +382,37 @@ def build_monthly_report(employee, target_month):
         previous_month=adjacent_month(first_day, -1),
         next_month=adjacent_month(first_day, 1),
     )
+    if is_finalized and closing.snapshot:
+        frozen = closing.snapshot
+        by_day = {item["day"]: item for item in frozen["daily"]}
+        frozen_rows = []
+        for row in report.rows:
+            data = by_day.get(row.day.isoformat())
+            if data is None:
+                continue
+            clock_in = datetime.fromisoformat(data["clock_in_at"]) if data["clock_in_at"] else None
+            clock_out = datetime.fromisoformat(data["clock_out_at"]) if data["clock_out_at"] else None
+            work_seconds = data["work_seconds"]
+            break_seconds = data["break_seconds"]
+            frozen_rows.append(replace(
+                row,
+                clock_in=format_clock(clock_in, row.day),
+                clock_out=format_clock(clock_out, row.day),
+                work_seconds=work_seconds,
+                break_seconds=break_seconds,
+                work_display=format_duration(work_seconds) if work_seconds is not None else "—",
+                break_display=format_duration(break_seconds) if break_seconds is not None else "—",
+                record_key="recorded" if work_seconds is not None else "no_record",
+                record_label=data["record_state"],
+            ))
+        report.rows = frozen_rows
+        report.total_work_seconds = frozen["work_seconds"]
+        report.total_break_seconds = frozen["break_seconds"]
+        report.work_display = format_duration(frozen["work_seconds"])
+        report.break_display = format_duration(frozen["break_seconds"])
+        report.incomplete_count = frozen["incomplete_count"]
+        report.pending_count = 0
+    return report
 
 
 def get_daily_session(employee, work_day):

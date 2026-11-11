@@ -26,7 +26,9 @@ def audit_login_failure(sender, credentials, request, **kwargs):
 
 
 @receiver(pre_save, sender=Employee, dispatch_uid="attendance_role_before")
-def capture_role_before(sender, instance, **kwargs):
+def capture_role_before(sender, instance, update_fields=None, **kwargs):
+    if update_fields is not None and "is_business_admin" not in update_fields:
+        return
     if instance.pk:
         instance._previous_business_admin = sender.objects.filter(pk=instance.pk).values_list(
             "is_business_admin", flat=True
@@ -34,7 +36,9 @@ def capture_role_before(sender, instance, **kwargs):
 
 
 @receiver(post_save, sender=Employee, dispatch_uid="attendance_role_after")
-def audit_role_change(sender, instance, created, **kwargs):
+def audit_role_change(sender, instance, created, update_fields=None, **kwargs):
+    if update_fields is not None and "is_business_admin" not in update_fields:
+        return
     previous = getattr(instance, "_previous_business_admin", None)
     if created or previous is None or previous == instance.is_business_admin:
         return

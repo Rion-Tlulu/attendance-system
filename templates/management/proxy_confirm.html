@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}代理申請の確認 | 勤怠管理{% endblock %}
+{% block screen_label %}管理者｜代理申請{% endblock %}
+{% block content %}
+<div class="v2-page">
+  <header class="v2-heading"><div><h1>代理申請の確認</h1></div></header>
+  <section class="v2-panel">
+    <p>対象: {{ employee.get_full_name }}（{{ employee.employee_number }}） 勤務日: {{ work_day|date:"Y/m/d" }}</p>
+    {% if target_day != work_day %}<p>移動先: {{ target_day|date:"Y/m/d" }}</p>{% endif %}
+    <h2>現在の有効値</h2>
+    <p>出勤 {{ current.clock_in_at|default:"未記録" }} ／ 退勤 {{ current.clock_out_at|default:"未記録" }}</p>
+    <h2>修正案</h2>
+    <p>出勤 {{ proposal.clock_in_at|default:"未記録" }} ／ 退勤 {{ proposal.clock_out_at|default:"未記録" }}</p>
+    <h3>休憩</h3>
+    {% for rest in proposal.breaks %}<p>{{ rest.started_at }} 〜 {{ rest.ended_at }}</p>{% empty %}<p>なし</p>{% endfor %}
+    <h3>理由と確認資料</h3>
+    <p>{{ reason }}</p><p>{{ proxy_reason }}</p><p>{{ evidence }}</p>
+    <form method="post">{% csrf_token %}
+      <input type="hidden" name="confirm_token" value="{{ confirm_token }}">
+      <button class="v2-button" type="submit">申請する</button>
+    </form>
+    <form method="post">{% csrf_token %}
+      <input type="hidden" name="return_token" value="{{ confirm_token }}">
+      <button class="v2-button v2-button--outline" type="submit">入力に戻る</button>
+    </form>
+  </section>
+</div>
+{% endblock %}

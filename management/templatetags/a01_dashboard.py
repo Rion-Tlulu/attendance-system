@@ -109,7 +109,7 @@ def _query_for_page(filters, page_number):
         "page": page_number,
     }
 
-    for name in ("q", "department", "status"):
+    for name in ("q", "department", "status", "active"):
         value = filters[name]
 
         if value and value != "all":
@@ -151,12 +151,15 @@ def a01_snapshot(context):
         "q": request.GET.get("q", "").strip()[:100],
         "department": request.GET.get("department", "").strip()[:100],
         "status": request.GET.get("status", "all"),
+        "active": request.GET.get("active", "all"),
     }
 
     allowed_statuses = {name for name, _ in STATUS_OPTIONS}
 
     if filters["status"] not in allowed_statuses:
         filters["status"] = "all"
+    if filters["active"] not in {"all", "active", "inactive"}:
+        filters["active"] = "all"
 
     # ------------------------------------------
     # 社員一覧
@@ -164,7 +167,13 @@ def a01_snapshot(context):
 
     Employee = get_user_model()
 
-    employees = list(Employee.objects.all().order_by("employee_number"))
+    employees = list(Employee.objects.filter(
+        is_staff=False, is_superuser=False,
+    ).order_by("employee_number"))
+    if filters["active"] == "active":
+        employees = [employee for employee in employees if employee.is_active]
+    elif filters["active"] == "inactive":
+        employees = [employee for employee in employees if not employee.is_active]
 
     department_names = sorted(
         {
@@ -263,17 +272,17 @@ def a01_snapshot(context):
 
         pending_qs = (
             CorrectionRequest.objects.filter(
-                work_session__employee_id__in=employee_ids,
-                work_session__work_date__gte=target_month,
-                work_session__work_date__lt=end_month,
+                employee_id__in=employee_ids,
+                work_date__gte=target_month,
+                work_date__lt=end_month,
                 status=CorrectionRequest.Status.PENDING,
             )
-            .values("work_session__employee_id")
+            .values("employee_id")
             .annotate(total=Count("pk"))
         )
 
         pending_counts = {
-            item["work_session__employee_id"]: item["total"] for item in pending_qs
+            item["employee_id"]: item["total"] for item in pending_qs
         }
 
         finalized_ids = set(

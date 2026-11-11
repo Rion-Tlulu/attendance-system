@@ -14,6 +14,8 @@ from .models import (
     MonthlyClosing,
     WorkSession,
 )
+from .validation import is_employed_on, overlapping_sessions
+from .incomplete import sync_incomplete_occurrences
 
 
 class ClockActionError(Exception):
@@ -47,7 +49,7 @@ def _has_pending_request(session: WorkSession) -> bool:
     """対象勤務に審査中の修正申請があるか確認する。"""
 
     return CorrectionRequest.objects.filter(
-        work_session=session,
+        employee=session.employee, work_date=session.work_date,
         status=CorrectionRequest.Status.PENDING,
     ).exists()
 
@@ -124,6 +126,16 @@ def record_clock_action(
         if _is_finalized(employee, today):
             raise ClockActionError("確定済みの月には打刻できません。")
 
+        from corrections.services import pending_for_day
+        if pending_for_day(employee, today):
+            raise ClockActionError("関係する勤務日の修正申請が審査中です。")
+
+        if not is_employed_on(employee, today):
+            raise ClockActionError("在籍期間外の日には出勤できません。")
+
+        if overlapping_sessions(employee, now, None):
+            raise ClockActionError("別の勤務と時間が重複しています。")
+
         existing_today = (
             WorkSession.objects
             .select_for_update()
@@ -138,7 +150,7 @@ def record_clock_action(
 
             # 修正申請の審査中は出勤できない
             if CorrectionRequest.objects.filter(
-                work_session=existing_today,
+                employee=employee, work_date=today,
                 status=CorrectionRequest.Status.PENDING,
             ).exists():
                 raise ClockActionError(
@@ -196,6 +208,9 @@ def record_clock_action(
 
         if _has_pending_request(session):
             raise ClockActionError("修正申請の審査中は打刻できません。")
+        from corrections.services import pending_for_day
+        if pending_for_day(employee, session.work_date):
+            raise ClockActionError("関係する勤務日の修正申請が審査中です。")
 
         before_data = {
             "status": session.status,
@@ -300,6 +315,8 @@ def record_clock_action(
         recorded_at=now,
         operation_id=operation_id,
     )
+
+    sync_incomplete_occurrences(session, now=now)
 
     # 同じトランザクションで監査履歴も保存
     AuditLog.objects.create(

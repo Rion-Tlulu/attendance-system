@@ -3,6 +3,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
+import uuid
 
 
 class WorkSession(models.Model):
@@ -47,6 +48,10 @@ class WorkSession(models.Model):
     version = models.PositiveIntegerField(
         "データ版",
         default=1,
+    )
+    moved_to = models.ForeignKey(
+        "self", on_delete=models.PROTECT, null=True, blank=True,
+        related_name="moved_from_sessions",
     )
     incomplete_notified_version = models.PositiveIntegerField(
         "未完了通知済みのデータ版",
@@ -113,7 +118,7 @@ class WorkSession(models.Model):
         if (
             self.clock_in_at
             and self.clock_out_at
-            and self.clock_out_at <= self.clock_in_at
+            and self.clock_out_at < self.clock_in_at
         ):
             raise ValidationError({
                 "clock_out_at": (
@@ -147,6 +152,32 @@ class WorkSession(models.Model):
             f"{self.employee.employee_number}"
             f" / {self.work_date}"
         )
+
+
+class IncompleteOccurrence(models.Model):
+    """One uninterrupted occurrence of a missing clock-out or break end."""
+
+    class Kind(models.TextChoices):
+        CLOCK_OUT = "clock_out", "退勤未記録"
+        BREAK_END = "break_end", "休憩未終了"
+
+    occurrence_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    work_session = models.ForeignKey(
+        WorkSession, on_delete=models.PROTECT, related_name="incomplete_occurrences",
+    )
+    kind = models.CharField(max_length=20, choices=Kind.choices)
+    started_at = models.DateTimeField(default=timezone.now)
+    ended_at = models.DateTimeField(null=True, blank=True)
+    recipient_ids = models.JSONField(default=list)
+    notified_recipient_ids = models.JSONField(default=list)
+    recipients_selected = models.BooleanField(default=False)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(
+            fields=["work_session", "kind"],
+            condition=models.Q(ended_at__isnull=True),
+            name="unique_open_incomplete_occurrence",
+        )]
 
 
 class ClockEvent(models.Model):
@@ -311,6 +342,13 @@ class MonthlyClosing(models.Model):
         "確定データ版",
         default=1,
     )
+    reconciled_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True,
+        related_name="reconciled_months",
+    )
+    reconciled_at = models.DateTimeField(null=True, blank=True)
+    snapshot = models.JSONField(default=dict)
+    integrity_check_result = models.JSONField(default=dict)
 
     class Meta:
         verbose_name = "月次確定"

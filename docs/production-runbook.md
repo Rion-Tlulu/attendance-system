@@ -1,4 +1,35 @@
-# 本番運用手順（v1.4）
+# 本番運用手順（v1.4.3）
+
+## v1.4.3 への切替
+
+1. 更新を停止し、DB・`.env`・ソースの保護されたバックアップを取得する。復元手順と保存先のアクセス権を確認する。
+2. 更新後のコードで `python manage.py migrate` を実行する。`corrections.0004` は原打刻・休憩・未完了履歴がなく、旧申請ログで仮勤務と確認できた空レコードだけを申請から切り離して削除する。証拠が不足するレコードは残すため個別確認する。ロールバック時はバックアップからDBを復元する。
+3. `python scripts/check_v143.py` で社員番号、入社日、勤務間重複、在籍期間、旧確定版を確認する。対象社員の内部IDと月を記録し、社員や勤怠を自動統合しない。
+   有効な業務管理者を運用担当が2人以上確保し、入社日未確認の社員は人事資料で確認して登録する。値を推測して補完しない。旧仮勤務や通知先不明の候補は履歴・原打刻を確認して解決する。
+4. 旧確定版に保存済みスナップショットがない月はCSV出力を止める。担当者が旧記録を確認し、理由付きで確定解除して訂正・再照合・再確定する。
+5. `python manage.py test` と `python manage.py check --deploy --settings=config.settings_production` を実行し、夜勤の重複、代理申請、出力IDの失効、通知の再実行を確認する。
+
+配布用ZIPや手動コピーには `.gitignore` が適用されない。配布対象をソース・テンプレート・静的ファイル・マイグレーション・依存一覧・手順書に限定し、`.env`、SQLite DB、秘密鍵、バックアップ、`.git`、仮想環境、テスト出力を含めない。作成後はZIPの全エントリを一覧化して確認し、配布先でも環境変数とDBを別経路で設定する。
+
+CSVは同じ出力IDから日次明細と月次集計を取得する。いずれかの社員が確定解除・再確定された場合は旧IDを使わず、新しいIDで両方を取得し直す。社員番号・氏名・部署は文字列列としてPower Queryで読み込み、自動作成された「変更された型」を削除し、`TXT_` 接頭辞を1回だけ除去する。
+
+Power Queryでテキスト型パラメーター `CsvPath` にファイルのフルパスを指定し、詳細エディターに次を設定する。
+
+```powerquery
+let
+    Input = Csv.Document(File.Contents(CsvPath), [Delimiter=",", Encoding=65001, QuoteStyle=QuoteStyle.Csv]),
+    Headers = Table.PromoteHeaders(Input),
+    Restore = (v as nullable text) as nullable text =>
+        if v = null then null
+        else if Text.StartsWith(v, "TXT_", Comparer.Ordinal) then Text.Range(v, 4)
+        else v,
+    Operations = List.Transform({"社員番号", "氏名", "部署"}, each {_, Restore, type text}),
+    Result = Table.TransformColumns(Headers, Operations)
+in
+    Result
+```
+
+初回取込とExcel更新時に `0007`、`=1+2`、`TXT_営業`、`TXT_=1+2`、空欄、全角記号、タブ・改行・引用符・カンマを含む値と秒数を照合する。復元済みの表へ同じ処理を再適用しない。
 
 ## リリース前確認
 

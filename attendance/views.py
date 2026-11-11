@@ -15,6 +15,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
 from corrections.models import CorrectionRequest
+from corrections.services import pending_for_day
 
 from .forms import ClockActionForm, MonthSelectForm
 from .models import (
@@ -109,7 +110,7 @@ def home(request):
 
         # 修正申請の審査中か確認
         pending_request = CorrectionRequest.objects.filter(
-            work_session=session,
+            employee=employee, work_date=session.work_date,
             status=CorrectionRequest.Status.PENDING,
         ).exists()
 
@@ -117,6 +118,8 @@ def home(request):
 
     else:
         target_date = today
+
+    pending_request = pending_request or pending_for_day(employee, target_date)
 
     # 対象勤務月が確定済みか確認
     is_finalized = MonthlyClosing.objects.filter(
@@ -484,10 +487,12 @@ def daily_attendance(request, year, month, day):
     ).exists()
 
     # 日別の集計と3種類の状態
+    corrections = get_corrections(session, request.user, work_day)
     summary = build_daily_row(
         work_day,
         session,
         is_finalized,
+        corrections=corrections,
     )
 
     # ----------------------------------------------
@@ -496,7 +501,6 @@ def daily_attendance(request, year, month, day):
 
     breaks = get_breaks(session)
 
-    corrections = get_corrections(session)
 
     # 新UI用：審査中の修正申請を取得
     pending_correction = next(
@@ -512,7 +516,7 @@ def daily_attendance(request, year, month, day):
     is_future_day = work_day > timezone.localdate()
 
     can_submit_correction = (
-        not is_future_day and not is_finalized and pending_correction is None
+        not is_future_day and not is_finalized and not pending_for_day(request.user, work_day)
     )
 
     # ----------------------------------------------
@@ -595,6 +599,7 @@ def daily_attendance(request, year, month, day):
         "work_day": work_day,
         "summary": summary,
         "session": session,
+        "moved_to": session.moved_to if session is not None else None,
         "comparison_rows": comparison_rows,
         "break_rows": break_rows,
         "original_events": original_events,

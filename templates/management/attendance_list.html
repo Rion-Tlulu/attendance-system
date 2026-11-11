@@ -492,6 +492,15 @@
 
             </div>
 
+            <div class="a01-field">
+                <label for="a01-active">利用状態</label>
+                <select id="a01-active" name="active">
+                    <option value="all" {% if a01.filters.active == 'all' %}selected{% endif %}>すべて</option>
+                    <option value="active" {% if a01.filters.active == 'active' %}selected{% endif %}>利用中</option>
+                    <option value="inactive" {% if a01.filters.active == 'inactive' %}selected{% endif %}>停止中</option>
+                </select>
+            </div>
+
             <div class="a01-filter-actions">
 
                 <button

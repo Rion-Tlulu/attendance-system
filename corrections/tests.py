@@ -211,26 +211,16 @@ class CorrectionFlowTests(TestCase):
 
         self.confirm(preview, target_day)
 
-        session = WorkSession.objects.get(
-            employee=self.employee,
-            work_date=target_day,
+        # 申請中も勤務を作らず、社員と勤務日で識別する。
+        self.assertFalse(WorkSession.objects.filter(
+            employee=self.employee, work_date=target_day,
+        ).exists())
+        correction = CorrectionRequest.objects.get(
+            employee=self.employee, work_date=target_day,
+            status=CorrectionRequest.Status.PENDING,
         )
-
-        self.assertEqual(
-            session.status,
-            WorkSession.Status.NO_RECORD,
-        )
-
-        # 原打刻や有効日時は追加されていない
-        self.assertIsNone(session.clock_in_at)
-
-        self.assertEqual(
-            CorrectionRequest.objects.filter(
-                work_session=session,
-                status=CorrectionRequest.Status.PENDING,
-            ).count(),
-            1,
-        )
+        self.assertIsNone(correction.work_session_id)
+        self.assertIsNone(correction.original_version)
 
     def test_future_datetime_rejected(self):
         data = self.form_data()

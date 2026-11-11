@@ -1,8 +1,8 @@
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, urlencode, parse_qsl, urlunsplit
 
+from django.core import signing
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.db import transaction
 from django.http import HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
@@ -72,23 +72,24 @@ def notification_list(request):
 @never_cache
 @login_required
 @require_POST
-@transaction.atomic
 def notification_open(request, pk):
-    """本人の通知を既読にして対象画面へ移動"""
+    """対象画面へ移動し、正常表示後にその通知だけ既読にする。"""
 
     notification = get_object_or_404(
-        visible_notifications(request.user).select_for_update(),
+        visible_notifications(request.user),
         pk=pk,
         recipient=request.user,
     )
 
-    if notification.read_at is None:
-        notification.read_at = timezone.now()
-        notification.save(update_fields=["read_at"])
-
     target = safe_notification_path(notification.target_path)
-
-    return HttpResponseRedirect(target)
+    parts = urlsplit(target)
+    token = signing.dumps(
+        {"notification_id": notification.pk, "recipient_id": request.user.pk},
+        salt="attendance-notification-open-v1",
+    )
+    query = parse_qsl(parts.query, keep_blank_values=True)
+    query.append(("_notification", token))
+    return HttpResponseRedirect(urlunsplit(("", "", parts.path, urlencode(query), parts.fragment)))
 
 
 @never_cache

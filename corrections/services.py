@@ -11,6 +11,7 @@ from attendance.models import (
     MonthlyClosing,
     WorkSession,
 )
+from attendance.validation import is_employed_on, overlapping_sessions
 from corrections.models import CorrectionRequest
 
 from auditlog.models import AuditLog
@@ -100,13 +101,9 @@ def validate_proposal(proposal, work_day, now=None):
     if end is not None and start is None:
         raise CorrectionError("退勤を設定するには出勤日時が必要です。")
 
-    if start is not None:
-        if timezone.localtime(start).date() != work_day:
-            raise CorrectionError("出勤日時の日付が勤務日と一致しません。")
-
     if start is not None and end is not None:
-        if end <= start:
-            raise CorrectionError("退勤日時は出勤日時より後にしてください。")
+        if end < start:
+            raise CorrectionError("退勤日時は出勤日時以降にしてください。")
 
     breaks = proposal["breaks"]
 
@@ -171,6 +168,39 @@ def validate_proposal(proposal, work_day, now=None):
     }
 
 
+def proposal_work_day(proposal, original_day):
+    start = _parse_datetime(proposal["clock_in_at"])
+    return timezone.localtime(start).date() if start is not None else original_day
+
+
+def pending_for_day(employee, work_day):
+    for correction in CorrectionRequest.objects.filter(
+        employee=employee, status=CorrectionRequest.Status.PENDING,
+    ):
+        try:
+            target_day = proposal_work_day(correction.proposal, correction.work_date)
+        except (KeyError, CorrectionError):
+            target_day = correction.work_date
+        if work_day in (correction.work_date, target_day):
+            return True
+    return False
+
+
+def pending_for_month(employee, target_month):
+    for correction in CorrectionRequest.objects.filter(
+        employee=employee, status=CorrectionRequest.Status.PENDING,
+    ):
+        try:
+            target_day = proposal_work_day(correction.proposal, correction.work_date)
+        except (KeyError, CorrectionError):
+            target_day = correction.work_date
+        days = (correction.work_date,
+                target_day)
+        if any(day.year == target_month.year and day.month == target_month.month for day in days):
+            return True
+    return False
+
+
 def current_values(session):
     """現在の有効値を修正案と同じ形式で取得。"""
 
@@ -216,6 +246,9 @@ def submit_correction(
     expected_version,
     proposal,
     reason,
+    actor_id=None,
+    proxy_reason="",
+    evidence="",
 ):
     """原記録を変更せずに修正申請を登録する。"""
 
@@ -224,7 +257,16 @@ def submit_correction(
     # Phase 5の打刻処理と同じ社員ロックを使用
     employee = Employee.objects.select_for_update().get(pk=employee_id)
 
-    if not employee.is_active:
+    actor = employee if actor_id is None else Employee.objects.select_for_update().get(pk=actor_id)
+    is_proxy = actor.pk != employee.pk
+    if is_proxy:
+        if employee.is_active or not actor.is_active or not actor.is_business_admin:
+            raise CorrectionError("停止中社員の代理申請権限がありません。")
+        proxy_reason = proxy_reason.strip()
+        evidence = evidence.strip()
+        if not 1 <= len(proxy_reason) <= 1000 or not 1 <= len(evidence) <= 1000:
+            raise CorrectionError("本人申請ができない理由と確認資料を各1000文字以内で入力してください。")
+    elif not employee.is_active:
         raise CorrectionError("無効なアカウントです。")
 
     if work_day > timezone.localdate():
@@ -251,7 +293,7 @@ def submit_correction(
 
     if session is not None:
         if CorrectionRequest.objects.filter(
-            work_session=session,
+            employee=employee, work_date=work_day,
             status=CorrectionRequest.Status.PENDING,
         ).exists():
             raise CorrectionError("この勤務には審査中の申請があります。")
@@ -261,6 +303,29 @@ def submit_correction(
         work_day,
     )
 
+    proposed_start = _parse_datetime(normalized["clock_in_at"])
+    proposed_end = _parse_datetime(normalized["clock_out_at"])
+    target_day = proposal_work_day(normalized, work_day)
+    if target_day != work_day and is_month_finalized(employee, target_day):
+        raise CorrectionError("移動先の勤務月は確定済みです。")
+    if target_day != work_day:
+        destination = WorkSession.objects.select_for_update().filter(
+            employee=employee, work_date=target_day,
+        ).first()
+        if destination and destination.status != WorkSession.Status.NO_RECORD:
+            raise CorrectionError("移動先に有効な勤務があります。")
+    if proposed_start is not None:
+        if not is_employed_on(employee, target_day):
+            raise CorrectionError("在籍期間外の勤務は申請できません。")
+        if overlapping_sessions(
+            employee, proposed_start, proposed_end,
+            exclude_session_id=session.pk if session else None,
+        ):
+            raise CorrectionError("別の勤務と時間が重複しています。")
+
+    if pending_for_day(employee, work_day) or pending_for_day(employee, target_day):
+        raise CorrectionError("関係する勤務日に審査中の申請があります。")
+
     if normalized == current_values(session):
         raise CorrectionError("現在の勤務記録から変更がありません。")
 
@@ -269,27 +334,29 @@ def submit_correction(
     if not 1 <= len(reason) <= 500:
         raise CorrectionError("申請理由は1〜500文字で入力してください。")
 
-    # 記録がない日の申請では空の勤務を作成
-    if session is None:
-        session = WorkSession.objects.create(
-            employee=employee,
-            work_date=work_day,
-            status=WorkSession.Status.NO_RECORD,
-        )
-
     before_snapshot = current_values(session)
+    previous_request = CorrectionRequest.objects.filter(
+        employee=employee, work_date=work_day,
+        status__in=[CorrectionRequest.Status.RETURNED, CorrectionRequest.Status.WITHDRAWN],
+    ).order_by("-created_at", "-pk").first()
 
     correction = CorrectionRequest.objects.create(
         work_session=session,
-        requested_by=employee,
-        original_version=session.version,
+        employee=employee,
+        work_date=work_day,
+        related_request=previous_request,
+        requested_by=actor,
+        original_version=session.version if session else None,
         proposal=normalized,
         reason=reason,
+        is_proxy=is_proxy,
+        proxy_reason=proxy_reason if is_proxy else "",
+        evidence=evidence if is_proxy else "",
         status=CorrectionRequest.Status.PENDING,
     )
 
     AuditLog.objects.create(
-        actor=employee,
+        actor=actor,
         target_employee=employee,
         action=AuditLog.Action.CORRECTION_SUBMIT,
         target_model="CorrectionRequest",
@@ -302,7 +369,12 @@ def submit_correction(
         reason=reason,
         details={
             "work_date": work_day.isoformat(),
-            "original_version": session.version,
+            "original_version": session.version if session else None,
+            "related_request_id": previous_request.pk if previous_request else None,
+            "target_work_date": target_day.isoformat(),
+            "is_proxy": is_proxy,
+            "proxy_reason": proxy_reason if is_proxy else "",
+            "evidence": evidence if is_proxy else "",
         },
     )
 
@@ -312,51 +384,71 @@ def submit_correction(
 
 
 @transaction.atomic
-def withdraw_correction(*, employee_id, request_id):
-    """本人の審査中申請だけを取り下げる。"""
+def withdraw_correction(*, employee_id, request_id, reason=""):
+    """Normal and proxy withdrawals use distinct actor checks."""
 
     Employee = get_user_model()
 
-    employee = Employee.objects.select_for_update().get(pk=employee_id)
+    actor = Employee.objects.select_for_update().get(pk=employee_id)
 
-    if not employee.is_active:
+    if not actor.is_active:
         raise CorrectionError("無効なアカウントです。")
 
     correction = CorrectionRequest.objects.filter(
         pk=request_id,
-        requested_by=employee,
     ).first()
 
     if correction is None:
         raise CorrectionError("対象の申請が見つかりません。")
 
+    employee = Employee.objects.select_for_update().get(pk=correction.employee_id)
+
     # ロック順序を打刻・申請処理と揃える
-    WorkSession.objects.select_for_update().get(pk=correction.work_session_id)
+    if correction.work_session_id:
+        WorkSession.objects.select_for_update().get(pk=correction.work_session_id)
 
     correction = CorrectionRequest.objects.select_for_update().get(pk=correction.pk)
 
     if correction.status != CorrectionRequest.Status.PENDING:
         raise CorrectionError("審査中の申請だけ取り下げできます。")
 
+    if correction.is_proxy:
+        if not actor.is_business_admin or actor.pk == employee.pk:
+            raise CorrectionError("代理申請の取下げ権限がありません。")
+        author = correction.requested_by
+        author_valid = author.is_active and author.is_business_admin
+        if author_valid and actor.pk != author.pk:
+            raise CorrectionError("有効な申請者本人だけが取り下げられます。")
+        if not author_valid and actor.pk == author.pk:
+            raise CorrectionError("管理権限が失効しています。")
+        if not author_valid and not 1 <= len(reason.strip()) <= 500:
+            raise CorrectionError("代理申請者が失効した場合は取下げ理由が必要です。")
+    elif actor.pk != employee.pk or correction.requested_by_id != actor.pk:
+        raise CorrectionError("本人の申請だけを取り下げられます。")
+
     if is_month_finalized(
         employee,
-        correction.work_session.work_date,
+        correction.work_date,
     ):
         raise CorrectionError("確定済みの月は変更できません。")
 
     correction.status = CorrectionRequest.Status.WITHDRAWN
     correction.withdrawn_at = timezone.now()
+    correction.withdrawn_by = actor
+    correction.withdraw_reason = reason.strip() if correction.is_proxy else ""
 
     correction.save(
         update_fields=[
             "status",
             "withdrawn_at",
+            "withdrawn_by",
+            "withdraw_reason",
             "updated_at",
         ]
     )
 
     AuditLog.objects.create(
-        actor=employee,
+        actor=actor,
         target_employee=employee,
         action=AuditLog.Action.CORRECTION_WITHDRAW,
         target_model="CorrectionRequest",
@@ -367,9 +459,9 @@ def withdraw_correction(*, employee_id, request_id):
         after_data={
             "status": CorrectionRequest.Status.WITHDRAWN,
         },
-        reason="本人による取下げ",
+        reason=reason.strip() or ("代理申請の取下げ" if correction.is_proxy else "本人による取下げ"),
         details={
-            "work_date": (correction.work_session.work_date.isoformat()),
+            "work_date": correction.work_date.isoformat(),
         },
     )
 

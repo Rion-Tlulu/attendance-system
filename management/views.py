@@ -25,8 +25,9 @@ from accounts.decorators import (
     business_admin_required as account_business_admin_required,
 )
 from attendance.forms import MonthSelectForm
-from attendance.models import MonthlyClosing
+from attendance.models import MonthlyClosing, WorkSession
 from attendance.reporting import build_monthly_report
+from attendance.validation import employed_during_month, month_integrity_issues
 from auditlog.models import AuditLog
 from corrections.models import CorrectionRequest
 from corrections.services import current_values as correction_current_values
@@ -39,6 +40,8 @@ from .forms import (
     ReviewForm,
 )
 from .initial_passwords import set_initial_password
+from .models import EmploymentInfo
+from .csv_format import csv_safe as _csv_safe
 from .services import (
     AdminActionError,
     finalize_month,
@@ -91,6 +94,7 @@ def _audit_employee_change(
     action,
     before,
     after,
+    reason="管理者による社員情報の登録・変更",
 ):
     AuditLog.objects.create(
         actor=actor,
@@ -100,7 +104,7 @@ def _audit_employee_change(
         target_id=str(employee.pk),
         before_data=before,
         after_data=after,
-        reason="管理者による社員情報の登録・変更",
+        reason=reason,
         details={},
     )
 
@@ -222,7 +226,7 @@ def correction_queue(request):
         status_filter = "pending"
 
     queryset = CorrectionRequest.objects.select_related(
-        "requested_by", "work_session"
+        "requested_by", "employee", "work_session"
     ).order_by("-created_at", "-pk")
 
     if status_filter != "all":
@@ -253,32 +257,38 @@ def correction_review_detail(request, pk):
     correction = get_object_or_404(
         CorrectionRequest.objects.select_related(
             "requested_by",
+            "employee",
             "work_session",
         ),
         pk=pk,
     )
 
-    session = correction.work_session
+    session = correction.work_session or WorkSession.objects.filter(
+        employee=correction.employee, work_date=correction.work_date,
+    ).first()
 
     # 現在の有効値
     current_record = correction_current_values(session)
 
     # 対象月が確定済みか
-    target_month = session.work_date.replace(day=1)
+    target_month = correction.work_date.replace(day=1)
 
     month_finalized = MonthlyClosing.objects.filter(
-        employee_id=session.employee_id,
+        employee_id=correction.employee_id,
         target_month=target_month,
         status=MonthlyClosing.Status.FINALIZED,
     ).exists()
 
     # 申請時と勤務データ版が一致するか
-    version_matches = correction.original_version == session.version
+    version_matches = (
+        (session is None and correction.original_version is None) or
+        (session is not None and correction.original_version == session.version)
+    )
 
     # 自分自身の申請・勤務は審査不可
     is_self_request = (
         correction.requested_by_id == request.user.pk
-        or session.employee_id == request.user.pk
+        or correction.employee_id == request.user.pk
     )
 
     # UIで審査ボタンを表示してよいか
@@ -287,6 +297,18 @@ def correction_review_detail(request, pk):
         and not is_self_request
         and not month_finalized
         and version_matches
+        and (not correction.is_proxy or (
+            not correction.employee.is_active
+            and correction.requested_by.is_active
+            and correction.requested_by.is_business_admin
+        ))
+    )
+
+    author_valid = correction.requested_by.is_active and correction.requested_by.is_business_admin
+    can_proxy_withdraw = (
+        correction.is_proxy and correction.status == CorrectionRequest.Status.PENDING
+        and (correction.requested_by_id == request.user.pk or not author_valid)
+        and request.user.pk != correction.employee_id
     )
 
     return render(
@@ -299,6 +321,8 @@ def correction_review_detail(request, pk):
             "month_finalized": month_finalized,
             "version_matches": version_matches,
             "is_self_request": is_self_request,
+            "can_proxy_withdraw": can_proxy_withdraw,
+            "proxy_author_invalid": not author_valid,
             "form": ReviewForm(),
         },
     )
@@ -412,6 +436,10 @@ def employee_create(request):
                     employee.is_staff = False
                     employee.is_superuser = False
                     employee.save()
+                    EmploymentInfo.objects.create(
+                        employee=employee,
+                        hire_date=form.cleaned_data["hire_date"],
+                    )
 
                     _audit_employee_change(
                         actor=request.user,
@@ -479,52 +507,47 @@ def employee_edit(request, employee_id):
                     "自分自身を利用停止にはできません。",
                 )
 
-            elif (
-                employee.is_business_admin
-                and not request.user.is_superuser
-                and not wants_active
-            ):
-                form.add_error(
-                    "is_active",
-                    "業務管理者の利用停止は" "上位管理者による確認が必要です。",
-                )
-
             else:
-                with transaction.atomic():
-                    employee = Employee.objects.select_for_update().get(pk=employee_id)
+                try:
+                    with transaction.atomic():
+                        employee = Employee.objects.select_for_update().get(pk=employee_id)
 
-                    before = _employee_snapshot(employee)
+                        before = _employee_snapshot(employee)
 
-                    # ロック取得後も対象を確認
-                    if not form.cleaned_data["is_active"] and (
-                        employee.pk == request.user.pk
-                        or (
-                            employee.is_business_admin and not request.user.is_superuser
-                        )
-                    ):
-                        form.add_error(
-                            "is_active",
-                            "この社員の利用停止はできません。",
-                        )
-
-                    else:
-                        for field_name in EmployeeEditForm.Meta.fields:
-                            setattr(
-                                employee,
-                                field_name,
-                                form.cleaned_data[field_name],
+                        if not wants_active and employee.pk == request.user.pk:
+                            form.add_error("is_active", "自分自身を利用停止にはできません。")
+                        elif not wants_active and employee.is_business_admin:
+                            active_admin_ids = list(
+                                Employee.objects.select_for_update().filter(
+                                    is_active=True, is_business_admin=True,
+                                ).order_by("pk").values_list("pk", flat=True)
                             )
+                            if employee.pk in active_admin_ids and len(active_admin_ids) <= 2:
+                                form.add_error("is_active", "有効な管理者は2人以上必要です。")
+                        elif wants_active and not employee.is_active and CorrectionRequest.objects.filter(
+                            employee=employee,
+                            is_proxy=True,
+                            status=CorrectionRequest.Status.PENDING,
+                        ).exists():
+                            form.add_error("is_active", "審査中の代理申請を処理または取下げてください。")
 
-                        employee.save()
-                        updated = employee
+                        if not form.errors:
+                            for field_name in EmployeeEditForm.Meta.fields:
+                                setattr(employee, field_name, form.cleaned_data[field_name])
 
-                        _audit_employee_change(
-                            actor=request.user,
-                            employee=updated,
-                            action=AuditLog.Action.EMPLOYEE_UPDATE,
-                            before=before,
-                            after=_employee_snapshot(updated),
-                        )
+                            employee.save()
+                            updated = employee
+
+                            _audit_employee_change(
+                                actor=request.user,
+                                employee=updated,
+                                action=AuditLog.Action.EMPLOYEE_UPDATE,
+                                before=before,
+                                after=_employee_snapshot(updated),
+                                reason=form.cleaned_data.get("change_reason") or "社員情報の変更",
+                            )
+                except IntegrityError:
+                    form.add_error("employee_number", "この社員番号はすでに登録されています。")
 
                 if not form.errors:
                     messages.success(request, "社員情報を更新しました")
@@ -541,6 +564,13 @@ def employee_edit(request, employee_id):
             "form": form,
             "creating": False,
             "employee": employee,
+            "incomplete_count": employee.work_sessions.filter(
+                status__in=["working", "on_break"],
+            ).count(),
+            "pending_count": CorrectionRequest.objects.filter(
+                employee=employee,
+                status=CorrectionRequest.Status.PENDING,
+            ).count(),
         },
     )
 
@@ -689,6 +719,8 @@ def employee_month(request, employee_id, year, month):
         employee,
         target_month,
     )
+    closing = MonthlyClosing.objects.filter(employee=employee, target_month=target_month).first()
+    frozen_info = closing.snapshot if closing and closing.status == MonthlyClosing.Status.FINALIZED else {}
 
     # 対象月が終了済みか
     month_is_past = target_month < timezone.localdate().replace(day=1)
@@ -701,9 +733,12 @@ def employee_month(request, employee_id, year, month):
         and month_is_past
         and report.incomplete_count == 0
         and report.pending_count == 0
+        and employed_during_month(employee, target_month)
+        and not month_integrity_issues(employee, target_month)
     )
 
     no_record_count = sum(row.record_key == "no_record" for row in report.rows)
+    integrity_issues = month_integrity_issues(employee, target_month)
 
     page_obj = Paginator(report.rows, 7).get_page(request.GET.get("page"))
 
@@ -712,9 +747,12 @@ def employee_month(request, employee_id, year, month):
         "management/employee_month.html",
         {
             "employee": employee,
+            "display_employee_number": frozen_info.get("employee_number", employee.employee_number),
+            "display_employee_name": frozen_info.get("name", employee.get_full_name()),
             "report": report,
             "page_obj": page_obj,
             "no_record_count": no_record_count,
+            "integrity_issues": integrity_issues,
             "closing_form": MonthClosingForm(),
             "month_is_past": month_is_past,
             "can_finalize": can_finalize,
@@ -736,7 +774,7 @@ def month_finalize(request, employee_id, year, month):
     if not form.is_valid():
         messages.error(
             request,
-            "記録なしの日の照合確認をしてください",
+            "別管理資料との照合を確認してください",
         )
 
     else:
@@ -799,23 +837,6 @@ def month_reopen(request, employee_id, year, month):
 
 
 # 確定済みCSV出力
-def _csv_safe(value):
-    """表計算ソフトでの数式解釈を防ぐ"""
-
-    if value is None:
-        return ""
-
-    text = str(value)
-
-    if text.lstrip().startswith(("=", "+", "-", "@")):
-        return "'" + text
-
-    if text.startswith(("\t", "\r", "\n")):
-        return "'" + text
-
-    return text
-
-
 @never_cache
 @business_admin_required
 @require_POST
@@ -847,6 +868,14 @@ def month_csv(request, employee_id, year, month):
             "確定済みの月だけCSV出力できます",
         )
 
+        return redirect(
+            "management:employee_month",
+            employee_id=employee_id,
+            year=year,
+            month=month,
+        )
+    if month_integrity_issues(employee, target_month):
+        messages.error(request, "勤務の不整合を解消して再確定してください。")
         return redirect(
             "management:employee_month",
             employee_id=employee_id,
