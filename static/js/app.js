@@ -2,6 +2,67 @@
 "use strict";
 
 document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll("form").forEach((form) => {
+    const errors = [...form.querySelectorAll("ul.errorlist")];
+    if (!errors.length) return;
+    const summary = document.createElement("div");
+    summary.className = "form-error-summary";
+    summary.setAttribute("role", "alert");
+    const heading = document.createElement("strong");
+    heading.textContent = "入力内容を確認してください。";
+    const list = document.createElement("ul");
+    summary.append(heading, list);
+
+    errors.forEach((error, index) => {
+      const message = error.textContent.trim();
+      if (!message) return;
+      error.id ||= `form-error-${index}-${Math.random().toString(36).slice(2, 8)}`;
+      const wrapper = error.closest(
+        ".admin-field, .v2-field, .field, .form-group, fieldset"
+      ) || error.parentElement;
+      const field = wrapper.querySelector(
+        "input:not([type=hidden]), select, textarea"
+      );
+      const item = document.createElement("li");
+      if (field && field.form === form) {
+        field.id ||= `form-field-${index}-${Math.random().toString(36).slice(2, 8)}`;
+        field.setAttribute("aria-invalid", "true");
+        const describedBy = new Set((field.getAttribute("aria-describedby") || "").split(/\s+/).filter(Boolean));
+        describedBy.add(error.id);
+        field.setAttribute("aria-describedby", [...describedBy].join(" "));
+        const label = form.querySelector(`label[for="${CSS.escape(field.id)}"]`);
+        const link = document.createElement("a");
+        link.href = `#${field.id}`;
+        link.textContent = `${label?.textContent.trim() || field.name}: ${message}`;
+        item.append(link);
+      } else {
+        item.textContent = message;
+      }
+      list.append(item);
+    });
+    form.prepend(summary);
+  });
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  const menu = document.querySelector(".mobile-more");
+  if (!menu) return;
+  menu.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" || !menu.open) return;
+    menu.open = false;
+    menu.querySelector("summary")?.focus();
+  });
+  menu.querySelectorAll("[data-mobile-section]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const section = document.getElementById(button.getAttribute("aria-controls"));
+      if (!section) return;
+      section.hidden = !section.hidden;
+      button.setAttribute("aria-expanded", String(!section.hidden));
+    });
+  });
+});
+
+document.addEventListener("DOMContentLoaded", () => {
   const toggleButtons = document.querySelectorAll("[data-toggle-password]");
 
   toggleButtons.forEach((button) => {

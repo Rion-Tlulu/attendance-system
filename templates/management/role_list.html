@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}業務管理者の権限管理 | 勤怠管理{% endblock %}
+{% block screen_label %}管理者｜権限管理{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/manager-pages.css' %}">{% endblock %}
+{% block content %}
+<div class="admin-page">
+  <header class="admin-heading">
+    <h1>業務管理者の権限管理（A06）</h1>
+    <p>有効な業務管理者 {{ active_manager_count }}人。対象社員の利用状態と権限を確認してください。</p>
+  </header>
+  <section class="ui-card admin-section">
+    <div class="table-scroll" role="region" aria-label="権限管理の対象社員" tabindex="0">
+      <table class="ui-table">
+        <thead><tr><th scope="col">社員番号</th><th scope="col">氏名</th><th scope="col">利用状態</th><th scope="col">管理権限</th><th scope="col">操作</th></tr></thead>
+        <tbody>
+          {% for employee in employees %}
+          <tr>
+            <td>{{ employee.employee_number }}</td><td>{{ employee.display_name }}</td>
+            <td>{% if employee.is_active %}利用中{% else %}利用停止{% endif %}</td>
+            <td>{% if employee.is_business_admin %}付与済み{% else %}なし{% endif %}</td>
+            <td><a href="{% url 'management:employee_role' employee.pk %}">権限を確認・変更</a></td>
+          </tr>
+          {% empty %}<tr><td colspan="5">対象社員はいません。</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock %}

@@ -47,6 +47,13 @@ a {
   outline-offset: 3px;
 }
 
+.side-section-label {
+  margin: 18px 12px 4px;
+  color: #c8dbf5;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
 .skip-link {
   position: absolute;
   top: -100px;
@@ -2232,9 +2239,32 @@ a.nav-item:hover {
   cursor: pointer;
 }
 
+.app-v6 .mobile-more-panel strong {
+  display: block;
+  padding: 8px 12px 2px;
+  color: #3d536f;
+  font-size: 0.85rem;
+}
+
+.app-v6 .mobile-more-panel [data-mobile-section] {
+  font-weight: 700;
+  color: #19345b;
+  background: #eaf2fc;
+}
+
+.app-v6 .mobile-more-links[hidden] {
+  display: none;
+}
+
 .app-v6 .mobile-more-panel a:hover,
 .app-v6 .mobile-more-panel button:hover {
   background: #edf3fa;
+}
+
+.app-v6 .mobile-more-panel a[aria-current="page"] {
+  background: #dbeaff;
+  color: #073f96;
+  font-weight: 700;
 }
 
 /* タブレット・スマートフォン */
@@ -3639,4 +3669,22 @@ a.nav-item:hover {
   .app-notification-link > span:not(.app-notification-count) { display: none; }
   .app-v6 .app-user-name { max-width: 70px; }
   .app-v6 .app-topbar__user { gap: 5px; }
+}
+.form-error-summary {
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  border: 2px solid #b42318;
+  border-radius: 0.5rem;
+  background: #fff4f2;
+  color: #711c16;
+}
+
+.form-error-summary ul {
+  margin: 0.5rem 0 0;
+  padding-left: 1.5rem;
+}
+
+.form-error-summary a {
+  color: inherit;
+  text-decoration: underline;
 }

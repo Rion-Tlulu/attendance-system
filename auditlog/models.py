@@ -95,6 +95,9 @@ class AuditLog(models.Model):
             "権限変更",
         )
 
+        DEPARTMENT_CREATE = ("department_create", "部署の登録")
+        DEPARTMENT_UPDATE = ("department_update", "部署情報変更")
+
         # --------------------------------------
         # CSV出力
         # --------------------------------------

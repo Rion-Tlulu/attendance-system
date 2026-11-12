@@ -17,6 +17,9 @@ class ClockActionForm(forms.Form):
     operation_id = forms.UUIDField(
         widget=forms.HiddenInput,
     )
+    work_date = forms.DateField(widget=forms.HiddenInput)
+    session_id = forms.IntegerField(required=False, min_value=1, widget=forms.HiddenInput)
+    session_version = forms.IntegerField(required=False, min_value=1, widget=forms.HiddenInput)
 
 
 class MonthSelectForm(forms.Form):

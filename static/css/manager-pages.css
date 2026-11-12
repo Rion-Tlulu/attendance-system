@@ -102,6 +102,16 @@
   margin-bottom: 18px;
 }
 
+.admin-field output {
+  display: block;
+  min-height: 48px;
+  padding: 10px 12px;
+  border: 1px solid #889bb2;
+  border-radius: 8px;
+  background: #edf3fa;
+  font-weight: 700;
+}
+
 .admin-field p {
   margin: 0;
   color: #46556c;

@@ -9,6 +9,7 @@
 <div class="admin-page">
     <header class="admin-heading">
         <h1>{{ operation_label }}が完了しました</h1>
+        {% if candidate_changed %}<p role="status">候補番号が変わったため、保存時の最新番号を発行しました。</p>{% endif %}
         <p>初期パスワードはこの画面で一度だけ確認できます。再読込みでは表示されません。</p>
     </header>
     <section class="ui-card admin-section" aria-labelledby="issued-password-title">

@@ -1,4 +1,4 @@
-# ---- management/tests.py ----
+# 共通画面・管理機能
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
@@ -110,7 +110,7 @@ class CommonLayoutTests(TestCase):
 
         self.client.force_login(self.manager)
 
-        response = self.client.get(reverse("management:home"))
+        response = self.client.get(reverse("management:home"), follow=True)
 
         self.assertEqual(response.status_code, 200)
 
@@ -126,10 +126,10 @@ class CommonLayoutTests(TestCase):
             'aria-label="管理者メニュー"',
         )
 
-        # 管理者ホーム
+        # 管理者メニューから A01 に移動できる
         self.assertContains(
             response,
-            "管理者ホーム",
+            "勤怠一覧",
         )
 
     def test_employee_cannot_open_management(self):
@@ -177,7 +177,7 @@ class CommonLayoutTests(TestCase):
         )
 
 
-# ---- management/test_phase9.py ----
+# 申請・月次管理
 import uuid
 
 from datetime import date, datetime
@@ -501,12 +501,17 @@ class Phase9Tests(TestCase):
     def test_finalization_and_csv(self):
         self.client.force_login(self.manager)
 
+        detail = self.client.get(reverse(
+            "management:employee_month", args=[self.employee.pk, 2026, 9]
+        ))
+        token = detail.context["closing_form"]["reconciliation_token"].value()
+
         self.client.post(
             reverse(
                 "management:month_finalize",
                 args=[self.employee.pk, 2026, 9],
             ),
-            {"checked_no_record": "on"},
+            {"checked_no_record": "on", "reconciliation_token": token},
         )
 
         self.assertTrue(
@@ -537,6 +542,24 @@ class Phase9Tests(TestCase):
             b"\r\n",
             response.content,
         )
+
+    def test_stale_reconciliation_requires_refresh(self):
+        self.client.force_login(self.manager)
+        detail = self.client.get(reverse(
+            "management:employee_month", args=[self.employee.pk, 2026, 9]
+        ))
+        token = detail.context["closing_form"]["reconciliation_token"].value()
+        self.work.clock_out_at = self.dt(19)
+        self.work.version += 1
+        self.work.save(update_fields=["clock_out_at", "version"])
+        response = self.client.post(reverse(
+            "management:month_finalize", args=[self.employee.pk, 2026, 9]
+        ), {"checked_no_record": "on", "reconciliation_token": token}, follow=True)
+        self.assertContains(response, "再照合")
+        self.assertFalse(MonthlyClosing.objects.filter(
+            employee=self.employee, target_month=date(2026, 9, 1),
+            status=MonthlyClosing.Status.FINALIZED,
+        ).exists())
 
     def test_unfinalized_month_csv_is_blocked(self):
         self.client.force_login(self.manager)
@@ -650,7 +673,7 @@ class Phase9Tests(TestCase):
         )
 
 
-# ---- management/test_phase10.py ----
+# CSV・監査の回帰試験
 """
 Phase 10：勤怠管理システム最終回帰テスト。
 
@@ -1249,7 +1272,7 @@ class Phase10RegressionTests(TestCase):
         )
 
 
-# ---- management/test_ui_a01.py ----
+# A01 勤怠一覧
 """A01 管理者勤怠一覧の表示・集計テスト。"""
 
 from datetime import date
@@ -1330,6 +1353,18 @@ class A01ManagerAttendanceUiTests(TestCase):
             response,
             "社員別の勤怠状況",
         )
+
+    def test_detail_back_link_restores_search_and_page(self):
+        url = reverse("management:employee_month", args=[self.employee.pk, 2026, 11])
+        response = self.client.get(url, {
+            "back": "month=2026-11&q=99402&department=%E5%96%B6%E6%A5%AD%E9%83%A8&page=2"
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.context["back_query"],
+            "month=2026-11&q=99402&department=%E5%96%B6%E6%A5%AD%E9%83%A8&page=2",
+        )
+        self.assertEqual(self.client.get(url).context["back_query"], response.context["back_query"])
 
     def test_02_employee_search(self):
         """社員番号で絞り込みできる。"""
@@ -1484,7 +1519,7 @@ class A01ManagerAttendanceUiTests(TestCase):
         self.assertTrue(result["month_error"])
 
 
-# ---- management/test_ui_a03.py ----
+# A03 社員管理
 """A03 社員管理の一覧・検索・権限制御テスト。"""
 
 from datetime import date
@@ -1700,7 +1735,7 @@ class A03EmployeeDirectoryTests(TestCase):
         )
 
 
-# ---- management/test_ui_a05.py ----
+# A05 操作履歴
 """A05 操作履歴の表示・権限制御テスト。"""
 
 from django.contrib.auth import get_user_model
@@ -1789,7 +1824,7 @@ class A05AuditUiTests(TestCase):
         )
 
 
-# ---- management/test_ui_v2.py ----
+# 管理画面の表示と操作
 """新デザインV2の表示・権限テスト。"""
 
 from datetime import date, datetime
@@ -1979,7 +2014,7 @@ class ManagementUiV2Tests(TestCase):
         )
 
 
-# ---- management/test_v2_additions.py ----
+# 管理機能の追加規則
 from datetime import date
 
 from django.contrib.auth import get_user_model
@@ -2265,3 +2300,1985 @@ class F11ManagerChartTests(TestCase):
         result = f11_manager_chart({"request": request})
 
         self.assertIsNone(result)
+
+
+# v1.4.3 確定版・代理申請の回帰試験
+
+"""Frozen closing and paired CSV export acceptance checks."""
+
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
+
+from django.contrib.auth import get_user_model
+from django.core import signing
+from django.test import RequestFactory, TestCase
+from django.urls import resolve, reverse
+
+from attendance.models import WorkSession
+from attendance.templatetags.f11_charts import f11_manager_chart
+from management.export_batches import create_export_batch, current_snapshots, write_snapshot_csv
+from management.services import finalize_month, reopen_month
+from corrections.models import CorrectionRequest
+
+
+class FrozenExportTests(TestCase):
+    def setUp(self):
+        Employee = get_user_model()
+        self.employee = Employee.objects.create_user(
+            employee_number="0007", password="TestPassword_2026!",
+            hire_date=date(2024, 1, 1), first_name="=営業",
+        )
+        self.manager = Employee.objects.create_user(
+            employee_number="9001", password="TestPassword_2026!",
+            is_business_admin=True,
+        )
+        WorkSession.objects.create(
+            employee=self.employee, work_date=date(2024, 1, 2),
+            clock_in_at=datetime(2024, 1, 2, 9, tzinfo=ZoneInfo("Asia/Tokyo")),
+            clock_out_at=datetime(2024, 1, 2, 18, tzinfo=ZoneInfo("Asia/Tokyo")),
+            status=WorkSession.Status.COMPLETED,
+        )
+
+    def test_reopen_invalidates_both_files_of_output_id(self):
+        closing = finalize_month(
+            manager_id=self.manager.pk, employee_id=self.employee.pk,
+            target_month=date(2024, 1, 1), checked_no_record=True,
+        )
+        self.assertEqual(closing.snapshot["employee_number"], "0007")
+        batch = create_export_batch(self.manager, [self.employee], date(2024, 1, 1))
+        daily = write_snapshot_csv(current_snapshots(batch), "daily")
+        monthly = write_snapshot_csv(current_snapshots(batch), "monthly")
+        self.assertIn("TXT_=営業", daily)
+        self.assertIn("0007", monthly)
+        self.assertIn("32400", monthly)
+        reopen_month(
+            manager_id=self.manager.pk, employee_id=self.employee.pk,
+            target_month=date(2024, 1, 1), reason="訂正のため",
+        )
+        with self.assertRaises(ValueError):
+            current_snapshots(batch)
+
+    def test_finalized_manager_chart_uses_frozen_values(self):
+        closing = finalize_month(
+            manager_id=self.manager.pk, employee_id=self.employee.pk,
+            target_month=date(2024, 1, 1), checked_no_record=True,
+        )
+        self.assertEqual(closing.integrity_check_result["issue_count"], 0)
+        url = reverse("management:employee_month", args=[self.employee.pk, 2024, 1])
+        request = RequestFactory().get(url)
+        request.user = self.manager
+        request.resolver_match = resolve(url)
+        original = f11_manager_chart({"request": request})
+        self.assertEqual(original["rows"][1]["seconds"], 32400)
+        WorkSession.objects.filter(employee=self.employee).update(
+            clock_out_at=datetime(2024, 1, 2, 20, tzinfo=ZoneInfo("Asia/Tokyo")),
+        )
+        frozen = f11_manager_chart({"request": request})
+        self.assertEqual(frozen["rows"][1]["seconds"], 32400)
+
+
+class ProxyConfirmationTests(TestCase):
+    def setUp(self):
+        Employee = get_user_model()
+        self.employee = Employee.objects.create_user(
+            employee_number="0021", password="TestPassword_2026!",
+            hire_date=date(2024, 1, 1), is_active=False,
+        )
+        self.manager = Employee.objects.create_user(
+            employee_number="9021", password="TestPassword_2026!",
+            is_business_admin=True,
+        )
+        self.client.force_login(self.manager)
+        self.url = reverse("management:proxy_correction", args=[self.employee.pk, 2024, 1, 2])
+
+    def test_confirmation_return_preserves_input_and_submission(self):
+        response = self.client.post(self.url, {
+            "clock_in_at": "2024-01-02T09:00:00",
+            "clock_out_at": "2024-01-02T18:00:00",
+            "reason": "本人から電話で申告", "proxy_reason": "アカウント停止中",
+            "evidence": "勤務表を確認", "breaks-TOTAL_FORMS": "0",
+            "breaks-INITIAL_FORMS": "0", "breaks-MIN_NUM_FORMS": "0",
+            "breaks-MAX_NUM_FORMS": "20",
+        })
+        self.assertEqual(response.status_code, 200)
+        token = response.context["confirm_token"]
+        self.assertContains(response, "代理申請の確認")
+        returned = self.client.post(self.url, {"return_token": token})
+        self.assertEqual(returned.status_code, 200)
+        self.assertEqual(returned.context["form"].initial["reason"], "本人から電話で申告")
+        self.assertEqual(returned.context["evidence_form"].initial["evidence"], "勤務表を確認")
+        self.assertEqual(CorrectionRequest.objects.count(), 0)
+        confirmed = self.client.post(self.url, {"confirm_token": token})
+        self.assertEqual(confirmed.status_code, 302)
+        correction = CorrectionRequest.objects.get()
+        self.assertTrue(correction.is_proxy)
+        self.assertIsNone(correction.work_session_id)
+
+    def test_malformed_signed_token_does_not_crash(self):
+        token = signing.dumps({"actor_id": self.manager.pk}, salt="attendance-proxy-v1")
+        response = self.client.post(self.url, {"return_token": token})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "最初から入力してください")
+        self.assertEqual(CorrectionRequest.objects.count(), 0)
+
+
+# 管理者権限
+
+"""業務管理者権限の画面と人数制約。"""
+
+from unittest.mock import patch
+
+from django.contrib.auth import get_user_model
+from django.test import Client, RequestFactory, TestCase
+from django.urls import reverse
+
+from auditlog.models import AuditLog
+from management.models import Department
+from management.templatetags.a03_directory import a03_directory
+
+
+class BusinessAdminRoleTests(TestCase):
+    """業務管理者権限の操作・人数制約に関するテスト。"""
+
+    def setUp(self):
+        Employee = get_user_model()
+
+        self.manager = Employee.objects.create_user(
+            employee_number="91001",
+            password="TestPassword_2026!",
+            is_business_admin=True,
+        )
+
+        self.employee = Employee.objects.create_user(
+            employee_number="91002",
+            password="TestPassword_2026!",
+        )
+
+        self.other = Employee.objects.create_user(
+            employee_number="91003",
+            password="TestPassword_2026!",
+        )
+
+        self.client.force_login(self.manager)
+
+    def url(self, employee=None):
+        return reverse(
+            "management:employee_role",
+            args=[(employee or self.employee).pk],
+        )
+
+    def data(
+        self,
+        expected="employee",
+        desired="admin",
+        reason="運用担当の承認済み",
+    ):
+        return {
+            "expected_role": expected,
+            "desired_role": desired,
+            "change_reason": reason,
+        }
+
+    def test_sole_manager_can_grant_second_manager_with_audit(self):
+        directory = self.client.get(reverse("management:employees"))
+        self.assertContains(directory, self.url())
+
+        edit = self.client.get(
+            reverse(
+                "management:employee_edit",
+                args=[self.employee.pk],
+            )
+        )
+        self.assertContains(edit, self.url())
+
+        self.assertContains(
+            self.client.get(self.url()),
+            "業務管理者権限の変更",
+        )
+
+        response = self.client.post(
+            self.url(),
+            self.data(),
+        )
+        self.assertEqual(response.status_code, 302)
+
+        self.employee.refresh_from_db()
+        self.assertTrue(self.employee.is_business_admin)
+        self.assertFalse(self.employee.is_staff)
+        self.assertFalse(self.employee.is_superuser)
+
+        role_logs = AuditLog.objects.filter(
+            action=AuditLog.Action.ROLE_CHANGE,
+            target_employee=self.employee,
+        )
+        self.assertEqual(role_logs.count(), 1)
+
+        log = role_logs.get()
+        self.assertEqual(log.actor_id, self.manager.pk)
+        self.assertEqual(log.reason, "運用担当の承認済み")
+        self.assertEqual(
+            log.before_data["is_business_admin"],
+            False,
+        )
+        self.assertEqual(
+            log.after_data["is_business_admin"],
+            True,
+        )
+
+        self.client.force_login(self.employee)
+        self.assertRedirects(
+            self.client.get(reverse("management:home")),
+            reverse("management:attendance_list"),
+        )
+
+    def test_cannot_revoke_one_of_only_two_active_managers(self):
+        self.client.post(
+            self.url(),
+            self.data(),
+        )
+
+        response = self.client.post(
+            self.url(),
+            self.data(
+                expected="admin",
+                desired="employee",
+                reason="管理者交代",
+            ),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "2人以上")
+
+        self.employee.refresh_from_db()
+        self.assertTrue(self.employee.is_business_admin)
+
+        self.assertEqual(
+            AuditLog.objects.filter(
+                action=AuditLog.Action.ROLE_CHANGE,
+                target_employee=self.employee,
+            ).count(),
+            1,
+        )
+
+    def test_third_manager_can_be_revoked_but_not_self(self):
+        self.client.post(
+            self.url(),
+            self.data(),
+        )
+
+        self.other.is_business_admin = True
+        self.other.save(update_fields=["is_business_admin"])
+
+        response = self.client.post(
+            self.url(),
+            self.data(
+                expected="admin",
+                desired="employee",
+                reason="交代済み",
+            ),
+        )
+
+        self.assertEqual(response.status_code, 302)
+
+        self.employee.refresh_from_db()
+        self.assertFalse(self.employee.is_business_admin)
+
+        self.assertEqual(
+            get_user_model()
+            .objects.filter(
+                is_active=True,
+                is_business_admin=True,
+            )
+            .count(),
+            2,
+        )
+
+        self.client.force_login(self.employee)
+        self.assertEqual(
+            self.client.get(reverse("management:home")).status_code,
+            403,
+        )
+
+        self.client.force_login(self.manager)
+
+        own = self.client.post(
+            self.url(self.manager),
+            self.data(
+                expected="admin",
+                desired="employee",
+                reason="自分を取消",
+            ),
+        )
+
+        self.assertContains(
+            own,
+            "自分自身の業務管理者権限",
+        )
+
+        self.manager.refresh_from_db()
+        self.assertTrue(self.manager.is_business_admin)
+
+    def test_inactive_and_technical_accounts_cannot_be_granted(self):
+        self.employee.is_active = False
+        self.employee.save(update_fields=["is_active"])
+
+        self.assertContains(
+            self.client.post(
+                self.url(),
+                self.data(),
+            ),
+            "利用停止中",
+        )
+
+        self.employee.refresh_from_db()
+        self.assertFalse(self.employee.is_business_admin)
+
+        self.other.is_staff = True
+        self.other.save(update_fields=["is_staff"])
+
+        self.assertContains(
+            self.client.post(
+                self.url(self.other),
+                self.data(),
+            ),
+            "技術管理用",
+        )
+
+        self.other.refresh_from_db()
+        self.assertFalse(self.other.is_business_admin)
+
+    def test_stale_form_and_missing_reason_are_rejected(self):
+        self.assertContains(
+            self.client.post(
+                self.url(),
+                self.data(reason=""),
+            ),
+            "変更理由",
+        )
+
+        self.employee.is_business_admin = True
+        self.employee.save(update_fields=["is_business_admin"])
+
+        response = self.client.post(
+            self.url(),
+            self.data(),
+        )
+
+        self.assertContains(
+            response,
+            "再読み込み",
+        )
+
+    def test_ordinary_employee_is_forbidden_and_csrf_is_required(self):
+        self.client.force_login(self.other)
+
+        self.assertEqual(
+            self.client.get(self.url()).status_code,
+            403,
+        )
+
+        self.assertEqual(
+            self.client.post(
+                self.url(),
+                self.data(),
+            ).status_code,
+            403,
+        )
+
+        client = Client(enforce_csrf_checks=True)
+        client.force_login(self.manager)
+
+        self.assertEqual(
+            client.post(
+                self.url(),
+                self.data(),
+            ).status_code,
+            403,
+        )
+
+    def test_audit_failure_rolls_back_role_grant(self):
+        with patch(
+            "accounts.signals.AuditLog.objects.create",
+            side_effect=RuntimeError("audit failed"),
+        ):
+            with self.assertRaises(RuntimeError):
+                self.client.post(
+                    self.url(),
+                    self.data(),
+                )
+
+        self.employee.refresh_from_db()
+        self.assertFalse(self.employee.is_business_admin)
+
+    def test_directory_manager_count_excludes_inactive_accounts(self):
+        self.other.is_business_admin = True
+        self.other.is_active = False
+
+        self.other.save(
+            update_fields=[
+                "is_business_admin",
+                "is_active",
+            ]
+        )
+
+        request = RequestFactory().get(reverse("management:employees"))
+        request.user = self.manager
+
+        self.assertEqual(
+            a03_directory({"request": request})["manager_count"],
+            1,
+        )
+
+    def test_employee_edit_still_works_and_cannot_disable_second_manager(self):
+        """社員編集と管理者2人以上の保護を検証する。"""
+
+        # Phase 2対応：
+        # テスト用DBに部署マスターを作成する。
+        department = Department.objects.create(
+            name="総務",
+            code=1,
+            is_active=True,
+        )
+
+        edit_url = reverse(
+            "management:employee_edit",
+            args=[self.employee.pk],
+        )
+        edit_state = self.client.get(edit_url).context["edit_state"]
+
+        # 1. 一般社員の情報更新
+        updated = self.client.post(
+            edit_url,
+            {
+                "employee_number": self.employee.employee_number,
+                "first_name": "更新",
+                "last_name": "社員",
+                "department_choice": str(department.pk),
+                "is_active": "on",
+                "change_reason": "社員情報の更新",
+                "edit_state": edit_state,
+            },
+        )
+
+        # 失敗時にフォームエラーを確認できるようにする。
+        if updated.status_code != 302:
+            form = updated.context.get("form") if updated.context else None
+            errors = (
+                form.errors.as_json()
+                if form is not None
+                else "フォームエラーを取得できませんでした。"
+            )
+            self.fail(
+                "社員情報の更新に失敗しました。"
+                f" HTTPステータス: {updated.status_code}"
+                f" フォームエラー: {errors}"
+            )
+
+        self.assertEqual(updated.status_code, 302)
+
+        self.employee.refresh_from_db()
+        self.assertEqual(self.employee.first_name, "更新")
+        self.assertEqual(self.employee.department, "総務")
+
+        # 2. 2人目の管理者に昇格
+        role_response = self.client.post(
+            self.url(),
+            self.data(),
+        )
+
+        self.assertEqual(role_response.status_code, 302)
+
+        self.employee.refresh_from_db()
+        self.assertTrue(self.employee.is_business_admin)
+
+        # 3. 管理者が2人しかいない状態で
+        #    2人目を利用停止にしようとする。
+        disabled = self.client.post(
+            edit_url,
+            {
+                "employee_number": self.employee.employee_number,
+                "first_name": "更新",
+                "last_name": "社員",
+                "department_choice": str(department.pk),
+                "change_reason": "管理者交代前の停止試行",
+                "edit_state": self.client.get(edit_url).context["edit_state"],
+            },
+        )
+
+        # 管理者2人以上の制約により停止できない。
+        self.assertContains(
+            disabled,
+            "2人以上",
+        )
+
+        self.employee.refresh_from_db()
+        self.assertTrue(self.employee.is_active)
+
+
+# 部署登録・社員番号
+
+"""部署登録・部署別自動採番・部署コード再利用防止の受入テスト。"""
+
+from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
+import uuid
+import json
+import tempfile
+from pathlib import Path
+from unittest.mock import patch
+
+from django.db import IntegrityError, OperationalError, transaction
+from django.test import TestCase
+from django.core.management import call_command
+from django.urls import reverse
+
+from management.department_rules import (
+    available_department_codes,
+    normalize_department_name,
+    used_department_codes,
+)
+from management.numbering import next_employee_number
+from auditlog.models import AuditLog
+from management.models import (
+    Department,
+    DepartmentRegistration,
+    EmployeeNumberHistory,
+    EmploymentInfo,
+    EmployeeNumberOperation,
+)
+
+
+class DepartmentRulesTests(TestCase):
+    def test_normalize_department_name(self):
+        self.assertEqual(normalize_department_name("  営業部  "), "営業部")
+        with self.assertRaises(ValidationError):
+            normalize_department_name("  ")
+        with self.assertRaises(ValidationError):
+            normalize_department_name("あ" * 101)
+
+    def test_new_department_code_is_available_without_employees(self):
+        Department.objects.create(name="ITソリューション部", code=3)
+        self.assertIn(3, used_department_codes())
+        self.assertNotIn(3, available_department_codes())
+        self.assertEqual(Department.objects.filter(code=3).count(), 1)
+
+    def test_inactive_department_code_is_not_reusable(self):
+        Department.objects.create(name="旧営業部", code=4, is_active=False)
+        self.assertNotIn(4, available_department_codes())
+
+    def test_existing_employee_number_reserves_its_prefix(self):
+        Employee = get_user_model()
+        Employee.objects.create_user(employee_number="50001", password="TestPassword_2026!")
+        self.assertNotIn(5, available_department_codes())
+
+    def test_legacy_number_reserves_unregistered_code_but_existing_department_can_issue(self):
+        Employee = get_user_model()
+        Employee.objects.create_user(employee_number="30001", password="TestPassword_2026!")
+        department = Department.objects.create(name="既存部署", code=1)
+        self.assertNotIn(3, available_department_codes())
+        self.assertEqual(next_employee_number(department), "10001")
+
+    def test_code_exhaustion_stops_only_new_departments(self):
+        Employee = get_user_model()
+        for code in range(2, 10):
+            Employee.objects.create_user(
+                employee_number=f"{code}0001", password="TestPassword_2026!",
+            )
+        department = Department.objects.create(name="既存部署", code=1)
+        self.assertEqual(available_department_codes(), [])
+        self.assertEqual(next_employee_number(department), "10001")
+
+    def test_number_history_reserves_its_prefix(self):
+        Employee = get_user_model()
+        employee = Employee.objects.create_user(
+            employee_number="91001", password="TestPassword_2026!"
+        )
+        department = Department.objects.create(name="旧開発部", code=6, is_active=False)
+        EmployeeNumberHistory.objects.create(
+            employee=employee, department=department, employee_number="60001"
+        )
+        self.assertNotIn(6, available_department_codes())
+
+    def test_department_code_must_be_between_one_and_nine(self):
+        for code in (0, 10):
+            with self.subTest(code=code):
+                department = Department(name=f"範囲外{code}", code=code)
+                with self.assertRaises(ValidationError):
+                    department.full_clean()
+
+    def test_duplicate_department_code_is_rejected(self):
+        Department.objects.create(name="営業部", code=1)
+        with self.assertRaises(ValidationError):
+            Department(name="総務部", code=1).full_clean()
+
+    def test_database_rejects_duplicate_department_code(self):
+        Department.objects.create(name="営業部", code=1)
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                Department.objects.create(name="総務部", code=1)
+
+
+class LegacyNumberingMigrationTests(TestCase):
+    def test_migration_preserves_old_numbers_and_is_repeatable(self):
+        Employee = get_user_model()
+        manager = Employee.objects.create_user(
+            employee_number="90001", password="TestPassword_2026!",
+            department="営業部", is_business_admin=True,
+        )
+        old = Employee.objects.create_user(
+            employee_number="00999", password="TestPassword_2026!",
+            department="開発部", is_active=False,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "mapping.json"
+            path.write_text(json.dumps({"開発部": 1, "営業部": 2}), encoding="utf-8")
+            options = {"mapping_file": str(path), "actor_number": manager.employee_number}
+            call_command("migrate_legacy_numbering", dry_run=True, **options)
+            self.assertFalse(Department.objects.exists())
+            call_command("migrate_legacy_numbering", **options)
+            call_command("migrate_legacy_numbering", **options)
+        self.assertEqual(Department.objects.count(), 2)
+        self.assertEqual(DepartmentRegistration.objects.count(), 2)
+        self.assertEqual(EmployeeNumberHistory.objects.count(), 2)
+        self.assertEqual(AuditLog.objects.filter(action=AuditLog.Action.DEPARTMENT_CREATE).count(), 2)
+        self.assertEqual(EmployeeNumberHistory.objects.get(employee=old).department.code, 1)
+        self.assertNotIn(9, available_department_codes())
+        self.assertEqual(next_employee_number(Department.objects.get(code=2)), "20001")
+
+
+class EmployeeDepartmentSelectionTests(TestCase):
+    def setUp(self):
+        Employee = get_user_model()
+        self.manager = Employee.objects.create_user(
+            employee_number="91001", password="TestPassword_2026!", is_business_admin=True
+        )
+        self.employee = Employee.objects.create_user(
+            employee_number="91002", password="TestPassword_2026!"
+        )
+        self.department = Department.objects.create(
+            name="ITソリューション部", code=3, is_active=True
+        )
+        self.client.force_login(self.manager)
+
+    def test_zero_employee_department_is_available_on_create_form(self):
+        response = self.client.get(reverse("management:employee_create"))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("department_choice", response.context["form"].fields)
+        field = response.context["form"].fields["department_choice"]
+        self.assertTrue(field.queryset.filter(pk=self.department.pk).exists())
+
+    def test_employee_preview_does_not_issue_number_until_confirmed(self):
+        data = {
+            "first_name": "太郎", "last_name": "佐藤",
+            "department_choice": str(self.department.pk),
+            "hire_date": "2026-04-01", "operation_id": str(uuid.uuid4()),
+        }
+        response = self.client.post(reverse("management:employee_create"), {
+            **data, "preview": "1",
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "社員登録内容の確認")
+        self.assertContains(response, "30001")
+        self.assertFalse(EmployeeNumberHistory.objects.exists())
+        response = self.client.post(reverse("management:employee_create"), data)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(EmployeeNumberHistory.objects.get().employee_number, "30001")
+
+    def test_employee_creation_saves_selected_department(self):
+        response = self.client.post(
+            reverse("management:employee_create"),
+            {
+                "first_name": "太郎",
+                "last_name": "佐藤",
+                "department_choice": str(self.department.pk),
+                "hire_date": "2026-04-01",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        Employee = get_user_model()
+        created = Employee.objects.filter(employee_number="30001").first()
+        self.assertIsNotNone(created, getattr(response.context.get("form"), "errors", None) if response.context else None)
+        self.assertEqual(created.department, "ITソリューション部")
+        self.assertEqual(EmploymentInfo.objects.get(employee=created).department, "ITソリューション部")
+        self.assertTrue(EmployeeNumberHistory.objects.filter(
+            employee=created, department=self.department, employee_number="30001"
+        ).exists())
+
+    def test_create_replay_does_not_issue_second_number_or_password(self):
+        data = {
+            "first_name": "太郎", "last_name": "佐藤",
+            "department_choice": str(self.department.pk),
+            "hire_date": "2026-04-01", "operation_id": str(uuid.uuid4()),
+        }
+        url = reverse("management:employee_create")
+        first = self.client.post(url, data)
+        self.assertEqual(first.status_code, 200)
+        replay = self.client.post(url, data)
+        self.assertEqual(replay.status_code, 302)
+        self.assertEqual(EmployeeNumberHistory.objects.filter(department=self.department).count(), 1)
+        self.assertEqual(EmployeeNumberOperation.objects.filter(kind="create").count(), 1)
+        different = self.client.post(url, {**data, "first_name": "次郎"})
+        self.assertEqual(different.status_code, 409)
+
+    def test_candidate_follows_max_history_and_rejects_manual_number(self):
+        Employee = get_user_model()
+        old = Employee.objects.create_user(employee_number="30007", password="TestPassword_2026!")
+        EmployeeNumberHistory.objects.create(
+            employee=old, department=self.department, employee_number="30007"
+        )
+        old.employee_number = "91007"
+        old.save(update_fields=["employee_number"])
+        self.assertEqual(next_employee_number(self.department), "30008")
+        response = self.client.post(reverse("management:employee_create"), {
+            "employee_number": "39999", "first_name": "花子", "last_name": "山田",
+            "department_choice": str(self.department.pk), "hire_date": "2026-04-01",
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(Employee.objects.filter(employee_number="30008").exists())
+        self.assertFalse(Employee.objects.filter(employee_number="39999").exists())
+
+    def test_department_transfer_keeps_old_number_in_history(self):
+        url = reverse("management:employee_edit", args=[self.employee.pk])
+        state = self.client.get(url).context["edit_state"]
+        response = self.client.post(
+            url,
+            {
+                "first_name": "更新", "last_name": "社員",
+                "department_choice": str(self.department.pk),
+                "is_active": "on", "change_reason": "部署異動",
+                "edit_state": state,
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.employee.refresh_from_db()
+        self.assertEqual(self.employee.employee_number, "30001")
+        self.assertTrue(EmployeeNumberHistory.objects.filter(employee_number="91002").exists())
+        self.assertTrue(EmployeeNumberHistory.objects.filter(employee_number="30001").exists())
+        self.client.logout()
+        login_url = reverse("accounts:login")
+        old_login = self.client.post(login_url, {
+            "username": "91002", "password": "TestPassword_2026!"
+        })
+        self.assertEqual(old_login.status_code, 200)
+        new_login = self.client.post(login_url, {
+            "username": "30001", "password": "TestPassword_2026!"
+        })
+        self.assertEqual(new_login.status_code, 302)
+
+    def test_candidate_api_and_number_limit(self):
+        candidate_url = reverse("management:employee_number_candidate")
+        response = self.client.get(candidate_url, {"department": self.department.pk})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["number"], "30001")
+        EmployeeNumberHistory.objects.create(
+            employee=self.employee, department=self.department, employee_number="39999"
+        )
+        response = self.client.get(candidate_url, {"department": self.department.pk})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("上限", response.json()["error"])
+        create = self.client.post(reverse("management:employee_create"), {
+            "first_name": "花子", "last_name": "山田",
+            "department_choice": str(self.department.pk), "hire_date": "2026-04-01",
+        })
+        self.assertContains(create, "上限")
+        self.assertFalse(get_user_model().objects.filter(employee_number__startswith="3").exists())
+
+    def test_inactive_department_cannot_be_selected_for_new_employee(self):
+        self.department.is_active = False
+        self.department.save(update_fields=["is_active"])
+        response = self.client.post(
+            reverse("management:employee_create"),
+            {
+                "first_name": "太郎",
+                "last_name": "佐藤",
+                "department_choice": str(self.department.pk),
+                "hire_date": "2026-04-01",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(get_user_model().objects.filter(employee_number="30001").exists())
+        self.assertTrue(response.context["form"].errors)
+
+    def test_ordinary_employee_cannot_create_employee(self):
+        self.client.force_login(self.employee)
+        response = self.client.get(reverse("management:employee_create"))
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(self.client.get(reverse("management:employee_number_candidate")).status_code, 403)
+        self.assertEqual(self.client.get(reverse("management:role_list")).status_code, 403)
+
+    def test_employee_edit_updates_department_and_employment_info(self):
+        url = reverse("management:employee_edit", args=[self.employee.pk])
+        state = self.client.get(url).context["edit_state"]
+        response = self.client.post(
+            url,
+            {
+                "employee_number": self.employee.employee_number,
+                "first_name": "更新",
+                "last_name": "社員",
+                "department_choice": str(self.department.pk),
+                "is_active": "on",
+                "change_reason": "所属部署の変更",
+                "edit_state": state,
+            },
+        )
+        self.assertEqual(response.status_code, 302, getattr(response.context.get("form"), "errors", None) if response.context else None)
+        self.employee.refresh_from_db()
+        self.assertEqual(self.employee.department, "ITソリューション部")
+        self.assertEqual(EmploymentInfo.objects.get(employee=self.employee).department, "ITソリューション部")
+
+    def test_stale_employee_edit_is_rejected(self):
+        url = reverse("management:employee_edit", args=[self.employee.pk])
+        state = self.client.get(url).context["edit_state"]
+        get_user_model().objects.filter(pk=self.employee.pk).update(first_name="別の更新")
+        response = self.client.post(url, {
+            "first_name": "古い入力", "last_name": "社員",
+            "department_choice": str(self.department.pk),
+            "is_active": "on", "change_reason": "部署異動",
+            "edit_state": state,
+        })
+        self.assertContains(response, "別の操作で変更", status_code=200)
+        self.employee.refresh_from_db()
+        self.assertEqual(self.employee.first_name, "別の更新")
+        self.assertEqual(self.employee.employee_number, "91002")
+
+
+class DepartmentManagementAcceptanceTests(TestCase):
+    def setUp(self):
+        Employee = get_user_model()
+        self.manager = Employee.objects.create_user(
+            employee_number="91011", password="TestPassword_2026!", is_business_admin=True
+        )
+        self.employee = Employee.objects.create_user(
+            employee_number="91012", password="TestPassword_2026!"
+        )
+        self.client.force_login(self.manager)
+        self.create_url = reverse("management:department_create")
+
+    def create_data(self, operation_id=None, **changes):
+        data = {
+            "name": "営業部",
+            "code": "1",
+            "is_active": "on",
+            "operation_id": str(operation_id or uuid.uuid4()),
+        }
+        data.update(changes)
+        return data
+
+    def test_department_preview_does_not_register_until_confirmed(self):
+        data = self.create_data()
+        response = self.client.post(self.create_url, {**data, "preview": "1"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "部署登録内容の確認")
+        self.assertFalse(Department.objects.exists())
+        response = self.client.post(self.create_url, data)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(Department.objects.get().name, "営業部")
+
+    def test_create_writes_one_audit_and_replay_does_not_duplicate_it(self):
+        data = self.create_data(name="  営業部  ")
+        first_response = self.client.post(self.create_url, data)
+        self.assertEqual(first_response.status_code, 302)
+        department = Department.objects.get(code=1)
+        self.assertEqual(first_response.url, reverse(
+            "management:department_registration_result",
+            args=[data["operation_id"]],
+        ))
+        result = self.client.get(first_response.url)
+        self.assertContains(result, f"<dd>{department.pk}</dd>", html=True)
+        self.assertContains(result, "営業部")
+        registration = DepartmentRegistration.objects.get(department=department)
+        self.assertEqual(registration.name, "営業部")
+        self.assertTrue(registration.is_active)
+        audit = AuditLog.objects.get(action=AuditLog.Action.DEPARTMENT_CREATE)
+        self.assertEqual(audit.actor, self.manager)
+        self.assertEqual(audit.target_id, str(department.pk))
+        self.assertEqual(audit.before_data, {})
+        self.assertEqual(
+            audit.after_data, {"name": "営業部", "code": 1, "is_active": True}
+        )
+        self.assertEqual(audit.details["operation_id"], data["operation_id"])
+
+        replay = self.client.post(self.create_url, data)
+        self.assertEqual(replay.status_code, 302)
+        self.assertEqual(replay.url, first_response.url)
+        self.assertEqual(Department.objects.count(), 1)
+        self.assertEqual(DepartmentRegistration.objects.count(), 1)
+        self.assertEqual(AuditLog.objects.filter(action=AuditLog.Action.DEPARTMENT_CREATE).count(), 1)
+
+    def test_reused_operation_with_changed_name_code_or_status_is_rejected(self):
+        data = self.create_data()
+        self.assertEqual(self.client.post(self.create_url, data).status_code, 302)
+        for changes in ({"name": "総務部"}, {"code": "2"}, {"is_active": ""}):
+            with self.subTest(changes=changes):
+                response = self.client.post(self.create_url, {**data, **changes})
+                self.assertEqual(response.status_code, 409)
+                self.assertContains(response, "同じ操作IDで異なる内容", status_code=409)
+        self.assertEqual(Department.objects.count(), 1)
+        self.assertEqual(AuditLog.objects.filter(action=AuditLog.Action.DEPARTMENT_CREATE).count(), 1)
+
+    def test_legacy_operation_without_status_snapshot_is_rejected(self):
+        data = self.create_data()
+        department = Department.objects.create(name=data["name"], code=1)
+        DepartmentRegistration.objects.create(
+            department=department,
+            actor=self.manager,
+            operation_id=uuid.UUID(data["operation_id"]),
+            name=department.name,
+            code=department.code,
+        )
+        response = self.client.post(self.create_url, data)
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(Department.objects.count(), 1)
+        self.assertFalse(AuditLog.objects.filter(action=AuditLog.Action.DEPARTMENT_CREATE).exists())
+
+    def test_edit_audits_changes_and_rejects_submitted_code_change(self):
+        department = Department.objects.create(name="営業部", code=1)
+        url = reverse("management:department_edit", args=[department.pk])
+        response = self.client.post(url, {"name": "総務部", "is_active": ""})
+        self.assertEqual(response.status_code, 302)
+        department.refresh_from_db()
+        self.assertEqual((department.name, department.code, department.is_active), ("総務部", 1, False))
+        audit = AuditLog.objects.get(action=AuditLog.Action.DEPARTMENT_UPDATE)
+        self.assertEqual(audit.actor, self.manager)
+        self.assertEqual(audit.target_id, str(department.pk))
+        self.assertEqual(audit.before_data, {"name": "営業部", "code": 1, "is_active": True})
+        self.assertEqual(audit.after_data, {"name": "総務部", "code": 1, "is_active": False})
+
+        response = self.client.post(url, {"name": "改ざん", "code": "2", "is_active": "on"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "部署コードは変更できません")
+        department.refresh_from_db()
+        self.assertEqual((department.name, department.code), ("総務部", 1))
+        self.assertEqual(AuditLog.objects.filter(action=AuditLog.Action.DEPARTMENT_UPDATE).count(), 1)
+
+    def test_department_name_cannot_change_while_employees_use_it(self):
+        department = Department.objects.create(name="営業部", code=1)
+        get_user_model().objects.filter(pk=self.employee.pk).update(department=department.name)
+        response = self.client.post(
+            reverse("management:department_edit", args=[department.pk]),
+            {"name": "新営業部", "is_active": "on"},
+        )
+        self.assertContains(response, "所属社員がいる部署名は変更できません")
+        department.refresh_from_db()
+        self.assertEqual(department.name, "営業部")
+
+    def test_stale_code_choice_and_database_lock_do_not_leave_partial_registration(self):
+        data = self.create_data()
+        with patch("management.department_views.available_department_codes", return_value=[]):
+            response = self.client.post(self.create_url, data)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "この部署コードは既に使用されています")
+        self.assertFalse(Department.objects.exists())
+
+        with patch("management.department_views.DepartmentForm.save", side_effect=OperationalError("database is locked")):
+            response = self.client.post(self.create_url, data)
+        self.assertEqual(response.status_code, 409)
+        self.assertContains(response, "登録が競合しました", status_code=409)
+        self.assertFalse(Department.objects.exists())
+        self.assertFalse(DepartmentRegistration.objects.exists())
+        self.assertFalse(AuditLog.objects.filter(action=AuditLog.Action.DEPARTMENT_CREATE).exists())
+
+    def test_audit_failure_rolls_back_registration(self):
+        with patch("management.department_views.AuditLog.objects.create", side_effect=IntegrityError("audit failed")):
+            response = self.client.post(self.create_url, self.create_data())
+        self.assertEqual(response.status_code, 409)
+        self.assertFalse(Department.objects.exists())
+        self.assertFalse(DepartmentRegistration.objects.exists())
+
+    def test_ordinary_employee_cannot_manage_departments(self):
+        self.client.force_login(self.employee)
+        self.assertEqual(self.client.get(self.create_url).status_code, 403)
+        self.assertEqual(self.client.post(self.create_url, self.create_data()).status_code, 403)
+        self.assertFalse(Department.objects.exists())
+
+
+# DB外の番号保全記録
+
+"""番号保全記録とバックアップ復元の停止条件。"""
+
+import tempfile
+import uuid
+from pathlib import Path
+from unittest.mock import patch
+
+from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError
+from django.test import TestCase, override_settings
+from django.urls import reverse
+
+from auditlog.models import AuditLog
+from management.models import Department, DepartmentRegistration, EmployeeNumberHistory
+from management.numbering_ledger import (
+    NumberingLedgerError, cancel_pending, export_snapshot, read_snapshot, reconcile_pending,
+    require_numbering_ready, reserve_pending, restore_departments, verify_snapshot,
+)
+
+
+class NumberingLedgerTests(TestCase):
+    def setUp(self):
+        Employee = get_user_model()
+        self.manager = Employee.objects.create_user(
+            employee_number="90001", password="TestPassword_2026!", is_business_admin=True,
+        )
+        self.department = Department.objects.create(name="新部署", code=3)
+        self.operation_id = uuid.uuid4()
+        self.registration = DepartmentRegistration.objects.create(
+            department=self.department, actor=self.manager, operation_id=self.operation_id,
+            name=self.department.name, code=self.department.code, is_active=True,
+        )
+        self.audit = AuditLog.objects.create(
+            actor=self.manager, action=AuditLog.Action.DEPARTMENT_CREATE,
+            target_model=Department._meta.label, target_id=str(self.department.pk),
+            before_data={}, after_data={"name": "新部署", "code": 3, "is_active": True},
+            details={"operation_id": str(self.operation_id)},
+        )
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.path = Path(self.directory.name) / "numbering-ledger.json"
+        export_snapshot(self.path)
+
+    def test_tampered_or_missing_ledger_stops_issuance(self):
+        with override_settings(NUMBERING_LEDGER_PATH=self.path), patch(
+            "management.numbering_ledger._test_database", return_value=False
+        ):
+            require_numbering_ready()
+            self.path.write_text("{}", encoding="utf-8")
+            with self.assertRaises(ValidationError):
+                require_numbering_ready()
+            self.path.unlink()
+            with self.assertRaises(ValidationError):
+                require_numbering_ready()
+
+    def test_restores_same_department_id_registration_and_a05_then_replay(self):
+        department_id = self.department.pk
+        self.audit.delete()
+        self.registration.delete()
+        self.department.delete()
+        with self.assertRaises(NumberingLedgerError):
+            verify_snapshot(self.path)
+        restore_departments(path=self.path, actor=self.manager)
+        verify_snapshot(self.path)
+        self.assertEqual(Department.objects.get(pk=department_id).name, "新部署")
+        self.assertEqual(DepartmentRegistration.objects.get(department_id=department_id).operation_id,
+                         self.operation_id)
+        self.assertEqual(AuditLog.objects.filter(action=AuditLog.Action.DEPARTMENT_CREATE).count(), 1)
+        self.client.force_login(self.manager)
+        create_form = self.client.get(reverse("management:employee_create"))
+        self.assertContains(create_form, "新部署")
+        response = self.client.post(reverse("management:department_create"), {
+            "name": "新部署", "code": "3", "is_active": "on", "operation_id": str(self.operation_id),
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(Department.objects.count(), 1)
+        self.assertEqual(DepartmentRegistration.objects.count(), 1)
+
+    def test_missing_issued_number_history_restores_when_employee_matches(self):
+        employee = get_user_model().objects.create_user(
+            employee_number="30001", password="TestPassword_2026!",
+        )
+        history = EmployeeNumberHistory.objects.create(
+            employee=employee, department=self.department, employee_number="30001",
+        )
+        export_snapshot(self.path)
+        history.delete()
+        restore_departments(path=self.path, actor=self.manager)
+        verify_snapshot(self.path)
+        self.assertTrue(EmployeeNumberHistory.objects.filter(
+            employee=employee, employee_number="30001",
+        ).exists())
+
+    def test_changed_employee_number_prevents_history_restore(self):
+        employee = get_user_model().objects.create_user(
+            employee_number="30001", password="TestPassword_2026!",
+        )
+        history = EmployeeNumberHistory.objects.create(
+            employee=employee, department=self.department, employee_number="30001",
+        )
+        export_snapshot(self.path)
+        history.delete()
+        employee.employee_number = "30002"
+        employee.save(update_fields=["employee_number"])
+        with self.assertRaisesRegex(NumberingLedgerError, "発行済み番号"):
+            restore_departments(path=self.path, actor=self.manager)
+
+    def test_restores_old_number_history_after_department_transfer(self):
+        new_department = Department.objects.create(name="異動先", code=4)
+        employee = get_user_model().objects.create_user(
+            employee_number="40001", password="TestPassword_2026!", department="異動先",
+        )
+        old_history = EmployeeNumberHistory.objects.create(
+            employee=employee, department=self.department, employee_number="30001",
+        )
+        current_history = EmployeeNumberHistory.objects.create(
+            employee=employee, department=new_department, employee_number="40001",
+        )
+        export_snapshot(self.path)
+        old_history_id = old_history.pk
+        old_history.delete()
+
+        restore_departments(path=self.path, actor=self.manager)
+
+        verify_snapshot(self.path)
+        self.assertEqual(
+            EmployeeNumberHistory.objects.get(pk=old_history_id).employee_number, "30001"
+        )
+        self.assertTrue(EmployeeNumberHistory.objects.filter(pk=current_history.pk).exists())
+
+    def test_a07_updates_external_ledger_after_commit(self):
+        self.client.force_login(self.manager)
+        with override_settings(NUMBERING_LEDGER_PATH=self.path), patch(
+            "management.numbering_ledger._test_database", return_value=False
+        ):
+            with self.captureOnCommitCallbacks(execute=True):
+                response = self.client.post(reverse("management:department_create"), {
+                    "name": "第2部署", "code": "4", "is_active": "on",
+                    "operation_id": str(uuid.uuid4()),
+                })
+            self.assertEqual(response.status_code, 302)
+            verify_snapshot(self.path)
+            self.assertEqual(len(verify_snapshot(self.path)["departments"]), 2)
+
+    def test_unfinished_reservation_stops_new_numbering(self):
+        with override_settings(NUMBERING_LEDGER_PATH=self.path), patch(
+            "management.numbering_ledger._test_database", return_value=False
+        ):
+            reserve_pending(kind="department_create", value=4,
+                            actor_id=self.manager.pk, operation_id=uuid.uuid4())
+            self.assertEqual(read_snapshot(self.path)["pending"][0]["value"], "4")
+            with self.assertRaises(ValidationError):
+                require_numbering_ready()
+            with self.assertRaisesRegex(NumberingLedgerError, "確定結果"):
+                reconcile_pending(path=self.path, actor=self.manager, reason="復旧確認")
+
+    def test_rolled_back_reservation_is_cleared_only_after_db_matches(self):
+        operation_id = uuid.uuid4()
+        with override_settings(NUMBERING_LEDGER_PATH=self.path), patch(
+            "management.numbering_ledger._test_database", return_value=False
+        ):
+            reserve_pending(kind="department_create", value=4,
+                            actor_id=self.manager.pk, operation_id=operation_id)
+            self.assertTrue(cancel_pending(kind="department_create",
+                                           operation_id=operation_id))
+            verify_snapshot(self.path)
+
+    def test_a07_audit_failure_rolls_back_pending_reservation(self):
+        self.client.force_login(self.manager)
+        with override_settings(NUMBERING_LEDGER_PATH=self.path), patch(
+            "management.numbering_ledger._test_database", return_value=False
+        ), patch("management.department_views.AuditLog.objects.create",
+                 side_effect=IntegrityError("simulated audit failure")):
+            response = self.client.post(reverse("management:department_create"), {
+                "name": "第2部署", "code": "4", "is_active": "on",
+                "operation_id": str(uuid.uuid4()),
+            })
+        self.assertEqual(response.status_code, 409)
+        verify_snapshot(self.path)
+        self.assertEqual(Department.objects.count(), 1)
+
+    def test_committed_operation_with_pending_reservation_can_be_reconciled(self):
+        self.client.force_login(self.manager)
+        operation_id = uuid.uuid4()
+        with override_settings(NUMBERING_LEDGER_PATH=self.path), patch(
+            "management.numbering_ledger._test_database", return_value=False
+        ), patch("management.department_views.sync_after_commit"):
+            response = self.client.post(reverse("management:department_create"), {
+                "name": "第2部署", "code": "4", "is_active": "on",
+                "operation_id": str(operation_id),
+            })
+            self.assertEqual(response.status_code, 302)
+            with self.assertRaises(ValidationError):
+                require_numbering_ready()
+            with self.captureOnCommitCallbacks(execute=True):
+                reconcile_pending(path=self.path, actor=self.manager,
+                                  reason="DBの登録結果と保全記録を照合して再開")
+            verify_snapshot(self.path)
+            self.assertTrue(AuditLog.objects.filter(
+                target_model="NumberingLedger", reason="DBの登録結果と保全記録を照合して再開",
+            ).exists())
+
+    def test_committed_employee_number_with_pending_reservation_can_be_reconciled(self):
+        self.client.force_login(self.manager)
+        operation_id = uuid.uuid4()
+        with override_settings(NUMBERING_LEDGER_PATH=self.path), patch(
+            "management.numbering_ledger._test_database", return_value=False
+        ), patch("management.views.sync_after_commit"):
+            response = self.client.post(reverse("management:employee_create"), {
+                "first_name": "太郎", "last_name": "佐藤",
+                "department_choice": str(self.department.pk),
+                "hire_date": "2026-04-01", "operation_id": str(operation_id),
+            })
+            self.assertEqual(response.status_code, 200)
+            self.assertTrue(EmployeeNumberHistory.objects.filter(
+                employee_number="30001"
+            ).exists())
+            with self.assertRaises(ValidationError):
+                require_numbering_ready()
+            with self.captureOnCommitCallbacks(execute=True):
+                reconcile_pending(path=self.path, actor=self.manager,
+                                  reason="発行済み社員番号をDBと照合して再開")
+            verify_snapshot(self.path)
+
+
+# リリース受入条件
+
+"""v1.4 リリース修正の受入テスト。"""
+
+import csv
+from datetime import date, datetime
+from io import StringIO
+from zoneinfo import ZoneInfo
+
+from django.contrib.auth import get_user_model
+from django.test import TestCase
+from django.urls import reverse
+
+from attendance.models import WorkSession
+from auditlog.models import AuditLog
+from management.models import (
+    Department,
+    EmploymentInfo,
+    ExportBatch,
+)
+from management.services import (
+    finalize_month,
+    reopen_month,
+)
+from notifications.models import Notification
+
+
+class ReleaseAcceptanceTests(TestCase):
+    """リリース受入テスト。"""
+
+    def setUp(self):
+        Employee = get_user_model()
+
+        self.manager = Employee.objects.create_user(
+            employee_number="91001",
+            password="ManagerPass_2026!",
+            is_business_admin=True,
+        )
+
+        self.employee = Employee.objects.create_user(
+            employee_number="91002",
+            password="EmployeePass_2026!",
+            first_name="花子",
+            last_name="山田",
+        )
+
+        self.client.force_login(self.manager)
+
+    def test_registration_and_reset_are_one_time_and_not_cached(self):
+        """社員登録と初期パスワード再発行の受入テスト。"""
+
+        # テスト専用DBに部署を登録する。
+        department = Department.objects.create(
+            name="営業部",
+            code=1,
+            is_active=True,
+        )
+
+        # 社員登録。
+        create = self.client.post(
+            reverse("management:employee_create"),
+            {
+                "first_name": "太郎",
+                "last_name": "佐藤",
+                "department_choice": str(department.pk),
+                "hire_date": "2026-04-01",
+            },
+        )
+
+        self.assertEqual(create.status_code, 200)
+
+        # 社員登録に失敗した場合、
+        # 原因を確認できるようにする。
+        created_exists = (
+            get_user_model().objects.filter(employee_number="10001").exists()
+        )
+
+        if not created_exists:
+            form = None
+
+            if create.context:
+                form = create.context.get("form")
+
+            errors = (
+                form.errors.as_json()
+                if form is not None
+                else "フォームエラーを取得できませんでした。"
+            )
+
+            self.fail("社員登録に失敗しました。" f" フォームエラー: {errors}")
+
+        self.assertContains(
+            create,
+            "初期パスワード",
+        )
+
+        self.assertIn(
+            "no-store",
+            create["Cache-Control"],
+        )
+
+        created = get_user_model().objects.get(employee_number="10001")
+
+        # 所属部署の保存確認。
+        self.assertEqual(
+            created.department,
+            "営業部",
+        )
+
+        # 初期パスワード再発行の確認画面。
+        reset_url = reverse(
+            "management:employee_password_reset",
+            args=[created.pk],
+        )
+
+        confirm = self.client.get(reset_url)
+
+        self.assertEqual(
+            confirm.status_code,
+            200,
+        )
+
+        self.assertContains(
+            confirm,
+            "再発行の確認",
+        )
+
+        ticket = confirm.context["ticket"]
+
+        # 初期パスワードを再発行する。
+        reset = self.client.post(
+            reset_url,
+            {
+                "ticket": ticket,
+                "confirm": "yes",
+            },
+        )
+
+        self.assertEqual(
+            reset.status_code,
+            200,
+        )
+
+        self.assertContains(
+            reset,
+            "初期パスワード再発行が完了",
+        )
+
+        self.assertIn(
+            "no-store",
+            reset["Cache-Control"],
+        )
+
+        # 同一チケットの再利用を禁止する。
+        replay = self.client.post(
+            reset_url,
+            {
+                "ticket": ticket,
+                "confirm": "yes",
+            },
+        )
+
+        self.assertEqual(
+            replay.status_code,
+            400,
+        )
+
+        self.assertNotIn(
+            "初期パスワード再発行が完了",
+            replay.content.decode(),
+        )
+
+    def test_month_notifications_for_finalize_reopen_refinalize(self):
+        """月次確定・再開・再確定の通知テスト。"""
+
+        month = date(2026, 9, 1)
+
+        args = {
+            "manager_id": self.manager.pk,
+            "employee_id": self.employee.pk,
+            "target_month": month,
+        }
+
+        finalize_month(
+            **args,
+            checked_no_record=True,
+        )
+
+        reopen_month(
+            **args,
+            reason="再確認が必要",
+        )
+
+        finalize_month(
+            **args,
+            checked_no_record=True,
+        )
+
+        kinds = list(
+            Notification.objects.filter(recipient=self.employee)
+            .order_by("created_at", "pk")
+            .values_list("kind", flat=True)
+        )
+
+        self.assertEqual(
+            kinds,
+            [
+                Notification.Kind.MONTH_FINALIZED,
+                Notification.Kind.MONTH_REOPENED,
+                Notification.Kind.MONTH_FINALIZED,
+            ],
+        )
+
+    def test_csv_schema_values_and_employment_period(self):
+        """CSV出力と在籍期間の受入テスト。"""
+
+        month = date(2026, 9, 1)
+        jst = ZoneInfo("Asia/Tokyo")
+
+        WorkSession.objects.create(
+            employee=self.employee,
+            work_date=date(2026, 9, 15),
+            clock_in_at=datetime(
+                2026,
+                9,
+                15,
+                9,
+                tzinfo=jst,
+            ),
+            clock_out_at=datetime(
+                2026,
+                9,
+                15,
+                18,
+                tzinfo=jst,
+            ),
+            status=WorkSession.Status.COMPLETED,
+        )
+
+        EmploymentInfo.objects.create(
+            employee=self.employee,
+            department="営業部",
+            hire_date=date(2026, 9, 15),
+            leave_date=date(2026, 9, 20),
+        )
+
+        finalize_month(
+            manager_id=self.manager.pk,
+            employee_id=self.employee.pk,
+            target_month=month,
+            checked_no_record=True,
+        )
+
+        base = {
+            "month": "2026-09",
+            "scope": "employee",
+            "department": "",
+            "employee_number": self.employee.employee_number,
+            "mode": "download",
+        }
+
+        created = self.client.post(
+            reverse("management:bulk_export"),
+            {
+                **base,
+                "output_format": "daily",
+            },
+        )
+
+        self.assertEqual(
+            created.status_code,
+            302,
+        )
+
+        batch = ExportBatch.objects.get()
+
+        daily = self.client.post(
+            reverse(
+                "management:batch_download",
+                args=[
+                    batch.output_id,
+                    "daily",
+                ],
+            )
+        )
+
+        self.assertEqual(
+            daily.status_code,
+            200,
+        )
+
+        self.assertTrue(daily.content.startswith(b"\xef\xbb\xbf"))
+
+        self.assertIn(
+            b"\r\n",
+            daily.content,
+        )
+
+        daily_rows = list(csv.reader(StringIO(daily.content.decode("utf-8-sig"))))
+
+        self.assertEqual(
+            daily_rows[0],
+            [
+                "社員番号",
+                "氏名",
+                "部署",
+                "勤務日",
+                "出勤日時",
+                "退勤日時",
+                "休憩秒数",
+                "実働秒数",
+                "記録状態",
+                "確定状態",
+                "データ版",
+            ],
+        )
+
+        self.assertEqual(
+            len(daily_rows),
+            7,
+        )
+
+        self.assertEqual(
+            daily_rows[1][4:6],
+            [
+                "2026-09-15 09:00:00",
+                "2026-09-15 18:00:00",
+            ],
+        )
+
+        self.assertEqual(
+            daily_rows[1][7],
+            "32400",
+        )
+
+        monthly = self.client.post(
+            reverse(
+                "management:batch_download",
+                args=[
+                    batch.output_id,
+                    "monthly",
+                ],
+            )
+        )
+
+        self.assertEqual(
+            monthly.status_code,
+            200,
+        )
+
+        monthly_rows = list(csv.reader(StringIO(monthly.content.decode("utf-8-sig"))))
+
+        self.assertEqual(
+            monthly_rows[0],
+            [
+                "社員番号",
+                "氏名",
+                "部署",
+                "対象月",
+                "勤務記録日数",
+                "実働秒数",
+                "休憩秒数",
+                "未完了件数",
+                "確定日時",
+                "データ版",
+            ],
+        )
+
+        self.assertEqual(
+            monthly_rows[1][4:8],
+            [
+                "1",
+                "32400",
+                "0",
+                "0",
+            ],
+        )
+
+        exports = list(
+            AuditLog.objects.filter(
+                action=AuditLog.Action.CSV_EXPORT,
+                target_model="ExportBatch",
+                target_id=str(batch.output_id),
+            ).order_by("pk")
+        )
+
+        self.assertEqual(
+            [item.details["format"] for item in exports],
+            [
+                "daily",
+                "monthly",
+            ],
+        )
+
+        self.assertTrue(
+            all(item.details["output_id"] == str(batch.output_id) for item in exports)
+        )
+
+    def test_role_change_and_login_failure_are_audited(self):
+        """権限変更とログイン失敗の監査テスト。"""
+
+        self.employee.is_business_admin = True
+
+        self.employee.save(
+            update_fields=[
+                "is_business_admin",
+            ]
+        )
+
+        self.assertTrue(
+            AuditLog.objects.filter(
+                action=AuditLog.Action.ROLE_CHANGE,
+                target_employee=self.employee,
+            ).exists()
+        )
+
+        self.client.logout()
+
+        self.client.post(
+            reverse("accounts:login"),
+            {
+                "username": self.employee.employee_number,
+                "password": "incorrect-password",
+            },
+        )
+
+        self.assertTrue(
+            AuditLog.objects.filter(action=AuditLog.Action.AUTH_FAILURE).exists()
+        )
+
+
+# PostgreSQL 並行処理
+
+"""PostgreSQL の別接続で実際の同時送信を検証する。"""
+
+import uuid
+import tempfile
+from concurrent.futures import ThreadPoolExecutor
+from datetime import date, datetime
+from pathlib import Path
+from threading import Barrier
+from unittest import skipUnless
+from unittest.mock import patch
+from zoneinfo import ZoneInfo
+
+from django.contrib.auth import get_user_model
+from django.db import close_old_connections, connection
+from django.test import Client, TransactionTestCase, override_settings
+from django.urls import reverse
+from django.utils import timezone
+
+from auditlog.models import AuditLog
+from attendance.models import ClockEvent, MonthlyClosing, WorkSession
+from attendance.services import ClockActionError, record_clock_action
+from corrections.models import CorrectionRequest
+from corrections.services import CorrectionError, current_values, withdraw_correction
+from management.models import Department, DepartmentRegistration, EmployeeNumberHistory
+from management.numbering_ledger import export_snapshot, verify_snapshot
+from management.services import AdminActionError, finalize_month, review_correction
+
+
+@skipUnless(connection.vendor == "postgresql", "PostgreSQL 専用の並行試験")
+class PostgreSQLConcurrencyTests(TransactionTestCase):
+    def setUp(self):
+        Employee = get_user_model()
+        self.manager = Employee.objects.create_user(
+            employee_number="91001", password="TestPassword_2026!", is_business_admin=True,
+        )
+
+    def concurrent_posts(self, requests):
+        barrier = Barrier(len(requests))
+
+        def run(url, data):
+            close_old_connections()
+            try:
+                client = Client()
+                client.force_login(self.manager)
+                barrier.wait(timeout=15)
+                return client.post(url, data).status_code
+            finally:
+                close_old_connections()
+
+        with ThreadPoolExecutor(max_workers=len(requests)) as pool:
+            futures = [pool.submit(run, url, data) for url, data in requests]
+            return [future.result(timeout=30) for future in futures]
+
+    def test_a07_same_code_concurrent_registration_writes_one_history(self):
+        url = reverse("management:department_create")
+        responses = self.concurrent_posts([
+            (url, {"name": "営業部", "code": "3", "is_active": "on", "operation_id": str(uuid.uuid4())}),
+            (url, {"name": "総務部", "code": "3", "is_active": "on", "operation_id": str(uuid.uuid4())}),
+        ])
+        self.assertEqual(responses.count(302), 1)
+        self.assertTrue(all(status in {200, 302, 409} for status in responses))
+        self.assertEqual(Department.objects.filter(code=3).count(), 1)
+        self.assertEqual(DepartmentRegistration.objects.filter(code=3).count(), 1)
+        self.assertEqual(AuditLog.objects.filter(action=AuditLog.Action.DEPARTMENT_CREATE).count(), 1)
+
+    def test_a07_same_normalized_name_concurrent_registration_writes_one_history(self):
+        url = reverse("management:department_create")
+        responses = self.concurrent_posts([
+            (url, {"name": "  開発部  ", "code": "3", "is_active": "on", "operation_id": str(uuid.uuid4())}),
+            (url, {"name": "開発部", "code": "4", "is_active": "on", "operation_id": str(uuid.uuid4())}),
+        ])
+        self.assertEqual(responses.count(302), 1)
+        self.assertTrue(all(status in {200, 302, 409} for status in responses))
+        self.assertEqual(Department.objects.count(), 1)
+        self.assertEqual(DepartmentRegistration.objects.count(), 1)
+        self.assertEqual(AuditLog.objects.filter(action=AuditLog.Action.DEPARTMENT_CREATE).count(), 1)
+
+    def test_a07_concurrency_with_external_ledger_keeps_one_result(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "ledger.json"
+            with override_settings(NUMBERING_LEDGER_PATH=path), patch(
+                "management.numbering_ledger._test_database", return_value=False
+            ):
+                export_snapshot(path)
+                url = reverse("management:department_create")
+                responses = self.concurrent_posts([
+                    (url, {"name": "営業部", "code": "3", "is_active": "on",
+                           "operation_id": str(uuid.uuid4())}),
+                    (url, {"name": "総務部", "code": "3", "is_active": "on",
+                           "operation_id": str(uuid.uuid4())}),
+                ])
+                self.assertEqual(responses.count(302), 1)
+                self.assertTrue(all(status in {200, 302, 409, 503} for status in responses))
+                self.assertEqual(len(verify_snapshot(path)["departments"]), 1)
+                self.assertEqual(DepartmentRegistration.objects.count(), 1)
+                self.assertEqual(AuditLog.objects.filter(
+                    action=AuditLog.Action.DEPARTMENT_CREATE,
+                ).count(), 1)
+
+    def test_a03_simultaneous_creates_get_distinct_numbers(self):
+        department = Department.objects.create(name="開発部", code=3)
+        url = reverse("management:employee_create")
+        responses = self.concurrent_posts([
+            (url, {"first_name": "太郎", "last_name": "佐藤", "department_choice": str(department.pk),
+                   "hire_date": "2026-04-01", "operation_id": str(uuid.uuid4())}),
+            (url, {"first_name": "花子", "last_name": "山田", "department_choice": str(department.pk),
+                   "hire_date": "2026-04-01", "operation_id": str(uuid.uuid4())}),
+        ])
+        self.assertEqual(responses, [200, 200])
+        self.assertEqual(set(EmployeeNumberHistory.objects.values_list("employee_number", flat=True)),
+                         {"30001", "30002"})
+
+    def test_a06_simultaneous_revocations_keep_two_active_managers(self):
+        Employee = get_user_model()
+        first = Employee.objects.create_user(
+            employee_number="91002", password="TestPassword_2026!", is_business_admin=True,
+        )
+        second = Employee.objects.create_user(
+            employee_number="91003", password="TestPassword_2026!", is_business_admin=True,
+        )
+        responses = self.concurrent_posts([
+            (reverse("management:employee_role", args=[first.pk]),
+             {"expected_role": "admin", "desired_role": "employee", "change_reason": "交代"}),
+            (reverse("management:employee_role", args=[second.pk]),
+             {"expected_role": "admin", "desired_role": "employee", "change_reason": "交代"}),
+        ])
+        self.assertEqual(sorted(responses), [200, 302])
+        self.assertEqual(Employee.objects.filter(is_active=True, is_business_admin=True).count(), 2)
+        self.assertEqual(AuditLog.objects.filter(action=AuditLog.Action.ROLE_CHANGE).count(), 1)
+
+    def test_t02_parallel_clock_replay_writes_one_event(self):
+        employee = get_user_model().objects.create_user(
+            employee_number="91004", password="TestPassword_2026!",
+            hire_date=date(2026, 1, 1),
+        )
+        today = timezone.localdate()
+        operation_id = uuid.uuid4()
+        barrier = Barrier(2)
+
+        def clock():
+            close_old_connections()
+            try:
+                barrier.wait(timeout=15)
+                return record_clock_action(
+                    employee_id=employee.pk, kind=ClockEvent.Kind.CLOCK_IN,
+                    operation_id=operation_id, expected_work_date=today,
+                )
+            finally:
+                close_old_connections()
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            futures = [pool.submit(clock) for _ in range(2)]
+            results = [future.result(timeout=30) for future in futures]
+        self.assertEqual(ClockEvent.objects.filter(operation_id=operation_id).count(), 1)
+        self.assertEqual(WorkSession.objects.filter(employee=employee).count(), 1)
+        self.assertEqual(sorted(result.already_recorded for result in results), [False, True])
+
+    def test_t02_parallel_distinct_clock_ins_reject_second(self):
+        employee = get_user_model().objects.create_user(
+            employee_number="91004", password="TestPassword_2026!",
+            hire_date=date(2026, 1, 1),
+        )
+        today = timezone.localdate()
+        barrier = Barrier(2)
+
+        def clock():
+            close_old_connections()
+            try:
+                barrier.wait(timeout=15)
+                try:
+                    return record_clock_action(
+                        employee_id=employee.pk, kind=ClockEvent.Kind.CLOCK_IN,
+                        operation_id=uuid.uuid4(), expected_work_date=today,
+                    )
+                except ClockActionError as exc:
+                    return exc
+            finally:
+                close_old_connections()
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            futures = [pool.submit(clock) for _ in range(2)]
+            results = [future.result(timeout=30) for future in futures]
+        self.assertEqual(sum(not isinstance(item, ClockActionError) for item in results), 1)
+        self.assertEqual(ClockEvent.objects.filter(kind=ClockEvent.Kind.CLOCK_IN).count(), 1)
+
+    def test_t04_parallel_withdrawal_and_approval_have_one_outcome(self):
+        employee = get_user_model().objects.create_user(
+            employee_number="91004", password="TestPassword_2026!",
+            hire_date=date(2026, 1, 1),
+        )
+        jst = ZoneInfo("Asia/Tokyo")
+        work = WorkSession.objects.create(
+            employee=employee, work_date=date(2026, 9, 15),
+            clock_in_at=datetime(2026, 9, 15, 9, tzinfo=jst),
+            clock_out_at=datetime(2026, 9, 15, 18, tzinfo=jst),
+            status=WorkSession.Status.COMPLETED,
+        )
+        proposal = current_values(work)
+        proposal["clock_out_at"] = datetime(2026, 9, 15, 18, 30, tzinfo=jst).isoformat()
+        correction = CorrectionRequest.objects.create(
+            work_session=work, employee=employee, work_date=work.work_date,
+            requested_by=employee, original_version=work.version,
+            proposal=proposal, reason="退勤の訂正", status=CorrectionRequest.Status.PENDING,
+        )
+        barrier = Barrier(2)
+
+        def run(action):
+            close_old_connections()
+            try:
+                barrier.wait(timeout=15)
+                try:
+                    if action == "approve":
+                        review_correction(manager_id=self.manager.pk,
+                                          correction_id=correction.pk, action="approve")
+                    else:
+                        withdraw_correction(employee_id=employee.pk, request_id=correction.pk)
+                    return "success"
+                except (AdminActionError, CorrectionError):
+                    return "rejected"
+            finally:
+                close_old_connections()
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            futures = [pool.submit(run, action) for action in ("approve", "withdraw")]
+            results = [future.result(timeout=30) for future in futures]
+        correction.refresh_from_db()
+        self.assertEqual(sorted(results), ["rejected", "success"])
+        self.assertIn(correction.status, {
+            CorrectionRequest.Status.APPROVED, CorrectionRequest.Status.WITHDRAWN,
+        })
+        work.refresh_from_db()
+        self.assertEqual(work.version, 2 if correction.status == CorrectionRequest.Status.APPROVED else 1)
+
+    def test_t05_parallel_month_finalization_keeps_one_current_version(self):
+        employee = get_user_model().objects.create_user(
+            employee_number="91004", password="TestPassword_2026!",
+            hire_date=date(2026, 1, 1),
+        )
+        barrier = Barrier(2)
+
+        def finalize():
+            close_old_connections()
+            try:
+                barrier.wait(timeout=15)
+                try:
+                    finalize_month(
+                        manager_id=self.manager.pk, employee_id=employee.pk,
+                        target_month=date(2026, 9, 1), checked_no_record=True,
+                    )
+                    return "success"
+                except AdminActionError:
+                    return "rejected"
+            finally:
+                close_old_connections()
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            futures = [pool.submit(finalize) for _ in range(2)]
+            results = [future.result(timeout=30) for future in futures]
+        self.assertEqual(sorted(results), ["rejected", "success"])
+        self.assertEqual(MonthlyClosing.objects.filter(
+            employee=employee, target_month=date(2026, 9, 1),
+            status=MonthlyClosing.Status.FINALIZED,
+        ).count(), 1)
+
+    def test_t17_parallel_stop_and_revoke_keep_two_managers(self):
+        department = Department.objects.create(name="総務部", code=1)
+        Employee = get_user_model()
+        first = Employee.objects.create_user(
+            employee_number="91002", password="TestPassword_2026!",
+            is_business_admin=True, department=department.name,
+        )
+        second = Employee.objects.create_user(
+            employee_number="91003", password="TestPassword_2026!",
+            is_business_admin=True, department=department.name,
+        )
+        edit_url = reverse("management:employee_edit", args=[second.pk])
+        state = Client()
+        state.force_login(self.manager)
+        edit_state = state.get(edit_url).context["edit_state"]
+        responses = self.concurrent_posts([
+            (reverse("management:employee_role", args=[first.pk]),
+             {"expected_role": "admin", "desired_role": "employee", "change_reason": "交代"}),
+            (edit_url, {
+                "employee_number": second.employee_number, "first_name": "Test",
+                "last_name": "Manager", "department_choice": str(department.pk),
+                "change_reason": "交代", "edit_state": edit_state,
+                "operation_id": str(uuid.uuid4()),
+            }),
+        ])
+        self.assertEqual(sorted(responses), [200, 302])
+        self.assertEqual(Employee.objects.filter(is_active=True, is_business_admin=True).count(), 2)
+
+    def test_t18_parallel_transfers_issue_distinct_numbers(self):
+        source = Department.objects.create(name="旧部署", code=1)
+        target = Department.objects.create(name="新部署", code=3)
+        Employee = get_user_model()
+        employees = [
+            Employee.objects.create_user(
+                employee_number=f"1000{index}", password="TestPassword_2026!",
+                first_name=f"社員{index}", last_name="試験",
+                department=source.name, hire_date=date(2026, 1, 1),
+            ) for index in (1, 2)
+        ]
+        for employee in employees:
+            EmployeeNumberHistory.objects.create(
+                employee=employee, department=source,
+                employee_number=employee.employee_number,
+            )
+        client = Client()
+        client.force_login(self.manager)
+        requests = []
+        for employee in employees:
+            url = reverse("management:employee_edit", args=[employee.pk])
+            state = client.get(url).context["edit_state"]
+            requests.append((url, {
+                "employee_number": employee.employee_number,
+                "first_name": employee.first_name,
+                "last_name": employee.last_name,
+                "department_choice": str(target.pk), "is_active": "on",
+                "change_reason": "異動", "edit_state": state,
+                "operation_id": str(uuid.uuid4()),
+            }))
+        self.assertEqual(self.concurrent_posts(requests), [302, 302])
+        self.assertEqual(set(Employee.objects.filter(pk__in=[e.pk for e in employees]).values_list(
+            "employee_number", flat=True,
+        )), {"30001", "30002"})
+        self.assertEqual(set(EmployeeNumberHistory.objects.filter(
+            department=target,
+        ).values_list("employee_number", flat=True)), {"30001", "30002"})

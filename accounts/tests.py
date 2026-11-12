@@ -1,6 +1,6 @@
 
 
-# ---- accounts/tests.py ----
+# 認証・アカウント
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
@@ -71,7 +71,7 @@ class AuthenticationFlowTests(TestCase):
             reverse("management:home")
         )
 
-        self.assertEqual(response.status_code, 200)
+        self.assertRedirects(response, reverse("management:attendance_list"))
 
     def test_first_login_requires_password_change(self):
         self.employee.must_change_password = True
@@ -206,7 +206,7 @@ class LoginRateLimitTests(TestCase):
         )
 
 
-# ---- accounts/test_phase8.py ----
+# 初期パスワード・再発行
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse

@@ -107,10 +107,7 @@ def notify_correction_reviewed(correction):
     target_employee = correction.employee
     if correction.is_proxy:
         recipients = [correction.requested_by] if correction.requested_by.is_active else []
-        target_path = reverse("management:employee_month", args=[
-            target_employee.pk, correction.work_date.year,
-            correction.work_date.month,
-        ])
+        target_path = reverse("management:correction_detail", args=[correction.pk])
         management = True
     elif target_employee.is_active:
         recipients = [target_employee]
@@ -119,10 +116,7 @@ def notify_correction_reviewed(correction):
     else:
         Employee = get_user_model()
         recipients = Employee.objects.filter(is_active=True, is_business_admin=True)
-        target_path = reverse("management:employee_month", args=[
-            target_employee.pk, correction.work_date.year,
-            correction.work_date.month,
-        ])
+        target_path = reverse("management:correction_detail", args=[correction.pk])
         management = True
     for recipient in recipients:
         management_body = (

@@ -60,6 +60,9 @@ def record_clock_action(
     employee_id: int,
     kind: str,
     operation_id,
+    expected_work_date=None,
+    expected_session_id=None,
+    expected_version=None,
 ) -> ClockResult:
     """4種類の打刻を安全に保存する。"""
 
@@ -76,6 +79,15 @@ def record_clock_action(
     if kind not in valid_kinds:
         raise ClockActionError("不正な打刻種別です。")
 
+    request_snapshot = (
+        {
+            "work_date": expected_work_date.isoformat(),
+            "session_id": expected_session_id,
+            "version": expected_version,
+        }
+        if expected_work_date is not None else {}
+    )
+
     # 同じ操作IDでの再送か確認する
     existing_event = (
         ClockEvent.objects.select_related("work_session")
@@ -87,6 +99,7 @@ def record_clock_action(
         if (
             existing_event.work_session.employee_id != employee.id
             or existing_event.kind != kind
+            or existing_event.request_snapshot != request_snapshot
         ):
             raise ClockActionError("この操作IDは使用できません。")
 
@@ -112,6 +125,22 @@ def record_clock_action(
         )
         .first()
     )
+
+    if expected_work_date is not None:
+        if kind == ClockEvent.Kind.CLOCK_IN:
+            if expected_work_date != today:
+                raise ClockActionError("古い出勤画面です。画面を開き直してください。")
+            current = session or WorkSession.objects.filter(
+                employee=employee, work_date=today
+            ).first()
+        else:
+            current = session
+        if (
+            (current.pk if current else None) != expected_session_id
+            or (current.version if current else None) != expected_version
+            or (current.work_date if current else today) != expected_work_date
+        ):
+            raise ClockActionError("勤務情報が更新されました。画面を開き直してください。")
 
     before_data = {}
     update_fields = []
@@ -314,6 +343,7 @@ def record_clock_action(
         kind=kind,
         recorded_at=now,
         operation_id=operation_id,
+        request_snapshot=request_snapshot,
     )
 
     sync_incomplete_occurrences(session, now=now)

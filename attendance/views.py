@@ -222,6 +222,7 @@ def home(request):
     context = {
         "now": now,
         "today": today,
+        "target_date": target_date,
         "session": session,
         "action_buttons": action_buttons,
         "clock_events": clock_events,
@@ -283,6 +284,9 @@ def clock_action(request):
             employee_id=request.user.pk,
             kind=kind,
             operation_id=operation_id,
+            expected_work_date=form.cleaned_data["work_date"],
+            expected_session_id=form.cleaned_data["session_id"],
+            expected_version=form.cleaned_data["session_version"],
         )
 
     except ClockActionError as exc:

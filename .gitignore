@@ -30,3 +30,4 @@ staticfiles/
 .coverage.*
 htmlcov/
 coverage.xml
+.local/

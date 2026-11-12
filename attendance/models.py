@@ -214,6 +214,8 @@ class ClockEvent(models.Model):
         editable=False,
     )
 
+    request_snapshot = models.JSONField(default=dict, editable=False)
+
     class Meta:
         verbose_name = "原打刻"
         verbose_name_plural = "原打刻"

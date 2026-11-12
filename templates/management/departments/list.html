@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}部署登録 | 勤怠管理{% endblock %}
+{% block screen_label %}管理者｜部署登録{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/manager-pages.css' %}">{% endblock %}
+{% block content %}
+<div class="admin-page">
+  <header class="admin-heading">
+    <h1>部署登録（A07）</h1>
+    <p>登録済みの部署と採番用コードを確認できます。</p>
+  </header>
+  <section class="ui-card admin-section">
+    <div class="admin-actions">
+      <a class="ui-button ui-button--primary" href="{% url 'management:department_create' %}">部署を新規登録する</a>
+      <a class="ui-button ui-button--secondary" href="{% url 'management:employee_create' %}">社員を登録する（A03）</a>
+    </div>
+    <form method="get" role="search" class="admin-field">
+      <label for="department-search">部署名で検索</label>
+      <input id="department-search" name="q" value="{{ keyword }}" maxlength="100">
+      <button class="ui-button ui-button--secondary" type="submit">検索</button>
+    </form>
+    <div class="table-scroll" role="region" aria-label="登録済み部署の一覧" tabindex="0">
+      <table class="admin-table">
+        <caption>登録済み部署</caption>
+        <thead><tr><th scope="col">コード</th><th scope="col">部署名</th><th scope="col">状態</th><th scope="col">操作</th></tr></thead>
+        <tbody>
+          {% for department in departments %}
+          <tr>
+            <td>{{ department.code }}</td><td>{{ department.name }}</td>
+            <td>{% if department.is_active %}有効{% else %}停止中{% endif %}</td>
+            <td><a href="{% url 'management:department_edit' department.pk %}">詳細・編集</a></td>
+          </tr>
+          {% empty %}<tr><td colspan="4">該当する部署はありません。</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock %}

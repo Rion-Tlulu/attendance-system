@@ -49,6 +49,8 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function show() {
+    const mobileMenu = document.querySelector(".mobile-more");
+    if (mobileMenu?.open) mobileMenu.open = false;
     panel.hidden = false;
     backdrop.hidden = false;
     openButton.setAttribute("aria-expanded", "true");
@@ -64,7 +66,7 @@ document.addEventListener("DOMContentLoaded", () => {
       items = data.items;
       loadState = "loaded";
       const count = data.unread_count;
-      openButton.setAttribute("aria-label", `お知らせ・通知。未読${count}件`);
+      openButton.setAttribute("aria-label", `通知${count > 99 ? "99+" : count || ""}（未読${count}件）`);
       if (badge) {
         badge.textContent = count > 99 ? "99+" : String(count);
         badge.hidden = count === 0;

@@ -8,6 +8,7 @@ from . import employee_details
 from . import proxy_corrections
 from . import export_batches
 from . import role_views
+from . import department_views
 
 app_name = "management"
 
@@ -50,6 +51,11 @@ urlpatterns = [
         views.employee_create,
         name="employee_create",
     ),
+    path(
+        "employees/number-candidate/",
+        views.employee_number_candidate,
+        name="employee_number_candidate",
+    ),
     # 社員情報の編集
     path(
         "employees/<int:employee_id>/edit/",
@@ -61,6 +67,7 @@ urlpatterns = [
         role_views.employee_role,
         name="employee_role",
     ),
+    path("roles/", role_views.role_list, name="role_list"),
     # 社員別月次詳細
     path(
         "employees/<int:employee_id>/months/<int:year>/<int:month>/",
@@ -105,7 +112,11 @@ urlpatterns = [
         proxy_corrections.proxy_correction,
         name="proxy_correction",
     ),
-    path("corrections/<int:pk>/withdraw/", proxy_corrections.proxy_withdraw, name="proxy_withdraw"),
+    path(
+        "corrections/<int:pk>/withdraw/",
+        proxy_corrections.proxy_withdraw,
+        name="proxy_withdraw",
+    ),
     # 全社員・部署別・個人別のCSV出力
     path(
         "exports/",
@@ -113,12 +124,36 @@ urlpatterns = [
         name="bulk_export",
     ),
     path("exports/<uuid:output_id>/", export_batches.batch_detail, name="batch_detail"),
-    path("exports/<uuid:output_id>/<str:output_format>/", export_batches.batch_download,
-         name="batch_download"),
+    path(
+        "exports/<uuid:output_id>/<str:output_format>/",
+        export_batches.batch_download,
+        name="batch_download",
+    ),
     # 社員の初期パスワード再発行URL
     path(
         "employees/<int:employee_id>/reset-password/",
         views.employee_reset_password,
         name="employee_password_reset",
+    ),
+    # 部署関連
+    path(
+        "departments/",
+        department_views.department_list,
+        name="department_list",
+    ),
+    path(
+        "departments/new/",
+        department_views.department_create,
+        name="department_create",
+    ),
+    path(
+        "departments/registrations/<uuid:operation_id>/",
+        department_views.department_registration_result,
+        name="department_registration_result",
+    ),
+    path(
+        "departments/<int:pk>/edit/",
+        department_views.department_edit,
+        name="department_edit",
     ),
 ]

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}部署登録内容の確認 | 勤怠管理{% endblock %}
+{% block screen_label %}管理者｜部署登録{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/manager-pages.css' %}">{% endblock %}
+{% block content %}
+<div class="admin-page">
+  <header class="admin-heading"><h1>部署登録内容の確認（A07）</h1>
+    <p>内容を確認してから部署を登録してください。</p>
+  </header>
+  <section class="ui-card admin-section admin-form-card">
+    <dl>
+      <dt>部署名</dt><dd>{{ department.name }}</dd>
+      <dt>採番用コード</dt><dd>{{ department.code }}</dd>
+      <dt>有効状態</dt><dd>{% if department.is_active %}有効{% else %}無効{% endif %}</dd>
+    </dl>
+    <p class="admin-field-help">使用済みのコードと社員番号は再利用できません。</p>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="operation_id" value="{{ operation_id }}">
+      <input type="hidden" name="name" value="{{ department.name }}">
+      <input type="hidden" name="code" value="{{ department.code }}">
+      {% if department.is_active %}<input type="hidden" name="is_active" value="on">{% endif %}
+      <div class="admin-actions">
+        <a class="ui-button ui-button--secondary" href="{% url 'management:department_create' %}" onclick="history.back(); return false;">入力に戻る</a>
+        <button class="ui-button ui-button--primary" type="submit">部署を登録する</button>
+      </div>
+    </form>
+  </section>
+</div>
+{% endblock %}

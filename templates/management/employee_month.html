@@ -27,7 +27,7 @@
 
         <a
             class="v2-button v2-button--outline"
-            href="{% url 'management:attendance_list' %}"
+            href="{% url 'management:attendance_list' %}{% if back_query %}?{{ back_query }}{% endif %}"
         >
             勤怠一覧へ戻る
         </a>
@@ -285,6 +285,8 @@
             action="{% url 'management:month_finalize' employee.pk report.month.year report.month.month %}"
         >
             {% csrf_token %}
+
+            {{ closing_form.reconciliation_token }}
 
             <label class="v2-checkbox-line">
                 {{ closing_form.checked_no_record }}

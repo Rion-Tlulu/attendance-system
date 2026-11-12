@@ -408,6 +408,7 @@ def a01_snapshot(context):
         "departments": department_names,
         "status_options": STATUS_OPTIONS,
         "page_obj": page_obj,
+        "current_query": _query_for_page(filters, page_obj.number),
         "employee_count": len(rows),
         "pending_count": sum(row["pending"] for row in rows),
         "incomplete_count": sum(row["incomplete"] for row in rows),

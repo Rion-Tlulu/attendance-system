@@ -49,16 +49,15 @@
             </p>
         </div>
 
-        <a
-            href="{% url 'management:employee_create' %}"
-            class="a03-button a03-button--primary"
-        >
-            <i
-                class="fa-solid fa-user-plus"
-                aria-hidden="true"
-            ></i>
-            新しい社員を登録
-        </a>
+        <div class="a03-heading-actions">
+            <a href="{% url 'management:department_create' %}"
+               class="a03-button a03-button--outline">部署を新規登録する（A07）</a>
+            <a href="{% url 'management:employee_create' %}"
+               class="a03-button a03-button--primary">
+                <i class="fa-solid fa-user-plus" aria-hidden="true"></i>
+                新しい社員を登録
+            </a>
+        </div>
 
     </header>
 

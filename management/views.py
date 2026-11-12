@@ -7,20 +7,22 @@
 import csv
 import io
 import logging
+import uuid
 from datetime import timedelta
+from urllib.parse import parse_qsl, urlencode
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.core import signing
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, OperationalError, transaction
 from django.db.models import Q
-from django.http import Http404, HttpResponse, HttpResponseBadRequest
+from django.http import Http404, HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
-from django.views.decorators.http import require_http_methods, require_POST
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from accounts.decorators import (
     business_admin_required as account_business_admin_required,
@@ -41,7 +43,12 @@ from .forms import (
     ReviewForm,
 )
 from .initial_passwords import set_initial_password
-from .models import EmploymentInfo
+from .models import Department, EmployeeNumberHistory, EmployeeNumberOperation, EmploymentInfo
+from .numbering import issue_employee_number, next_employee_number
+from .numbering_ledger import (
+    cancel_pending, require_numbering_ready, reserve_pending, sync_after_commit,
+)
+from .reconciliation import reconciliation_matches, reconciliation_token
 from .csv_format import csv_safe as _csv_safe
 from .services import (
     AdminActionError,
@@ -55,8 +62,8 @@ from .services import (
 @never_cache
 @account_business_admin_required
 def home(request):
-    """管理者用ホーム（既存の認可方式を維持）。"""
-    return render(request, "management/home.html")
+    """管理者画面への切替後は勤怠一覧（A01）を開く。"""
+    return redirect("management:attendance_list")
 
 
 logger = logging.getLogger(__name__)
@@ -136,6 +143,28 @@ def _employee_snapshot(employee):
     return data
 
 
+class StaleEmployeeEdit(Exception):
+    pass
+
+
+def _employee_edit_state(employee):
+    return signing.dumps(
+        {"employee_id": employee.pk, "snapshot": _employee_snapshot(employee)},
+        salt="attendance-employee-edit-v1",
+    )
+
+
+def _check_employee_edit_state(employee, token):
+    try:
+        expected = signing.loads(
+            token, salt="attendance-employee-edit-v1", max_age=3600
+        )
+    except signing.BadSignature as exc:
+        raise StaleEmployeeEdit("編集画面の有効期限が切れました。最新の社員情報を開き直してください。") from exc
+    if expected != {"employee_id": employee.pk, "snapshot": _employee_snapshot(employee)}:
+        raise StaleEmployeeEdit("社員情報が別の操作で変更されました。最新の情報を開き直してください。")
+
+
 # ==========================================
 # A01：管理者勤怠一覧
 # ==========================================
@@ -160,45 +189,13 @@ def attendance_list(request):
             status=400,
         )
 
-    keyword = request.GET.get("q", "").strip()[:100]
-
-    queryset = Employee.objects.all().order_by("employee_number")
-
-    if keyword:
-        queryset = queryset.filter(
-            Q(employee_number__icontains=keyword)
-            | Q(first_name__icontains=keyword)
-            | Q(last_name__icontains=keyword)
-        )
-
-    paginator = Paginator(queryset, 20)
-    page_obj = paginator.get_page(request.GET.get("page"))
-
-    entries = []
-
-    # ページ内の社員についてのみ集計
-    for employee in page_obj.object_list:
-        report = build_monthly_report(
-            employee,
-            target_month,
-        )
-
-        entries.append(
-            {
-                "employee": employee,
-                "report": report,
-            }
-        )
-
     return render(
         request,
         "management/attendance_list.html",
         {
             "form": form,
             "month_query": target_month.strftime("%Y-%m"),
-            "keyword": keyword,
-            "entries": entries,
-            "page_obj": page_obj,
+            "keyword": request.GET.get("q", "").strip()[:100],
         },
     )
 
@@ -233,6 +230,25 @@ def correction_queue(request):
     if status_filter != "all":
         queryset = queryset.filter(status=status_filter)
 
+    kind_filter = request.GET.get("kind", "all")
+    if kind_filter == "normal":
+        queryset = queryset.filter(is_proxy=False)
+    elif kind_filter == "proxy":
+        queryset = queryset.filter(is_proxy=True)
+    else:
+        kind_filter = "all"
+
+    keyword = request.GET.get("q", "").strip()[:100]
+    if keyword:
+        queryset = queryset.filter(
+            Q(employee__employee_number__icontains=keyword)
+            | Q(employee__first_name__icontains=keyword)
+            | Q(employee__last_name__icontains=keyword)
+            | Q(requested_by__employee_number__icontains=keyword)
+            | Q(requested_by__first_name__icontains=keyword)
+            | Q(requested_by__last_name__icontains=keyword)
+        )
+
     page_obj = Paginator(queryset, 20).get_page(request.GET.get("page"))
 
     return render(
@@ -241,6 +257,11 @@ def correction_queue(request):
         {
             "page_obj": page_obj,
             "status_filter": status_filter,
+            "kind_filter": kind_filter,
+            "keyword": keyword,
+            "filter_query": urlencode({
+                "status": status_filter, "kind": kind_filter, "q": keyword,
+            }),
         },
     )
 
@@ -264,9 +285,13 @@ def correction_review_detail(request, pk):
         pk=pk,
     )
 
-    session = correction.work_session or WorkSession.objects.filter(
-        employee=correction.employee, work_date=correction.work_date,
-    ).first()
+    session = (
+        correction.work_session
+        or WorkSession.objects.filter(
+            employee=correction.employee,
+            work_date=correction.work_date,
+        ).first()
+    )
 
     # 現在の有効値
     current_record = correction_current_values(session)
@@ -281,9 +306,8 @@ def correction_review_detail(request, pk):
     ).exists()
 
     # 申請時と勤務データ版が一致するか
-    version_matches = (
-        (session is None and correction.original_version is None) or
-        (session is not None and correction.original_version == session.version)
+    version_matches = (session is None and correction.original_version is None) or (
+        session is not None and correction.original_version == session.version
     )
 
     # 自分自身の申請・勤務は審査不可
@@ -298,16 +322,22 @@ def correction_review_detail(request, pk):
         and not is_self_request
         and not month_finalized
         and version_matches
-        and (not correction.is_proxy or (
-            not correction.employee.is_active
-            and correction.requested_by.is_active
-            and correction.requested_by.is_business_admin
-        ))
+        and (
+            not correction.is_proxy
+            or (
+                not correction.employee.is_active
+                and correction.requested_by.is_active
+                and correction.requested_by.is_business_admin
+            )
+        )
     )
 
-    author_valid = correction.requested_by.is_active and correction.requested_by.is_business_admin
+    author_valid = (
+        correction.requested_by.is_active and correction.requested_by.is_business_admin
+    )
     can_proxy_withdraw = (
-        correction.is_proxy and correction.status == CorrectionRequest.Status.PENDING
+        correction.is_proxy
+        and correction.status == CorrectionRequest.Status.PENDING
         and (correction.requested_by_id == request.user.pk or not author_valid)
         and request.user.pk != correction.employee_id
     )
@@ -388,6 +418,51 @@ def correction_review_submit(request, pk):
 # ==========================================
 
 
+def _employee_post_data(request, *, creating):
+    """再送判定に使う入力。CSRF と画面上の候補番号は含めない。"""
+    keys = ["first_name", "last_name", "department_choice"]
+    if creating:
+        keys.append("hire_date")
+    else:
+        keys.extend(["is_active", "change_reason"])
+    return {key: request.POST.get(key, "").strip() for key in keys}
+
+
+def _employee_operation(request, payload, kind):
+    raw = request.POST.get("operation_id", "")
+    try:
+        operation_id = uuid.UUID(raw) if raw else uuid.uuid4()
+    except (TypeError, ValueError, AttributeError):
+        raise ValidationError("操作IDが不正です。画面を再表示してください。")
+    previous = EmployeeNumberOperation.objects.filter(
+        actor=request.user, operation_id=operation_id
+    ).first()
+    if previous:
+        if previous.kind != kind or previous.request_data != payload:
+            raise ValidationError("同じ操作IDで異なる内容は登録できません。")
+    return operation_id, previous
+
+
+@never_cache
+@business_admin_required
+@require_GET
+def employee_number_candidate(request):
+    """部署選択時に非予約の番号候補を返す。"""
+    try:
+        department = Department.objects.get(pk=request.GET.get("department"), is_active=True)
+        employee_id = request.GET.get("employee")
+        if employee_id:
+            employee = Employee.objects.get(pk=employee_id)
+            if employee.department == department.name:
+                return JsonResponse({"number": employee.employee_number})
+        number = next_employee_number(department)
+    except (Department.DoesNotExist, Employee.DoesNotExist, ValueError, TypeError):
+        return JsonResponse({"error": "有効な部署を選択してください。"}, status=400)
+    except ValidationError as exc:
+        return JsonResponse({"error": exc.messages[0]}, status=400)
+    return JsonResponse({"number": number})
+
+
 @never_cache
 @business_admin_required
 def employee_list(request):
@@ -420,17 +495,54 @@ def employee_list(request):
 
 @never_cache
 @business_admin_required
+@require_http_methods(["GET", "POST"])
 def employee_create(request):
     """F07：初期パスワードを安全に自動生成して社員を登録する。"""
 
     if request.method == "POST":
         form = EmployeeCreateForm(request.POST)
+        payload = _employee_post_data(request, creating=True)
+        try:
+            operation_id, previous = _employee_operation(request, payload, "create")
+        except ValidationError as exc:
+            form.add_error(None, exc)
+            return render(request, "management/employee_form.html", {
+                "form": form, "creating": True,
+                "operation_id": request.POST.get("operation_id", ""),
+            }, status=409)
+        if previous:
+            messages.info(request, "この社員登録は既に処理されています。初期パスワードは再表示できません。")
+            return redirect("management:employees")
+        if request.POST.get("preview") == "1" and form.is_valid():
+            try:
+                candidate = next_employee_number(form.cleaned_data["department_choice"])
+            except ValidationError as exc:
+                form.add_error("department_choice", exc)
+            else:
+                return render(request, "management/employee_confirm.html", {
+                    "employee_data": form.cleaned_data,
+                    "operation_id": str(operation_id),
+                    "candidate": candidate,
+                })
         if form.is_valid():
             password = None
             employee = None
             try:
                 with transaction.atomic():
+                    actor = Employee.objects.select_for_update().get(pk=request.user.pk)
+                    if not actor.is_active or not actor.is_business_admin:
+                        raise PermissionDenied("社員登録の権限がありません。")
+                    selected = Department.objects.select_for_update().get(
+                        pk=form.cleaned_data["department_choice"].pk
+                    )
+                    number = next_employee_number(selected)
+                    reserve_pending(
+                        kind="employee_create", value=number,
+                        actor_id=actor.pk, operation_id=operation_id,
+                    )
                     employee = form.save(commit=False)
+                    employee.employee_number = number
+                    employee.department = selected.name
                     password = set_initial_password(employee)
                     employee.is_active = True
                     employee.is_business_admin = False
@@ -439,7 +551,14 @@ def employee_create(request):
                     employee.save()
                     EmploymentInfo.objects.create(
                         employee=employee,
+                        department=selected.name,
                         hire_date=form.cleaned_data["hire_date"],
+                    )
+                    issue_employee_number(department=selected, employee=employee)
+                    EmployeeNumberOperation.objects.create(
+                        actor=actor, employee=employee,
+                        operation_id=operation_id, kind="create",
+                        request_data=payload, issued_number=number,
                     )
 
                     _audit_employee_change(
@@ -449,12 +568,23 @@ def employee_create(request):
                         before={},
                         after=_employee_snapshot(employee),
                     )
-            except IntegrityError:
-                # 同時に同じ社員番号が登録されたケースも再表示を禁止する。
-                form.add_error(
-                    "employee_number",
-                    "この社員番号はすでに登録されています。",
-                )
+                    sync_after_commit()
+            except Department.DoesNotExist:
+                cancel_pending(kind="employee_create", operation_id=operation_id)
+                form.add_error("department_choice", "有効な部署を選択してください。")
+            except ValidationError as exc:
+                cancel_pending(kind="employee_create", operation_id=operation_id)
+                form.add_error("department_choice", exc)
+            except (IntegrityError, OperationalError):
+                cancel_pending(kind="employee_create", operation_id=operation_id)
+                replay = EmployeeNumberOperation.objects.filter(
+                    actor=request.user, operation_id=operation_id,
+                    kind="create",
+                ).first()
+                if replay and replay.request_data == payload:
+                    messages.info(request, "この社員登録は既に処理されています。初期パスワードは再表示できません。")
+                    return redirect("management:employees")
+                form.add_error(None, "登録が競合しました。内容を確認して再試行してください。")
             else:
                 # 成功したPOST応答で1回だけ表示。session/DB/URLへ平文を保存しない。
                 response = render(
@@ -465,6 +595,10 @@ def employee_create(request):
                         "initial_password": password,
                         "expires_at": employee.initial_password_expires_at,
                         "operation_label": "新規社員登録",
+                        "candidate_changed": bool(
+                            request.POST.get("displayed_candidate")
+                            and request.POST["displayed_candidate"] != number
+                        ),
                     },
                 )
                 response["Referrer-Policy"] = "no-referrer"
@@ -472,6 +606,7 @@ def employee_create(request):
                 return response
     else:
         form = EmployeeCreateForm()
+        operation_id = uuid.uuid4()
 
     return render(
         request,
@@ -479,12 +614,14 @@ def employee_create(request):
         {
             "form": form,
             "creating": True,
+            "operation_id": str(operation_id),
         },
     )
 
 
 @never_cache
 @business_admin_required
+@require_http_methods(["GET", "POST"])
 def employee_edit(request, employee_id):
     """社員の基本情報を変更する。"""
 
@@ -498,6 +635,22 @@ def employee_edit(request, employee_id):
             request.POST,
             instance=employee,
         )
+        edit_state = request.POST.get("edit_state", "")
+        payload = _employee_post_data(request, creating=False)
+        try:
+            operation_id, previous = _employee_operation(request, payload, "edit")
+        except ValidationError as exc:
+            form.add_error(None, exc)
+            return render(request, "management/employee_form.html", {
+                "form": form, "creating": False, "employee": employee,
+                "operation_id": request.POST.get("operation_id", ""),
+                "edit_state": edit_state,
+            }, status=409)
+        if previous:
+            if previous.employee_id != employee_id:
+                return HttpResponseBadRequest("同じ操作IDで異なる社員を更新できません。")
+            messages.info(request, "この社員情報の変更は既に処理されています。")
+            return redirect("management:employees")
 
         if form.is_valid():
             wants_active = form.cleaned_data["is_active"]
@@ -512,54 +665,145 @@ def employee_edit(request, employee_id):
                 try:
                     with transaction.atomic():
                         active_admin_ids = list(
-                            Employee.objects.select_for_update().filter(
-                                is_active=True, is_business_admin=True,
-                            ).order_by("pk").values_list("pk", flat=True)
+                            Employee.objects.select_for_update()
+                            .filter(
+                                is_active=True,
+                                is_business_admin=True,
+                            )
+                            .order_by("pk")
+                            .values_list("pk", flat=True)
                         )
-                        actor = Employee.objects.select_for_update().get(pk=request.user.pk)
+                        actor = Employee.objects.select_for_update().get(
+                            pk=request.user.pk
+                        )
                         if not actor.is_active or not actor.is_business_admin:
-                            raise PermissionDenied("この管理機能を利用する権限がありません。")
-                        employee = Employee.objects.select_for_update().get(pk=employee_id)
+                            raise PermissionDenied(
+                                "この管理機能を利用する権限がありません。"
+                            )
+                        require_numbering_ready()
+                        employee = Employee.objects.select_for_update().get(
+                            pk=employee_id
+                        )
 
                         before = _employee_snapshot(employee)
+                        _check_employee_edit_state(employee, edit_state)
 
                         if not wants_active and employee.pk == request.user.pk:
-                            form.add_error("is_active", "自分自身を利用停止にはできません。")
+                            form.add_error(
+                                "is_active", "自分自身を利用停止にはできません。"
+                            )
                         elif not wants_active and employee.is_business_admin:
-                            if employee.pk in active_admin_ids and len(active_admin_ids) <= 2:
-                                form.add_error("is_active", "有効な管理者は2人以上必要です。")
-                        elif wants_active and not employee.is_active and CorrectionRequest.objects.filter(
-                            employee=employee,
-                            is_proxy=True,
-                            status=CorrectionRequest.Status.PENDING,
-                        ).exists():
-                            form.add_error("is_active", "審査中の代理申請を処理または取下げてください。")
+                            if (
+                                employee.pk in active_admin_ids
+                                and len(active_admin_ids) <= 2
+                            ):
+                                form.add_error(
+                                    "is_active", "有効な管理者は2人以上必要です。"
+                                )
+                        elif (
+                            wants_active
+                            and not employee.is_active
+                            and CorrectionRequest.objects.filter(
+                                employee=employee,
+                                is_proxy=True,
+                                status=CorrectionRequest.Status.PENDING,
+                            ).exists()
+                        ):
+                            form.add_error(
+                                "is_active",
+                                "審査中の代理申請を処理または取下げてください。",
+                            )
 
                         if not form.errors:
-                            for field_name in EmployeeEditForm.Meta.fields:
-                                setattr(employee, field_name, form.cleaned_data[field_name])
-
-                            employee.save()
-                            updated = employee
-
-                            _audit_employee_change(
-                                actor=request.user,
-                                employee=updated,
-                                action=AuditLog.Action.EMPLOYEE_UPDATE,
-                                before=before,
-                                after=_employee_snapshot(updated),
-                                reason=form.cleaned_data.get("change_reason") or "社員情報の変更",
+                            selected_department = Department.objects.select_for_update().get(
+                                pk=form.cleaned_data["department_choice"].pk
                             )
-                except IntegrityError:
-                    form.add_error("employee_number", "この社員番号はすでに登録されています。")
+                            department_changed = selected_department.name != employee.department
+                            if department_changed:
+                                new_number = next_employee_number(selected_department)
+                            else:
+                                new_number = employee.employee_number
+                            reserve_pending(
+                                kind="employee_edit", value=new_number,
+                                actor_id=actor.pk, operation_id=operation_id,
+                            )
+                            if department_changed:
+                                old_department = Department.objects.filter(name=employee.department).first()
+                                prior_number, _ = EmployeeNumberHistory.objects.get_or_create(
+                                    employee_number=employee.employee_number,
+                                    defaults={"department": old_department, "employee": employee},
+                                )
+                                if prior_number.employee_id != employee.pk:
+                                    raise ValidationError("旧社員番号の履歴に不整合があります。管理担当者へ確認してください。")
+                            for field_name in (
+                                "first_name",
+                                "last_name",
+                                "is_active",
+                            ):
+                                setattr(
+                                    employee,
+                                    field_name,
+                                    form.cleaned_data[field_name],
+                                )
+
+                            employee.department = selected_department.name
+                            employee.employee_number = new_number
+                            employee.save()
+
+                            EmploymentInfo.objects.update_or_create(
+                                employee=employee,
+                                defaults={
+                                    "department": selected_department.name,
+                                },
+                            )
+                            if department_changed:
+                                issue_employee_number(department=selected_department, employee=employee)
+                            EmployeeNumberOperation.objects.create(
+                                actor=actor, employee=employee,
+                                operation_id=operation_id, kind="edit",
+                                request_data=payload, issued_number=new_number,
+                            )
+                            _audit_employee_change(
+                                actor=actor, employee=employee,
+                                action=AuditLog.Action.EMPLOYEE_UPDATE,
+                                before=before, after=_employee_snapshot(employee),
+                                reason=form.cleaned_data.get("change_reason", "").strip(),
+                            )
+                            sync_after_commit()
+
+                except StaleEmployeeEdit as exc:
+                    cancel_pending(kind="employee_edit", operation_id=operation_id)
+                    form.add_error(None, str(exc))
+                except Department.DoesNotExist:
+                    cancel_pending(kind="employee_edit", operation_id=operation_id)
+                    form.add_error("department_choice", "有効な部署を選択してください。")
+                except ValidationError as exc:
+                    cancel_pending(kind="employee_edit", operation_id=operation_id)
+                    form.add_error(None, exc)
+                except (IntegrityError, OperationalError):
+                    cancel_pending(kind="employee_edit", operation_id=operation_id)
+                    replay = EmployeeNumberOperation.objects.filter(
+                        actor=request.user, operation_id=operation_id,
+                        kind="edit",
+                        employee_id=employee_id,
+                    ).first()
+                    if replay and replay.request_data == payload:
+                        messages.info(request, "この社員情報の変更は既に処理されています。")
+                        return redirect("management:employees")
+                    form.add_error(None, "更新が競合しました。内容を確認して再試行してください。")
 
                 if not form.errors:
+                    if (request.POST.get("displayed_candidate")
+                            and request.POST["displayed_candidate"] != employee.employee_number):
+                        messages.info(request, "候補番号が変わったため、保存時の最新番号を発行しました。")
                     messages.success(request, "社員情報を更新しました")
 
                     return redirect("management:employees")
 
     else:
         form = EmployeeEditForm(instance=employee)
+        operation_id = uuid.uuid4()
+        edit_state = _employee_edit_state(employee)
 
     return render(
         request,
@@ -568,6 +812,8 @@ def employee_edit(request, employee_id):
             "form": form,
             "creating": False,
             "employee": employee,
+            "operation_id": str(operation_id),
+            "edit_state": edit_state,
             "incomplete_count": employee.work_sessions.filter(
                 status__in=["working", "on_break"],
             ).count(),
@@ -595,9 +841,7 @@ def employee_reset_password(request, employee_id):
         or employee.is_superuser
         or employee.is_business_admin
     ):
-        return HttpResponseBadRequest(
-            "このアカウントは管理画面から再発行できません。"
-        )
+        return HttpResponseBadRequest("このアカウントは管理画面から再発行できません。")
 
     if request.method == "GET":
         issued_version = (
@@ -642,9 +886,7 @@ def employee_reset_password(request, employee_id):
 
     with transaction.atomic():
         # PostgreSQLでは行ロックにより同一チケットの重複再発行を防ぐ。
-        locked_employee = Employee.objects.select_for_update().get(
-            pk=employee.pk
-        )
+        locked_employee = Employee.objects.select_for_update().get(pk=employee.pk)
         current_version = (
             locked_employee.initial_password_issued_at.isoformat()
             if locked_employee.initial_password_issued_at is not None
@@ -662,20 +904,21 @@ def employee_reset_password(request, employee_id):
             previous_issued_at is not None
             and locked_employee.initial_password_issued_at <= previous_issued_at
         ):
-            locked_employee.initial_password_issued_at = (
-                previous_issued_at + timedelta(microseconds=1)
+            locked_employee.initial_password_issued_at = previous_issued_at + timedelta(
+                microseconds=1
             )
             locked_employee.initial_password_expires_at = (
-                locked_employee.initial_password_issued_at
-                + timedelta(hours=72)
+                locked_employee.initial_password_issued_at + timedelta(hours=72)
             )
 
-        locked_employee.save(update_fields=[
-            "password",
-            "must_change_password",
-            "initial_password_issued_at",
-            "initial_password_expires_at",
-        ])
+        locked_employee.save(
+            update_fields=[
+                "password",
+                "must_change_password",
+                "initial_password_issued_at",
+                "initial_password_expires_at",
+            ]
+        )
 
         # 監査情報に新しい平文やパスワードハッシュは記録しない。
         AuditLog.objects.create(
@@ -719,12 +962,28 @@ def employee_month(request, employee_id, year, month):
 
     target_month = _month_from_url(year, month)
 
+    back_query = request.GET.get("back", "")
+    if back_query and len(back_query) <= 512:
+        parameters = parse_qsl(back_query, keep_blank_values=True)
+        if all(key in {"month", "page", "q", "department", "status", "active"}
+               for key, _ in parameters):
+            request.session["a01_back_query"] = urlencode(parameters)
+    back_query = request.session.get("a01_back_query", "")
+
+    reconciliation_state = reconciliation_token(employee, target_month)
+
     report = build_monthly_report(
         employee,
         target_month,
     )
-    closing = MonthlyClosing.objects.filter(employee=employee, target_month=target_month).first()
-    frozen_info = closing.snapshot if closing and closing.status == MonthlyClosing.Status.FINALIZED else {}
+    closing = MonthlyClosing.objects.filter(
+        employee=employee, target_month=target_month
+    ).first()
+    frozen_info = (
+        closing.snapshot
+        if closing and closing.status == MonthlyClosing.Status.FINALIZED
+        else {}
+    )
 
     # 対象月が終了済みか
     month_is_past = target_month < timezone.localdate().replace(day=1)
@@ -739,6 +998,7 @@ def employee_month(request, employee_id, year, month):
         and report.pending_count == 0
         and employed_during_month(employee, target_month)
         and not month_integrity_issues(employee, target_month)
+        and reconciliation_matches(employee, target_month, reconciliation_state)
     )
 
     no_record_count = sum(row.record_key == "no_record" for row in report.rows)
@@ -751,13 +1011,18 @@ def employee_month(request, employee_id, year, month):
         "management/employee_month.html",
         {
             "employee": employee,
-            "display_employee_number": frozen_info.get("employee_number", employee.employee_number),
+            "display_employee_number": frozen_info.get(
+                "employee_number", employee.employee_number
+            ),
             "display_employee_name": frozen_info.get("name", employee.get_full_name()),
             "report": report,
             "page_obj": page_obj,
             "no_record_count": no_record_count,
             "integrity_issues": integrity_issues,
-            "closing_form": MonthClosingForm(),
+            "closing_form": MonthClosingForm(initial={
+                "reconciliation_token": reconciliation_state
+            }),
+            "back_query": back_query,
             "month_is_past": month_is_past,
             "can_finalize": can_finalize,
         },
@@ -783,11 +1048,14 @@ def month_finalize(request, employee_id, year, month):
 
     else:
         try:
+            if not form.cleaned_data["reconciliation_token"]:
+                raise AdminActionError("最新の月次画面で照合を確認してください。")
             finalize_month(
                 manager_id=request.user.pk,
                 employee_id=employee_id,
                 target_month=target_month,
                 checked_no_record=(form.cleaned_data["checked_no_record"]),
+                expected_reconciliation=form.cleaned_data["reconciliation_token"],
             )
 
         except (AdminActionError, Employee.DoesNotExist) as exc:

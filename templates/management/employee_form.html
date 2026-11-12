@@ -20,11 +20,16 @@
         <p>
             {% if creating %}
                 社員情報を登録すると、初回ログイン用パスワードが自動発行されます。
+                新しい部署は先に部署登録（A07）で登録してください。
             {% else %}
                 社員の基本情報とアカウントの有効状態を管理します。
             {% endif %}
         </p>
     </header>
+
+    {% if creating %}
+    <a href="{% url 'management:department_create' %}">部署を新規登録する（A07）</a>
+    {% endif %}
 
     {% if not creating and employee.is_active %}
     <div class="admin-warning" role="note">
@@ -35,8 +40,13 @@
 
     <section class="ui-card admin-section admin-form-card"
              aria-labelledby="employee-form-title">
-        <form method="post" autocomplete="off">
+        <form method="post" autocomplete="off"
+              data-number-candidate-url="{% url 'management:employee_number_candidate' %}"
+              {% if not creating %}data-employee-id="{{ employee.pk }}"{% endif %}>
             {% csrf_token %}
+            <input type="hidden" name="operation_id" value="{{ operation_id }}">
+            {% if not creating %}<input type="hidden" name="edit_state" value="{{ edit_state }}">{% endif %}
+            <input type="hidden" name="displayed_candidate" value="">
 
             {% if form.non_field_errors %}
             <div class="admin-warning" role="alert">
@@ -59,6 +69,14 @@
             </div>
             {% endfor %}
 
+            <div class="admin-field">
+                <label for="employee-number-candidate">社員番号候補</label>
+                <output id="employee-number-candidate" aria-live="polite">
+                    {% if creating %}部署を選択すると候補を表示します。{% else %}{{ employee.employee_number }}{% endif %}
+                </output>
+                <p class="admin-field-help">候補は予約されません。保存時に番号を確定します。</p>
+            </div>
+
             {% if creating %}
             <div class="admin-warning" role="note">
                 <p>新しい社員は一般社員として登録されます。</p>
@@ -78,9 +96,9 @@
                    class="ui-button ui-button--secondary">
                     戻る
                 </a>
-                <button type="submit"
+                <button type="submit" {% if creating %}name="preview" value="1"{% endif %}
                         class="ui-button ui-button--primary">
-                    {% if creating %}社員を登録する{% else %}変更を保存する{% endif %}
+                    {% if creating %}登録内容を確認{% else %}変更を保存する{% endif %}
                 </button>
             </div>
         </form>
@@ -112,4 +130,5 @@
     </section>
     {% endif %}
 </div>
+<script src="{% static 'js/employee-number.js' %}" defer></script>
 {% endblock %}

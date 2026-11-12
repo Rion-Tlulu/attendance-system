@@ -88,7 +88,7 @@
 <button type="button" id="notification-panel-open"
     class="app-notification-link" aria-haspopup="dialog"
     aria-controls="notification-panel" aria-expanded="false"
-    aria-label="お知らせ・通知。未読{{ notification_unread_count }}件"
+    aria-label="通知{% if notification_unread_count > 99 %}99+{% elif notification_unread_count %}{{ notification_unread_count }}{% endif %}（未読{{ notification_unread_count }}件）"
     data-panel-url="{% url 'notifications:panel' %}">
     <i
         class="fa-solid fa-bell"

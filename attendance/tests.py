@@ -1,4 +1,4 @@
-# ---- attendance/tests.py ----
+# 勤務記録・基本規則
 
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
@@ -168,7 +168,7 @@ class Phase2ModelTests(TestCase):
             closing.full_clean()
 
 
-# ---- attendance/test_clock.py ----
+# 打刻
 import uuid
 
 from datetime import date, datetime
@@ -323,6 +323,53 @@ class ClockActionTests(TestCase):
             ClockEvent.objects.count(),
             1,
         )
+
+    def test_stale_clock_in_day_is_rejected(self):
+        with patch("attendance.services.timezone.now", return_value=self.dt(2026, 10, 16, 9)):
+            with self.assertRaisesRegex(ClockActionError, "古い出勤画面"):
+                record_clock_action(
+                    employee_id=self.employee.pk,
+                    kind="clock_in",
+                    operation_id=uuid.uuid4(),
+                    expected_work_date=date(2026, 10, 15),
+                )
+        self.assertFalse(ClockEvent.objects.exists())
+
+    def test_stale_session_version_and_reused_id_with_changed_content_are_rejected(self):
+        day = date(2026, 10, 15)
+        operation_id = uuid.uuid4()
+        with patch("attendance.services.timezone.now", return_value=self.dt(2026, 10, 15, 9)):
+            first = record_clock_action(
+                employee_id=self.employee.pk,
+                kind="clock_in",
+                operation_id=operation_id,
+                expected_work_date=day,
+            )
+            replay = record_clock_action(
+                employee_id=self.employee.pk,
+                kind="clock_in",
+                operation_id=operation_id,
+                expected_work_date=day,
+            )
+            self.assertTrue(replay.already_recorded)
+            with self.assertRaisesRegex(ClockActionError, "操作ID"):
+                record_clock_action(
+                    employee_id=self.employee.pk,
+                    kind="clock_in",
+                    operation_id=operation_id,
+                    expected_work_date=day,
+                    expected_session_id=first.session.pk,
+                    expected_version=first.session.version,
+                )
+            with self.assertRaisesRegex(ClockActionError, "更新されました"):
+                record_clock_action(
+                    employee_id=self.employee.pk,
+                    kind="break_start",
+                    operation_id=uuid.uuid4(),
+                    expected_work_date=day,
+                    expected_session_id=first.session.pk,
+                    expected_version=first.session.version - 1,
+                )
 
     def test_double_clock_in_rejected(self):
         """勤務中の追加出勤は拒否される。"""
@@ -579,6 +626,7 @@ class ClockActionTests(TestCase):
             {
                 "action": "clock_in",
                 "operation_id": str(uuid.uuid4()),
+                "work_date": timezone.localdate().isoformat(),
             },
         )
 
@@ -628,7 +676,7 @@ def timezone_to_jst_date(value):
     ).date()
 
 
-# ---- attendance/test_monthly.py ----
+# 月次集計
 import uuid
 
 from datetime import date, datetime
@@ -1017,7 +1065,7 @@ class Phase6Tests(TestCase):
         self.assertEqual(response.status_code, 302)
 
 
-# ---- attendance/test_ui_e01.py ----
+# E01 打刻ホーム
 """E01 打刻ホームの表示テスト。"""
 
 from django.contrib.auth import get_user_model
@@ -1180,7 +1228,7 @@ class E01ClockHomeTests(TestCase):
         )
 
 
-# ---- attendance/test_ui_e02.py ----
+# E02 月次勤怠
 """E02 自分の勤怠（月次一覧）の表示テスト。"""
 
 from datetime import date, datetime
@@ -1304,7 +1352,7 @@ class E02MonthlyUiTests(TestCase):
         )
 
 
-# ---- attendance/test_ui_e03.py ----
+# E03 日別詳細
 """E03 日別詳細・修正申請のUIテスト。"""
 
 from datetime import date, datetime
@@ -1739,3 +1787,212 @@ class F11ChartUnitTests(SimpleTestCase):
 
         self.assertEqual(status, "未完了")
         self.assertIsNone(seconds)
+
+
+# v1.4.3 規則の回帰試験
+
+"""Acceptance checks for the v1.4.3 interval and proxy rules."""
+
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
+
+from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
+from django.test import TestCase
+
+from attendance.models import WorkSession
+from attendance.validation import employment_dates, month_integrity_issues, overlapping_sessions
+from corrections.models import CorrectionRequest
+from corrections.services import submit_correction, withdraw_correction
+from management.services import AdminActionError, review_correction
+from management.csv_format import csv_safe
+from management.models import EmploymentInfo
+
+
+JST = ZoneInfo("Asia/Tokyo")
+
+
+def at(day, hour):
+    return datetime(day.year, day.month, day.day, hour, tzinfo=JST)
+
+
+def proposal(start, end):
+    return {"clock_in_at": start.isoformat(), "clock_out_at": end.isoformat(), "breaks": []}
+
+
+class Version143RulesTests(TestCase):
+    def setUp(self):
+        Employee = get_user_model()
+        self.employee = Employee.objects.create_user(
+            employee_number="0007", password="TestPassword_2026!",
+            hire_date=date(2024, 1, 1),
+        )
+        self.first_manager = Employee.objects.create_user(
+            employee_number="9001", password="TestPassword_2026!",
+            is_business_admin=True,
+        )
+        self.second_manager = Employee.objects.create_user(
+            employee_number="9002", password="TestPassword_2026!",
+            is_business_admin=True,
+        )
+
+    def test_night_shift_overlap_endpoint_and_zero_hours(self):
+        first = WorkSession.objects.create(
+            employee=self.employee, work_date=date(2024, 1, 1),
+            clock_in_at=at(date(2024, 1, 1), 22),
+            clock_out_at=at(date(2024, 1, 2), 7),
+            status=WorkSession.Status.COMPLETED,
+        )
+        self.assertEqual(
+            overlapping_sessions(self.employee, at(date(2024, 1, 2), 6), at(date(2024, 1, 2), 15)),
+            [first],
+        )
+        self.assertEqual(
+            overlapping_sessions(self.employee, at(date(2024, 1, 2), 7), at(date(2024, 1, 2), 15)),
+            [],
+        )
+        self.assertEqual(
+            overlapping_sessions(self.employee, at(date(2024, 1, 2), 6), at(date(2024, 1, 2), 6)),
+            [],
+        )
+        self.assertTrue(month_integrity_issues(self.employee, date(2024, 1, 1)) == [])
+
+    def test_proxy_author_cannot_review_but_can_withdraw(self):
+        self.employee.is_active = False
+        self.employee.save(update_fields=["is_active"])
+        correction = submit_correction(
+            employee_id=self.employee.pk, actor_id=self.first_manager.pk,
+            work_day=date(2024, 1, 2), expected_version=0,
+            proposal=proposal(at(date(2024, 1, 2), 9), at(date(2024, 1, 2), 18)),
+            reason="打刻漏れ", proxy_reason="本人は利用停止中",
+            evidence="勤務表を2024-01-03に担当者が照合",
+        )
+        with self.assertRaises(AdminActionError):
+            review_correction(
+                manager_id=self.first_manager.pk, correction_id=correction.pk, action="approve",
+            )
+        withdraw_correction(employee_id=self.first_manager.pk, request_id=correction.pk)
+        correction.refresh_from_db()
+        self.assertEqual(correction.status, CorrectionRequest.Status.WITHDRAWN)
+
+    def test_no_record_request_has_no_original_and_creates_work_only_on_approval(self):
+        work_day = date(2024, 1, 5)
+        correction = submit_correction(
+            employee_id=self.employee.pk, work_day=work_day,
+            expected_version=0,
+            proposal=proposal(at(work_day, 9), at(work_day, 18)),
+            reason="打刻漏れ",
+        )
+        self.assertIsNone(correction.work_session_id)
+        self.assertIsNone(correction.original_version)
+        self.assertFalse(WorkSession.objects.filter(
+            employee=self.employee, work_date=work_day,
+        ).exists())
+        review_correction(
+            manager_id=self.first_manager.pk, correction_id=correction.pk,
+            action="approve",
+        )
+        correction.refresh_from_db()
+        self.assertIsNone(correction.work_session_id)
+        self.assertIsNone(correction.original_version)
+        self.assertEqual(WorkSession.objects.get(
+            employee=self.employee, work_date=work_day,
+        ).status, WorkSession.Status.COMPLETED)
+
+    def test_no_record_return_and_followup_keep_old_request(self):
+        work_day = date(2024, 1, 6)
+        first = submit_correction(
+            employee_id=self.employee.pk, work_day=work_day,
+            expected_version=0,
+            proposal=proposal(at(work_day, 9), at(work_day, 18)),
+            reason="打刻漏れ",
+        )
+        review_correction(
+            manager_id=self.first_manager.pk, correction_id=first.pk,
+            action="return", return_reason="資料を確認してください",
+        )
+        self.assertFalse(WorkSession.objects.filter(
+            employee=self.employee, work_date=work_day,
+        ).exists())
+
+        second = submit_correction(
+            employee_id=self.employee.pk, work_day=work_day,
+            expected_version=0,
+            proposal=proposal(at(work_day, 10), at(work_day, 18)),
+            reason="資料を再確認",
+        )
+        self.assertEqual(second.related_request_id, first.pk)
+        withdraw_correction(employee_id=self.employee.pk, request_id=second.pk)
+        self.assertFalse(WorkSession.objects.filter(
+            employee=self.employee, work_date=work_day,
+        ).exists())
+
+    def test_two_active_managers_cannot_be_reduced_by_role_or_deactivation(self):
+        self.first_manager.is_business_admin = False
+        with self.assertRaises(ValidationError):
+            self.first_manager.save(update_fields=["is_business_admin"])
+        self.first_manager.refresh_from_db()
+        self.first_manager.is_active = False
+        with self.assertRaises(ValidationError):
+            self.first_manager.save(update_fields=["is_active"])
+        self.first_manager.refresh_from_db()
+        third = get_user_model().objects.create_user(
+            employee_number="9003", password="TestPassword_2026!",
+            is_business_admin=True,
+        )
+        self.first_manager.is_business_admin = False
+        self.first_manager.save(update_fields=["is_business_admin"])
+        self.assertEqual(get_user_model().objects.filter(
+            is_active=True, is_business_admin=True,
+        ).count(), 2)
+        self.assertTrue(third.is_business_admin)
+
+    def test_partial_update_does_not_use_stale_role_value(self):
+        from auditlog.models import AuditLog
+
+        self.first_manager.is_business_admin = False  # stale in-memory value
+        self.first_manager.is_active = True
+        self.first_manager.save(update_fields=["is_active"])
+        self.first_manager.refresh_from_db()
+        self.assertTrue(self.first_manager.is_business_admin)
+        self.assertFalse(AuditLog.objects.filter(
+            action=AuditLog.Action.ROLE_CHANGE,
+            target_employee=self.first_manager,
+        ).exists())
+
+    def test_approved_date_move_keeps_source_history(self):
+        source = WorkSession.objects.create(
+            employee=self.employee, work_date=date(2024, 1, 3),
+            clock_in_at=at(date(2024, 1, 3), 9),
+            clock_out_at=at(date(2024, 1, 3), 18),
+            status=WorkSession.Status.COMPLETED,
+        )
+        correction = submit_correction(
+            employee_id=self.employee.pk, work_day=source.work_date,
+            expected_version=source.version,
+            proposal=proposal(at(date(2024, 1, 4), 9), at(date(2024, 1, 4), 18)),
+            reason="勤務日の訂正",
+        )
+        review_correction(
+            manager_id=self.first_manager.pk, correction_id=correction.pk,
+            action="approve",
+        )
+        source.refresh_from_db()
+        self.assertEqual(source.status, WorkSession.Status.NO_RECORD)
+        self.assertEqual(source.moved_to.work_date, date(2024, 1, 4))
+        self.assertEqual(source.moved_to.status, WorkSession.Status.COMPLETED)
+
+    def test_csv_text_round_trip_prefix(self):
+        self.assertEqual(csv_safe("0007"), "0007")
+        self.assertEqual(csv_safe("=1+2"), "TXT_=1+2")
+        self.assertEqual(csv_safe("TXT_営業"), "TXT_TXT_営業")
+        self.assertEqual(csv_safe("　＋1"), "TXT_　＋1")
+        self.assertEqual(csv_safe(""), "")
+
+    def test_employment_profile_can_clear_legacy_retirement_date(self):
+        self.employee.retirement_date = date(2024, 1, 31)
+        self.employee.save(update_fields=["retirement_date"])
+        EmploymentInfo.objects.create(
+            employee=self.employee, hire_date=date(2024, 1, 1), leave_date=None,
+        )
+        self.assertEqual(employment_dates(self.employee), (date(2024, 1, 1), None))

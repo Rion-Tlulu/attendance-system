@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 {% load static %}
 {% block title %}業務管理者権限の変更 | 勤怠管理{% endblock %}
-{% block screen_label %}管理者｜社員管理{% endblock %}
+{% block screen_label %}管理者｜業務管理者の権限管理{% endblock %}
 {% block extra_css %}<link rel="stylesheet" href="{% static 'css/manager-pages.css' %}">{% endblock %}
 {% block content %}
 <div class="admin-page">
   <header class="admin-heading">
-    <h1 id="role-title">業務管理者権限の変更</h1>
+    <h1 id="role-title">業務管理者の権限管理（A06）</h1>
     <p>対象: {{ employee.get_full_name }}（{{ employee.employee_number }}）</p>
     <p>現在: {% if employee.is_business_admin %}業務管理者{% else %}一般社員{% endif %}
       ／ 利用状態: {% if employee.is_active %}有効{% else %}停止中{% endif %}</p>
@@ -32,7 +32,7 @@
         {% if form.change_reason.errors %}<div class="admin-warning" role="alert">{{ form.change_reason.errors }}</div>{% endif %}
       </div>
       <div class="admin-actions">
-        <a class="ui-button ui-button--secondary" href="{% url 'management:employee_edit' employee.pk %}">戻る</a>
+        <a class="ui-button ui-button--secondary" href="{% url 'management:role_list' %}">権限一覧に戻る</a>
         <button class="ui-button ui-button--primary" type="submit">権限を変更する</button>
       </div>
     </form>

@@ -27,6 +27,7 @@ from corrections.services import (
 )
 
 from notifications.services import notify_correction_reviewed, notify_month_changed
+from .reconciliation import reconciliation_matches
 
 
 class AdminActionError(Exception):
@@ -419,6 +420,7 @@ def finalize_month(
     employee_id,
     target_month,
     checked_no_record,
+    expected_reconciliation=None,
 ):
     """対象社員の月次勤怠を確定する。"""
 
@@ -434,6 +436,11 @@ def finalize_month(
         raise AdminActionError("別管理資料との照合確認が必要です。")
 
     employee = _employee_locked(employee_id)
+
+    if expected_reconciliation is not None and not reconciliation_matches(
+        employee, target_month, expected_reconciliation
+    ):
+        raise AdminActionError("照合後に勤務情報が変更されました。最新の内容を再照合してください。")
 
     if not employed_during_month(employee, target_month):
         raise AdminActionError("対象月に在籍日がありません。")

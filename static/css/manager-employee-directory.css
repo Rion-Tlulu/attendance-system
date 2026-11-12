@@ -36,6 +36,12 @@
   gap: 18px;
 }
 
+.a03-heading-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .a03-eyebrow {
   margin: 0 0 7px;
   color: #365f98;
@@ -602,6 +608,11 @@
   }
 
   .a03-heading > .a03-button {
+    width: 100%;
+  }
+
+  .a03-heading-actions,
+  .a03-heading-actions .a03-button {
     width: 100%;
   }
 

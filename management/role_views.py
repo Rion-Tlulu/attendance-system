@@ -13,6 +13,19 @@ from .role_management import RoleChangeError, change_business_admin_role
 
 @never_cache
 @business_admin_required
+def role_list(request):
+    Employee = get_user_model()
+    employees = Employee.objects.filter(is_staff=False, is_superuser=False).order_by(
+        "employee_number"
+    )
+    return render(request, "management/role_list.html", {
+        "employees": employees,
+        "active_manager_count": employees.filter(is_active=True, is_business_admin=True).count(),
+    })
+
+
+@never_cache
+@business_admin_required
 def employee_role(request, employee_id):
     Employee = get_user_model()
     employee = get_object_or_404(Employee, pk=employee_id)

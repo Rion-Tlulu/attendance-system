@@ -218,6 +218,9 @@
                     action="/employee/clock/"
                 >
                     {% csrf_token %}
+                    <input type="hidden" name="work_date" value="{{ target_date|date:'Y-m-d' }}">
+                    <input type="hidden" name="session_id" value="{{ session.pk|default:'' }}">
+                    <input type="hidden" name="session_version" value="{{ session.version|default:'' }}">
 
                     <input
                         type="hidden"
@@ -274,6 +277,9 @@
                     action="/employee/clock/"
                 >
                     {% csrf_token %}
+                    <input type="hidden" name="work_date" value="{{ target_date|date:'Y-m-d' }}">
+                    <input type="hidden" name="session_id" value="{{ session.pk|default:'' }}">
+                    <input type="hidden" name="session_version" value="{{ session.version|default:'' }}">
 
                     <input
                         type="hidden"
@@ -330,6 +336,9 @@
                     action="/employee/clock/"
                 >
                     {% csrf_token %}
+                    <input type="hidden" name="work_date" value="{{ target_date|date:'Y-m-d' }}">
+                    <input type="hidden" name="session_id" value="{{ session.pk|default:'' }}">
+                    <input type="hidden" name="session_version" value="{{ session.version|default:'' }}">
 
                     <input
                         type="hidden"
@@ -386,6 +395,9 @@
                     action="/employee/clock/"
                 >
                     {% csrf_token %}
+                    <input type="hidden" name="work_date" value="{{ target_date|date:'Y-m-d' }}">
+                    <input type="hidden" name="session_id" value="{{ session.pk|default:'' }}">
+                    <input type="hidden" name="session_version" value="{{ session.version|default:'' }}">
 
                     <input
                         type="hidden"

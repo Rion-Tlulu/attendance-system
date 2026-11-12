@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}{{ page_title }} | 勤怠管理{% endblock %}
+{% block screen_label %}管理者｜部署登録{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/manager-pages.css' %}">{% endblock %}
+{% block content %}
+<div class="admin-page">
+  <header class="admin-heading"><h1>{{ page_title }}（A07）</h1>
+    <p>部署名と割当可能な採番用コードを確認してください。</p>
+  </header>
+  <section class="ui-card admin-section admin-form-card">
+    <form method="post">
+      {% csrf_token %}
+      {% if operation_id %}<input type="hidden" name="operation_id" value="{{ operation_id }}">{% endif %}
+      {% if form.non_field_errors %}<div class="admin-warning" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+      {% if no_codes %}<div class="admin-warning" role="alert">割当可能な部署コードがありません。</div>{% endif %}
+      {% if stop_reason %}<div class="admin-warning" role="alert">{{ stop_reason }}</div>{% endif %}
+      {% for field in form %}
+        <div class="admin-field">
+          {{ field.label_tag }} {{ field }}
+          {% if field.help_text %}<p class="admin-field-help">{{ field.help_text }}</p>{% endif %}
+          {% if field.errors %}<div class="admin-warning" role="alert">{{ field.errors }}</div>{% endif %}
+        </div>
+      {% endfor %}
+      <p class="admin-field-help">使用済みのコードと社員番号は再利用できません。</p>
+      <div class="admin-actions">
+        <a class="ui-button ui-button--secondary" href="{% url 'management:department_list' %}">一覧へ戻る</a>
+        <button class="ui-button ui-button--primary" type="submit" {% if not department %}name="preview" value="1"{% endif %} {% if no_codes or stop_reason %}disabled{% endif %}>{% if department %}変更を保存する{% else %}登録内容を確認{% endif %}</button>
+      </div>
+    </form>
+  </section>
+</div>
+{% endblock %}
