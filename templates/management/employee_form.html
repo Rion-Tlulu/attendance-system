@@ -27,6 +27,7 @@
         </p>
     </header>
 
+    {% include "components/employee_tabs.html" %}
     {% if creating %}
     <a href="{% url 'management:department_create' %}">部署を新規登録する（A07）</a>
     {% endif %}
@@ -55,8 +56,8 @@
             {% endif %}
 
             {% for field in form %}
-            <div class="admin-field">
-                {{ field.label_tag }}
+            <div class="admin-field reference-employee-field">
+                <label for="{{ field.id_for_label }}">{{ field.label }} {% if field.field.required %}<span class="reference-required">必須</span>{% endif %}</label>
                 {{ field }}
                 {% if field.help_text %}
                 <p class="admin-field-help">{{ field.help_text }}</p>
@@ -92,7 +93,7 @@
             {% endif %}
 
             <div class="admin-actions">
-                <a href="{% url 'management:employees' %}"
+                <a href="{% url 'management:employees' %}{% if request.session.a03_return_query %}?{{ request.session.a03_return_query }}{% endif %}"
                    class="ui-button ui-button--secondary">
                     戻る
                 </a>

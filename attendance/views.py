@@ -15,6 +15,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
 from corrections.models import CorrectionRequest
+from corrections.forms import CorrectionValuesForm, CorrectionBreakFormSet
 from corrections.services import pending_for_day
 
 from .forms import ClockActionForm, MonthSelectForm
@@ -610,6 +611,13 @@ def daily_attendance(request, year, month, day):
         "corrections": corrections,
         "month_query": month_start.strftime("%Y-%m"),
         "return_page": return_page,
+        "correction_form": CorrectionValuesForm(initial={
+            "clock_in_at": session.clock_in_at if session else None,
+            "clock_out_at": session.clock_out_at if session else None,
+        }),
+        "correction_break_formset": CorrectionBreakFormSet(initial=[{
+            "started_at": item.started_at, "ended_at": item.ended_at,
+        } for item in breaks][:20] or [{}], prefix="breaks"),
         "is_finalized": is_finalized,
         "pending_correction": pending_correction,
         "is_future_day": is_future_day,

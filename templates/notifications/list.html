@@ -11,7 +11,7 @@
 
 {% block content %}
 
-<main class="v2-page">
+<div class="v2-page">
 
     <header class="v2-heading">
         <div>
@@ -67,15 +67,14 @@
 
                     <h2>{{ item.title }}</h2>
 
-                    {% if item.is_resolved %}
-                    <span class="v2-state">対応済み</span>
-                    {% elif item.is_read %}
+                    {% if item.is_read %}
                     <span class="v2-state">既読</span>
                     {% else %}
                     <span class="v2-state v2-state--info">
                         未読
                     </span>
                     {% endif %}
+                    <span class="v2-state">{{ item.workflow_label }}</span>
 
                 </div>
 
@@ -133,6 +132,6 @@
 
     </section>
 
-</main>
+</div>
 
 {% endblock %}

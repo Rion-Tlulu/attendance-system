@@ -11,10 +11,12 @@
     <p>現在: {% if employee.is_business_admin %}業務管理者{% else %}一般社員{% endif %}
       ／ 利用状態: {% if employee.is_active %}有効{% else %}停止中{% endif %}</p>
   </header>
+  <p class="reference-section-bar"><i class="fa-solid fa-users" aria-hidden="true"></i> 有効な業務管理者 {{ active_manager_count }}人</p>
+  <div class="reference-role-grid">
   <section class="ui-card admin-section admin-form-card" aria-labelledby="role-title">
     <p>業務管理者は社員情報・勤怠・修正申請を扱えます。付与先と理由を確認してください。</p>
     <p>停止中の社員には付与できません。有効な業務管理者が2人未満になる取消は拒否します。</p>
-    <form method="post" autocomplete="off">
+    <form method="post" autocomplete="off" id="reference-role-form">
       {% csrf_token %}
       {{ form.expected_role }}
       {% if form.expected_role.errors %}<div class="admin-warning" role="alert">{{ form.expected_role.errors }}画面を再読み込みしてください。</div>{% endif %}
@@ -32,10 +34,20 @@
         {% if form.change_reason.errors %}<div class="admin-warning" role="alert">{{ form.change_reason.errors }}</div>{% endif %}
       </div>
       <div class="admin-actions">
-        <a class="ui-button ui-button--secondary" href="{% url 'management:role_list' %}">権限一覧に戻る</a>
-        <button class="ui-button ui-button--primary" type="submit">権限を変更する</button>
+        <a class="ui-button ui-button--secondary" href="{% url 'management:role_list' %}{% if request.session.a06_return_query %}?{{ request.session.a06_return_query }}{% endif %}">権限一覧に戻る</a>
+        <button class="ui-button ui-button--primary" type="button" data-role-preview><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i> 変更内容を確認</button>
+        <noscript><button class="ui-button ui-button--primary" type="submit">権限を変更する</button></noscript>
       </div>
     </form>
   </section>
+  <aside class="reference-role-preview">
+    <h2>確認（変更内容）</h2>
+    <dl class="v2-data-list"><div><dt>対象社員</dt><dd>{{ employee.display_name }}（{{ employee.employee_number }}）</dd></div><div><dt>利用状態</dt><dd>{% if employee.is_active %}利用中{% else %}利用停止{% endif %}</dd></div><div><dt>管理権限</dt><dd data-role-result>変更内容を確認してください</dd></div></dl>
+    <p data-role-preview-status role="status"></p>
+    <button class="v2-button" type="submit" form="reference-role-form" data-role-submit hidden>権限を変更する</button>
+    <p><a href="{% url 'management:audit_history' %}"><i class="fa-regular fa-clock" aria-hidden="true"></i> 操作履歴で確認</a></p>
+    <p class="v2-notice v2-notice--warning">有効な管理者が2人未満になる取消はできません。取り消した管理権限は、再有効化しても復活しません。</p>
+  </aside>
+  </div>
 </div>
 {% endblock %}

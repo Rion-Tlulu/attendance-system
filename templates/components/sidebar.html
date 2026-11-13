@@ -1,240 +1,28 @@
-
-{% load static %}
-
-<nav class="side-navigation"
-     aria-label="{% if request.resolver_match.namespace == 'management' %}管理者メニュー{% else %}社員メニュー{% endif %}">
-
-    <a href="{% url 'attendance:home' %}"
-       class="side-brand">
-
-        <img src="{% static 'img/attendance-icon.png' %}"
-             alt="">
-
-        <span>勤怠管理</span>
-    </a>
-
-    {% if request.resolver_match.namespace == "management" %}
-
-        {% with current=request.resolver_match.view_name %}
-
-<a href="{% url 'management:home' %}"
-   class="side-link">
-    <i class="fa-solid fa-house" aria-hidden="true"></i>
-    <span>管理者ホーム</span>
-</a>
-
-<div class="side-section-label">勤怠管理</div>
-
-<a href="{% url 'management:attendance_list' %}"
-   class="side-link {% if current == 'management:attendance_list' %}side-link--current{% endif %}"
-   {% if current == 'management:attendance_list' %}aria-current="page"{% endif %}>
-    <i class="fa-solid fa-calendar-days" aria-hidden="true"></i>
-    <span>勤怠一覧</span>
-</a>
-
-<a href="{% url 'management:corrections' %}"
-   class="side-link {% if current == 'management:corrections' or current == 'management:correction_detail' %}side-link--current{% endif %}"
-   {% if current == 'management:corrections' or current == 'management:correction_detail' %}aria-current="page"{% endif %}>
-    <i class="fa-solid fa-file-circle-check" aria-hidden="true"></i>
-    <span>修正申請</span>
-</a>
-
-<div class="side-section-label">月次管理</div>
-
-<a href="{% url 'management:attendance_list' %}"
-   class="side-link {% if current == 'management:employee_month' %}side-link--current{% endif %}"
-   {% if current == 'management:employee_month' %}aria-current="page"{% endif %}>
-    <i class="fa-solid fa-file-csv" aria-hidden="true"></i>
-    <span>月次詳細と出力（A04）</span>
-</a>
-
-<div class="side-section-label">社員・権限管理</div>
-
-<a href="{% url 'management:employees' %}"
-   class="side-link {% if current == 'management:employees' or current == 'management:employee_create' or current == 'management:employee_edit' %}side-link--current{% endif %}"
-   {% if current == 'management:employees' or current == 'management:employee_create' or current == 'management:employee_edit' %}aria-current="page"{% endif %}>
-    <i class="fa-solid fa-users" aria-hidden="true"></i>
-    <span>社員管理</span>
-</a>
-
-<a href="{% url 'management:department_list' %}"
-   class="side-link {% if current == 'management:department_list' or current == 'management:department_create' or current == 'management:department_edit' %}side-link--current{% endif %}"
-   {% if current == 'management:department_list' or current == 'management:department_create' or current == 'management:department_edit' %}aria-current="page"{% endif %}>
-    <i class="fa-solid fa-building" aria-hidden="true"></i>
-    <span>部署登録（A07）</span>
-</a>
-
-<a href="{% url 'management:role_list' %}"
-   class="side-link {% if current == 'management:role_list' or current == 'management:employee_role' %}side-link--current{% endif %}"
-   {% if current == 'management:role_list' or current == 'management:employee_role' %}aria-current="page"{% endif %}>
-    <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
-    <span>業務管理者の権限管理（A06）</span>
-</a>
-
-<div class="side-section-label">運用メニュー</div>
-
-<a href="{% url 'management:audit_history' %}"
-   class="side-link {% if current == 'management:audit_history' or current == 'management:audit_detail' %}side-link--current{% endif %}"
-   {% if current == 'management:audit_history' or current == 'management:audit_detail' %}aria-current="page"{% endif %}>
-    <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i>
-    <span>操作履歴</span>
-</a>
-
-<a href="{% url 'accounts:overview' %}"
-   class="side-link {% if current == 'accounts:overview' %}side-link--current{% endif %}">
-    <i class="fa-solid fa-user-gear" aria-hidden="true"></i>
-    <span>アカウントと使い方（C02）</span>
-</a>
-
-<div class="side-separator"></div>
-
-<a href="{% url 'attendance:home' %}"
-   class="side-link">
-    <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
-    <span>社員画面へ</span>
-</a>
-
-{% endwith %}
-
-    {% else %}
-
-        <div class="side-section-label">打刻メニュー</div>
-
-        {% if request.resolver_match.view_name == "attendance:home" %}
-
-        <a href="{% url 'attendance:home' %}"
-           class="side-link side-link--current"
-           aria-current="page">
-            <i class="fa-regular fa-clock"
-               aria-hidden="true"></i>
-            <span>打刻ホーム</span>
-        </a>
-
-        {% else %}
-
-        <a href="{% url 'attendance:home' %}"
-           class="side-link">
-            <i class="fa-regular fa-clock"
-               aria-hidden="true"></i>
-            <span>打刻ホーム</span>
-        </a>
-
-        {% endif %}
-
-
-        <div class="side-section-label">勤怠メニュー</div>
-
-        {% if request.resolver_match.view_name == "attendance:monthly" or request.resolver_match.view_name == "attendance:daily" %}
-
-        <a href="{% url 'attendance:monthly' %}"
-           class="side-link side-link--current"
-           aria-current="page">
-            <i class="fa-solid fa-file-lines"
-               aria-hidden="true"></i>
-            <span>自分の勤怠</span>
-        </a>
-
-        {% else %}
-
-        <a href="{% url 'attendance:monthly' %}"
-           class="side-link">
-            <i class="fa-solid fa-file-lines"
-               aria-hidden="true"></i>
-            <span>自分の勤怠</span>
-        </a>
-
-        {% endif %}
-
-
-        <div class="side-section-label">アカウントメニュー</div>
-
-        {% if request.resolver_match.view_name == "accounts:password_change" %}
-
-        <a href="{% url 'accounts:password_change' %}"
-           class="side-link side-link--current"
-           aria-current="page">
-            <i class="fa-solid fa-key"
-               aria-hidden="true"></i>
-            <span>パスワード変更</span>
-        </a>
-
-        {% else %}
-
-        <a href="{% url 'accounts:password_change' %}"
-           class="side-link">
-            <i class="fa-solid fa-key"
-               aria-hidden="true"></i>
-            <span>パスワード変更</span>
-        </a>
-
-        {% endif %}
-
-        
-{% if request.resolver_match.view_name == "accounts:overview" %}
-
-<a href="{% url 'accounts:overview' %}"
-   class="side-link side-link--current"
-   aria-current="page">
-
-    <i class="fa-solid fa-user-gear"
-       aria-hidden="true"></i>
-
-    <span>アカウントと使い方</span>
-</a>
-
-{% else %}
-
-<a href="{% url 'accounts:overview' %}"
-   class="side-link">
-
-    <i class="fa-solid fa-user-gear"
-       aria-hidden="true"></i>
-
-    <span>アカウントと使い方</span>
-</a>
-
-{% endif %}
-
-
-{% if request.resolver_match.view_name == "accounts:guide" %}
-
-<a href="{% url 'accounts:guide' %}"
-   class="side-link side-link--current"
-   aria-current="page">
-
-    <i class="fa-solid fa-book-open"
-       aria-hidden="true"></i>
-
-    <span>使い方ガイド</span>
-</a>
-
-{% else %}
-
-<a href="{% url 'accounts:guide' %}"
-   class="side-link">
-
-    <i class="fa-solid fa-book-open"
-       aria-hidden="true"></i>
-
-    <span>使い方ガイド</span>
-</a>
-
-{% endif %}
-
-
-        {% if request.user.is_business_admin %}
-
-        <div class="side-separator"></div>
-
-        <a href="{% url 'management:home' %}"
-           class="side-link">
-            <i class="fa-solid fa-shield-halved"
-               aria-hidden="true"></i>
-            <span>管理者画面へ</span>
-        </a>
-
-        {% endif %}
-
-    {% endif %}
-
+<nav class="side-navigation" aria-label="{% if request.resolver_match.namespace == 'management' %}管理者メニュー{% else %}社員メニュー{% endif %}">
+  <div class="reference-identity">
+    <i class="fa-solid fa-user" aria-hidden="true"></i>
+    <div><strong>{% if request.resolver_match.namespace == 'management' %}管理者画面{% else %}社員画面{% endif %}</strong><span>{{ request.user.display_name }}</span><small>{{ request.user.employee_number }}</small></div>
+  </div>
+  {% with current=request.resolver_match.view_name %}
+  {% if request.resolver_match.namespace == 'management' %}
+    <div class="side-section-label">勤怠管理</div>
+    <a href="{% url 'management:attendance_list' %}" class="side-link {% if current == 'management:attendance_list' %}side-link--current{% endif %}" {% if current == 'management:attendance_list' %}aria-current="page"{% endif %}><i class="fa-solid fa-list" aria-hidden="true"></i><span>勤怠一覧</span></a>
+    <a href="{% url 'management:corrections' %}" class="side-link {% if current == 'management:corrections' or current == 'management:correction_detail' %}side-link--current{% endif %}" {% if current == 'management:corrections' or current == 'management:correction_detail' %}aria-current="page"{% endif %}><i class="fa-regular fa-file-lines" aria-hidden="true"></i><span>申請一覧</span></a>
+    <div class="side-section-label">月次管理</div>
+    <a href="{% url 'management:attendance_list' %}" class="side-link {% if current == 'management:employee_month' or current == 'management:bulk_export' or current == 'management:batch_detail' %}side-link--current{% endif %}" {% if current == 'management:employee_month' or current == 'management:bulk_export' or current == 'management:batch_detail' %}aria-current="page"{% endif %}><i class="fa-regular fa-calendar-days" aria-hidden="true"></i><span>月次詳細と出力</span></a>
+    <div class="side-section-label">社員・権限管理</div>
+    <a href="{% url 'management:employees' %}" class="side-link {% if current == 'management:employees' or current == 'management:employee_create' or current == 'management:employee_edit' or current == 'management:employment_edit' %}side-link--current{% endif %}" {% if current == 'management:employees' or current == 'management:employee_create' or current == 'management:employee_edit' or current == 'management:employment_edit' %}aria-current="page"{% endif %}><i class="fa-solid fa-users" aria-hidden="true"></i><span>社員管理</span></a>
+    <a href="{% url 'management:department_list' %}" class="side-link {% if current == 'management:department_list' or current == 'management:department_create' or current == 'management:department_edit' or current == 'management:department_registration_result' %}side-link--current{% endif %}" {% if current == 'management:department_list' or current == 'management:department_create' or current == 'management:department_edit' or current == 'management:department_registration_result' %}aria-current="page"{% endif %}><i class="fa-regular fa-folder" aria-hidden="true"></i><span>部署登録（A07）</span></a>
+    <a href="{% url 'management:role_list' %}" class="side-link {% if current == 'management:role_list' or current == 'management:employee_role' %}side-link--current{% endif %}" {% if current == 'management:role_list' or current == 'management:employee_role' %}aria-current="page"{% endif %}><i class="fa-solid fa-shield-halved" aria-hidden="true"></i><span>業務管理者の権限管理</span></a>
+    <div class="side-section-label">運用メニュー</div>
+    <a href="{% url 'management:audit_history' %}" class="side-link {% if current == 'management:audit_history' or current == 'management:audit_detail' %}side-link--current{% endif %}" {% if current == 'management:audit_history' or current == 'management:audit_detail' %}aria-current="page"{% endif %}><i class="fa-regular fa-clock" aria-hidden="true"></i><span>操作履歴</span></a>
+  {% else %}
+    <div class="side-section-label">打刻メニュー</div>
+    <a href="{% url 'attendance:home' %}" class="side-link {% if current == 'attendance:home' %}side-link--current{% endif %}" {% if current == 'attendance:home' %}aria-current="page"{% endif %}><i class="fa-regular fa-clock" aria-hidden="true"></i><span>打刻ホーム</span></a>
+    <div class="side-section-label">勤怠メニュー</div>
+    <a href="{% url 'attendance:monthly' %}" class="side-link {% if current == 'attendance:monthly' or current == 'attendance:daily' or request.resolver_match.namespace == 'corrections' %}side-link--current{% endif %}" {% if current == 'attendance:monthly' or current == 'attendance:daily' or request.resolver_match.namespace == 'corrections' %}aria-current="page"{% endif %}><i class="fa-regular fa-file-lines" aria-hidden="true"></i><span>自分の勤怠</span></a>
+    <div class="side-section-label">アカウントメニュー</div>
+    <a href="{% url 'accounts:overview' %}" class="side-link {% if request.resolver_match.namespace == 'accounts' %}side-link--current{% endif %}" {% if request.resolver_match.namespace == 'accounts' %}aria-current="page"{% endif %}><i class="fa-solid fa-gear" aria-hidden="true"></i><span>アカウントと使い方</span></a>
+  {% endif %}
+  {% endwith %}
 </nav>

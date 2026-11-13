@@ -22,7 +22,7 @@
       <input type="hidden" name="code" value="{{ department.code }}">
       {% if department.is_active %}<input type="hidden" name="is_active" value="on">{% endif %}
       <div class="admin-actions">
-        <a class="ui-button ui-button--secondary" href="{% url 'management:department_create' %}" onclick="history.back(); return false;">入力に戻る</a>
+        <button class="ui-button ui-button--secondary" type="submit" name="back" value="1">入力に戻る</button>
         <button class="ui-button ui-button--primary" type="submit">部署を登録する</button>
       </div>
     </form>

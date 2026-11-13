@@ -122,6 +122,7 @@ def account_overview(request):
         "account_role": account_role,
         "is_business_admin": is_business_admin,
         "account_active": employee.is_active,
+        "password_form": EmployeePasswordChangeForm(user=employee),
     }
     return render(request, "accounts/overview.html", context)
 

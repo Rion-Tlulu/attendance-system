@@ -13,14 +13,14 @@
 
 {% block content %}
 
-<div class="v2-page">
+<div class="v2-page reference-month-page">
 
     <!-- ページ見出し -->
     <header class="v2-heading">
         <div>
-            <h1>月次勤怠詳細・確定</h1>
+            <h1>月次詳細と出力 A04</h1>
             <p>
-                社員の勤怠状況を確認し、
+                社員の月次勤怠詳細を確認し、
                 対象月の確定・解除を行います。
             </p>
         </div>
@@ -34,6 +34,11 @@
     </header>
 
 
+    <form method="get" class="reference-month-selector reference-filter-bar">
+      <div><label for="month-employee">対象社員</label><select id="month-employee" name="employee">{% for item in month_employees %}<option value="{{ item.pk }}" {% if item.pk == employee.pk %}selected{% endif %}>{{ item.display_name }}（{{ item.employee_number }}）{% if not item.is_active %}・利用停止{% endif %}</option>{% endfor %}</select></div>
+      <div>{{ selector_form.month.label_tag }}{{ selector_form.month }}{{ selector_form.month.errors }}</div>
+      <button type="submit" class="v2-button"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i> 表示</button>
+    </form>
     <!-- 対象社員 -->
     <section class="v2-panel"
              aria-labelledby="monthly-target-title">
@@ -42,7 +47,7 @@
             対象社員・対象月
         </h2>
 
-        <dl class="v2-data-list">
+        <dl class="reference-inline-data">
             <div>
                 <dt>社員番号</dt>
                 <dd>{{ display_employee_number }}</dd>
@@ -77,48 +82,7 @@
 
 
     <!-- 月次集計 -->
-    <section aria-label="月次勤怠の集計">
-
-        <div class="v2-kpi-grid">
-
-            <div class="v2-kpi">
-                <span class="v2-kpi__label">
-                    実働合計
-                </span>
-                <strong class="v2-kpi__value">
-                    {{ report.work_display }}
-                </strong>
-            </div>
-
-            <div class="v2-kpi">
-                <span class="v2-kpi__label">
-                    休憩合計
-                </span>
-                <strong class="v2-kpi__value">
-                    {{ report.break_display }}
-                </strong>
-            </div>
-
-            <div class="v2-kpi">
-                <span class="v2-kpi__label">
-                    未完了の勤務
-                </span>
-                <strong class="v2-kpi__value">
-                    {{ report.incomplete_count }}件
-                </strong>
-            </div>
-
-            <div class="v2-kpi">
-                <span class="v2-kpi__label">
-                    審査中の申請
-                </span>
-                <strong class="v2-kpi__value">
-                    {{ report.pending_count }}件
-                </strong>
-            </div>
-
-        </div>
-    </section>
+    {% include "components/month_summary.html" %}
 
 
     <!-- F11：確定状態に関係なく表示できる月次実働グラフ -->
@@ -137,6 +101,7 @@
             確定前に、以下の条件を確認してください。
         </p>
 
+        <details class="reference-closing-checks" {% if integrity_issues %}open{% endif %}><summary>確定条件・記録状況を確認</summary>
         <dl class="v2-data-list">
 
             <div>
@@ -196,6 +161,7 @@
           {% for day, reason in integrity_issues %}<li>{{ day|date:"Y/m/d" }}: {{ reason }}</li>{% endfor %}
         </ul>
         {% endif %}
+        </details>
 
         <p class="v2-notice">
             記録がない日は、欠勤と断定しません。
@@ -219,27 +185,6 @@
         <p>
             この月は確定されています。
         </p>
-
-        <div class="v2-actions">
-
-            <!-- CSVはPOST方式を維持 -->
-            <form
-                method="post"
-                action="{% url 'management:month_csv' employee.pk report.month.year report.month.month %}"
-            >
-                {% csrf_token %}
-
-                <button
-                    type="submit"
-                    class="v2-button"
-                >
-                    <i class="fa-solid fa-file-csv"
-                       aria-hidden="true"></i>
-                    CSVを出力する
-                </button>
-            </form>
-
-        </div>
 
         <form
             method="post"
@@ -320,12 +265,16 @@
 
 
     <!-- 日別の勤怠記録 -->
-    <section class="v2-panel"
+    <section class="v2-panel reference-export-panel" aria-labelledby="month-export-title">
+      <h2 id="month-export-title"><i class="fa-solid fa-download" aria-hidden="true"></i> CSV出力</h2>
+      {% if report.is_finalized %}<p>確定した版から、日次明細・月次集計の共通出力IDを作成します。</p><form method="post" action="{% url 'management:month_csv' employee.pk report.month.year report.month.month %}">{% csrf_token %}<button class="v2-button" type="submit"><i class="fa-solid fa-file-csv" aria-hidden="true"></i> CSVの出力IDを作成</button></form>{% else %}<p class="v2-notice">月次確定後にCSVを出力できます。</p>{% endif %}
+      <p><a href="{% url 'management:bulk_export' %}">全社員・部署別のCSV出力 <span aria-hidden="true">›</span></a></p><small>解除・再確定後は以前の出力IDが失効します。</small>
+    </section>
+    <details class="v2-panel reference-month-records" {% if request.GET.page %}open{% endif %}
              aria-labelledby="monthly-records-title">
-
-        <h2 id="monthly-records-title">
+        <summary id="monthly-records-title">
             日別の勤怠記録
-        </h2>
+        </summary>
 
         <!-- PC用の一覧 -->
         <div
@@ -449,7 +398,7 @@
             {% endif %}
         </nav>
 
-    </section>
+    </details>
 
 </div>
 

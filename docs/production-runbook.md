@@ -1,4 +1,4 @@
-# 本番運用手順（v1.4.3）
+# 本番運用手順（v1.5.6）
 
 ## v1.4.3 への切替
 
@@ -12,25 +12,15 @@
 
 配布用ZIPや手動コピーには `.gitignore` が適用されない。配布対象をソース・テンプレート・静的ファイル・マイグレーション・依存一覧・手順書に限定し、`.env`、SQLite DB、秘密鍵、バックアップ、`.git`、仮想環境、テスト出力を含めない。作成後はZIPの全エントリを一覧化して確認し、配布先でも環境変数とDBを別経路で設定する。
 
-CSVは同じ出力IDから日次明細と月次集計を取得する。いずれかの社員が確定解除・再確定された場合は旧IDを使わず、新しいIDで両方を取得し直す。社員番号・氏名・部署は文字列列としてPower Queryで読み込み、自動作成された「変更された型」を削除し、`TXT_` 接頭辞を1回だけ除去する。
+CSVは同じ出力IDから日次明細と月次集計を取得し、ダウンロードしたファイルをそのまま給与担当者へ渡す。いずれかの社員が確定解除・再確定された場合は旧IDを使わず、新しいIDで両方を取得し直す。給与側の変換・取込は既存業務の範囲とする。
 
-Power Queryでテキスト型パラメーター `CsvPath` にファイルのフルパスを指定し、詳細エディターに次を設定する。
+## 外部素材と静的ファイル
 
-```powerquery
-let
-    Input = Csv.Document(File.Contents(CsvPath), [Delimiter=",", Encoding=65001, QuoteStyle=QuoteStyle.Csv]),
-    Headers = Table.PromoteHeaders(Input),
-    Restore = (v as nullable text) as nullable text =>
-        if v = null then null
-        else if Text.StartsWith(v, "TXT_", Comparer.Ordinal) then Text.Range(v, 4)
-        else v,
-    Operations = List.Transform({"社員番号", "氏名", "部署"}, each {_, Restore, type text}),
-    Result = Table.TransformColumns(Headers, Operations)
-in
-    Result
-```
-
-初回取込とExcel更新時に `0007`、`=1+2`、`TXT_営業`、`TXT_=1+2`、空欄、全角記号、タブ・改行・引用符・カンマを含む値と秒数を照合する。復元済みの表へ同じ処理を再適用しない。
+- 標準書体は Google Fonts の Noto Sans JP（400/700、display=swap）。取得できない場合は Yu Gothic・Meiryo・sans-serif を使用する。
+- Font Awesome Free 7.3.1 は jsDelivr からコア・Solid・Regular のCSSだけを取得する。MIT（CSS）・SIL OFL 1.1（Webフォント）に従う。URLとSHA-384 SRIは `templates/base.html` に固定し、更新時は配信内容とハッシュをセットで検証する。
+- Chart.js 4.5.1 は `static/vendor/chartjs/` から配信する。MITライセンスは同フォルダーの `LICENSE.md` を参照する。
+- CSPの許可先は `config/security.py` に限定する。外部素材を遮断しても、通知・アカウント等の文字ラベルと業務操作を維持する。U09で社内の配信元許可を確認する。
+- 配布時は `python manage.py collectstatic --noinput --settings=config.settings_production` を実行し、Webサーバーが `STATIC_ROOT` を配信できることを確認する。
 
 ## リリース前確認
 
@@ -44,7 +34,7 @@ in
 ## 定時ジョブ（Asia/Tokyo）
 
 - 毎日 09:00: `python manage.py notify_incomplete --settings=config.settings_production`
-- 毎日 09:15: `python manage.py cleanup_notifications --settings=config.settings_production`
+- 毎日 09:00: `python manage.py cleanup_notifications --settings=config.settings_production`
 - 毎日、業務開始前の別時刻: `python scripts/backup_postgres.py`（`BACKUP_DIR` は保護されたバックアップ保存先を指定）
 - ジョブの終了コードと標準出力を収集し、失敗・未実行時に管理者へ通知する。二重起動を避けるためスケジューラ側で同時実行を禁止する。
 - ジョブは `TZ=Asia/Tokyo` で実行する。アプリ設定も `TIME_ZONE=Asia/Tokyo` を使用する。
@@ -60,4 +50,4 @@ in
 
 - HTTP 5xx、ログイン失敗の急増、DB 接続失敗、ジョブ失敗、ディスク容量、バックアップ失敗をアラート対象にする。
 - `AuditLog` の `AUTH_FAILURE`、`ROLE_CHANGE`、`CSV_EXPORT` と月次確定・解除を定期照合する。監査ログにはパスワードを保存しない。
-- 本番相当の PostgreSQL データ量で月次一覧、通知パネル、500人の CSV 出力の応答時間とメモリ使用量を計測し、基準値を記録する。規模に応じてページネーション・クエリ最適化を見直す。
+- 登録100人・同時利用20人の本番相当のPostgreSQL環境で月次一覧、通知パネル、全員分のCSV出力を計測する。主要操作可能までの画面表示p95は3秒以内、打刻は受信から応答生成までのp95が1秒以内、日次・月次CSVはそれぞれ取得完了まで30秒以内を目標とし、U10で測定条件と担当を確定する。

@@ -144,5 +144,13 @@ class Notification(models.Model):
                 ).exists()
         return False
 
+    @property
+    def workflow_label(self):
+        if self.kind in (self.Kind.CORRECTION_SUBMITTED, self.Kind.INCOMPLETE, self.Kind.ATTENDANCE_INCOMPLETE):
+            return "対応済み" if self.is_resolved else "未対応"
+        if self.kind in (self.Kind.CORRECTION_APPROVED, self.Kind.CORRECTION_RETURNED, self.Kind.MONTH_FINALIZED, self.Kind.MONTH_REOPENED):
+            return "処理結果"
+        return "お知らせ"
+
     def __str__(self):
         return self.title

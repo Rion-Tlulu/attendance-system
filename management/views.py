@@ -43,6 +43,7 @@ from .forms import (
     ReviewForm,
 )
 from .initial_passwords import set_initial_password
+from .navigation import remember_list_query, return_to_list
 from .models import Department, EmployeeNumberHistory, EmployeeNumberOperation, EmploymentInfo
 from .numbering import issue_employee_number, next_employee_number
 from .numbering_ledger import (
@@ -209,6 +210,7 @@ def attendance_list(request):
 @business_admin_required
 def correction_queue(request):
     """修正申請を状態別に一覧表示する。"""
+    remember_list_query(request, "a02", ("status", "kind", "q"))
 
     status_filter = request.GET.get("status", "pending")
 
@@ -249,13 +251,18 @@ def correction_queue(request):
             | Q(requested_by__last_name__icontains=keyword)
         )
 
-    page_obj = Paginator(queryset, 20).get_page(request.GET.get("page"))
+    page_obj = Paginator(queryset, 25).get_page(request.GET.get("page"))
+    selected = next((item for item in page_obj if str(item.pk) == request.GET.get("selected")), None)
+    if selected is None:
+        selected = next(iter(page_obj), None)
+    review_context = _correction_review_context(request, selected) if selected else {}
 
     return render(
         request,
         "management/correction_queue.html",
         {
             "page_obj": page_obj,
+            **review_context,
             "status_filter": status_filter,
             "kind_filter": kind_filter,
             "keyword": keyword,
@@ -271,20 +278,7 @@ def correction_queue(request):
 # ==========================================
 
 
-@never_cache
-@business_admin_required
-def correction_review_detail(request, pk):
-    """修正前後を比較して申請を審査する画面。"""
-
-    correction = get_object_or_404(
-        CorrectionRequest.objects.select_related(
-            "requested_by",
-            "employee",
-            "work_session",
-        ),
-        pk=pk,
-    )
-
+def _correction_review_context(request, correction, form=None):
     session = (
         correction.work_session
         or WorkSession.objects.filter(
@@ -342,21 +336,34 @@ def correction_review_detail(request, pk):
         and request.user.pk != correction.employee_id
     )
 
-    return render(
-        request,
-        "management/correction_review.html",
-        {
-            "correction": correction,
-            "current_values": current_record,
-            "can_review": can_review,
-            "month_finalized": month_finalized,
-            "version_matches": version_matches,
-            "is_self_request": is_self_request,
-            "can_proxy_withdraw": can_proxy_withdraw,
-            "proxy_author_invalid": not author_valid,
-            "form": ReviewForm(),
-        },
+    return {
+        "correction": correction,
+        "current_values": current_record,
+        "can_review": can_review,
+        "month_finalized": month_finalized,
+        "version_matches": version_matches,
+        "is_self_request": is_self_request,
+        "can_proxy_withdraw": can_proxy_withdraw,
+        "proxy_author_invalid": not author_valid,
+        "form": form if form is not None else ReviewForm(),
+    }
+
+
+@never_cache
+@business_admin_required
+def correction_review_detail(request, pk, form=None):
+    """修正前後を比較して申請を審査する画面。"""
+
+    correction = get_object_or_404(
+        CorrectionRequest.objects.select_related(
+            "requested_by",
+            "employee",
+            "work_session",
+        ),
+        pk=pk,
     )
+
+    return render(request, "management/correction_review.html", _correction_review_context(request, correction, form))
 
 
 @never_cache
@@ -372,10 +379,7 @@ def correction_review_submit(request, pk):
             request,
             "審査内容を確認してください。",
         )
-        return redirect(
-            "management:correction_detail",
-            pk=pk,
-        )
+        return correction_review_detail(request, pk, form=form)
 
     try:
         review_correction(
@@ -467,6 +471,7 @@ def employee_number_candidate(request):
 @business_admin_required
 def employee_list(request):
     """社員アカウントを検索する。"""
+    remember_list_query(request, "a03", ("q", "department", "status", "role"))
 
     keyword = request.GET.get("q", "").strip()[:100]
 
@@ -512,7 +517,11 @@ def employee_create(request):
             }, status=409)
         if previous:
             messages.info(request, "この社員登録は既に処理されています。初期パスワードは再表示できません。")
-            return redirect("management:employees")
+            return return_to_list(request, "a03", "management:employees")
+        if request.POST.get("back") == "1":
+            return render(request, "management/employee_form.html", {
+                "form": form, "creating": True, "operation_id": str(operation_id),
+            })
         if request.POST.get("preview") == "1" and form.is_valid():
             try:
                 candidate = next_employee_number(form.cleaned_data["department_choice"])
@@ -583,7 +592,7 @@ def employee_create(request):
                 ).first()
                 if replay and replay.request_data == payload:
                     messages.info(request, "この社員登録は既に処理されています。初期パスワードは再表示できません。")
-                    return redirect("management:employees")
+                    return return_to_list(request, "a03", "management:employees")
                 form.add_error(None, "登録が競合しました。内容を確認して再試行してください。")
             else:
                 # 成功したPOST応答で1回だけ表示。session/DB/URLへ平文を保存しない。
@@ -650,7 +659,7 @@ def employee_edit(request, employee_id):
             if previous.employee_id != employee_id:
                 return HttpResponseBadRequest("同じ操作IDで異なる社員を更新できません。")
             messages.info(request, "この社員情報の変更は既に処理されています。")
-            return redirect("management:employees")
+            return return_to_list(request, "a03", "management:employees")
 
         if form.is_valid():
             wants_active = form.cleaned_data["is_active"]
@@ -789,7 +798,7 @@ def employee_edit(request, employee_id):
                     ).first()
                     if replay and replay.request_data == payload:
                         messages.info(request, "この社員情報の変更は既に処理されています。")
-                        return redirect("management:employees")
+                        return return_to_list(request, "a03", "management:employees")
                     form.add_error(None, "更新が競合しました。内容を確認して再試行してください。")
 
                 if not form.errors:
@@ -798,7 +807,7 @@ def employee_edit(request, employee_id):
                         messages.info(request, "候補番号が変わったため、保存時の最新番号を発行しました。")
                     messages.success(request, "社員情報を更新しました")
 
-                    return redirect("management:employees")
+                    return return_to_list(request, "a03", "management:employees")
 
     else:
         form = EmployeeEditForm(instance=employee)
@@ -962,6 +971,17 @@ def employee_month(request, employee_id, year, month):
 
     target_month = _month_from_url(year, month)
 
+    selector_form = MonthSelectForm(request.GET if "month" in request.GET else None,
+                                    initial={"month": target_month.strftime("%Y-%m")})
+    if "employee" in request.GET and selector_form.is_valid():
+        selected_id = request.GET.get("employee", "")
+        if not selected_id.isascii() or not selected_id.isdecimal() or len(selected_id) > 18:
+            raise Http404("対象社員を確認してください。")
+        selected_employee = get_object_or_404(Employee, pk=selected_id)
+        selected_month = selector_form.cleaned_data["month"]
+        return redirect("management:employee_month", employee_id=selected_employee.pk,
+                        year=selected_month.year, month=selected_month.month)
+
     back_query = request.GET.get("back", "")
     if back_query and len(back_query) <= 512:
         parameters = parse_qsl(back_query, keep_blank_values=True)
@@ -1015,6 +1035,9 @@ def employee_month(request, employee_id, year, month):
                 "employee_number", employee.employee_number
             ),
             "display_employee_name": frozen_info.get("name", employee.get_full_name()),
+            "selector_form": selector_form,
+            "month_employees": Employee.objects.order_by("employee_number"),
+            "completed_day_count": sum(row.work_seconds is not None for row in report.rows),
             "report": report,
             "page_obj": page_obj,
             "no_record_count": no_record_count,
@@ -1251,6 +1274,7 @@ def month_csv(request, employee_id, year, month):
 @business_admin_required
 def audit_history(request):
     """操作履歴を新しい順に表示する"""
+    remember_list_query(request, "a05", ("from_date", "to_date", "action", "q"))
     queryset = AuditLog.objects.all().order_by("-pk")
 
     action = request.GET.get("action", "").strip()

@@ -161,6 +161,21 @@ class CorrectionFlowTests(TestCase):
             self.dt(self.day, 18),
         )
 
+    def test_return_from_confirmation_preserves_times_breaks_and_reason(self):
+        data = self.form_data()
+        preview = self.client.post(self.url(), data)
+        self.assertContains(preview, "修正前の有効値")
+        token = preview.context["confirm_token"]
+        response = self.client.post(self.url(), {"confirm_token": token, "back": "1"})
+        self.assertTemplateUsed(response, "corrections/form.html")
+        self.assertEqual(response.context["form"]["reason"].value(), data["reason"])
+        self.assertEqual(response.context["form"]["clock_out_at"].value(), data["clock_out_at"])
+        self.assertEqual(response.context["break_formset"].forms[0]["started_at"].value(), data["breaks-0-started_at"])
+        self.assertFalse(CorrectionRequest.objects.exists())
+        confirmed = self.client.post(self.url(), {"confirm_token": token})
+        self.assertEqual(confirmed.status_code, 302)
+        self.assertEqual(CorrectionRequest.objects.count(), 1)
+
     def test_confirm_creates_pending_request(self):
         preview = self.preview()
         response = self.confirm(preview)

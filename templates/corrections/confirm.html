@@ -1,115 +1,21 @@
-
 {% extends "base.html" %}
 {% load static %}
-
-{% block title %}
-修正申請の内容確認 | 勤怠管理
-{% endblock %}
-
-{% block screen_label %}
-社員画面｜修正申請
-{% endblock %}
-
-{% block extra_css %}
-<link rel="stylesheet"
-      href="{% static 'css/daily-record-correction.css' %}">
-{% endblock %}
-
+{% block title %}修正申請の内容確認 | 勤怠管理{% endblock %}
+{% block screen_label %}社員画面｜修正申請{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/daily-record-correction.css' %}">{% endblock %}
 {% block content %}
-
 <div class="v2-page e03-page">
-
-    <header class="e03-heading">
-        <div>
-            <h1>申請内容の確認</h1>
-            <p class="e03-date">
-                {{ work_day|date:"Y年n月j日（D）" }}
-            </p>
-            {% if target_day != work_day %}<p>移動先の勤務日: {{ target_day|date:"Y年n月j日（D）" }}</p>{% endif %}
-            <p>
-                内容を確認してから提出してください。
-            </p>
-        </div>
-    </header>
-
-    <ol class="e03-steps"
-        aria-label="修正申請の進行状況">
-        <li>1. 入力</li>
-        <li aria-current="step">2. 内容確認</li>
-        <li>3. 提出完了</li>
-    </ol>
-
-    <section class="e03-card"
-             aria-labelledby="e03-confirm-values-title">
-        <h2 id="e03-confirm-values-title">
-            申請する修正内容
-        </h2>
-
-        <dl class="e03-data-list">
-            <div>
-                <dt>出勤</dt>
-                <dd>{{ proposal_display.clock_in }}</dd>
-            </div>
-
-            <div>
-                <dt>退勤</dt>
-                <dd>{{ proposal_display.clock_out }}</dd>
-            </div>
-        </dl>
-
-        <h3 class="e03-history-title">
-            修正後の休憩
-        </h3>
-
-        {% for rest in proposal_display.breaks %}
-        <p class="e03-break-summary">
-            休憩 {{ rest.number }}：
-            {{ rest.start }} 〜 {{ rest.end }}
-        </p>
-        {% empty %}
-        <p class="e03-empty">
-            休憩の設定はありません。
-        </p>
-        {% endfor %}
-    </section>
-
-    <section class="e03-card">
-        <h2>修正理由</h2>
-        <p>{{ reason|linebreaksbr }}</p>
-    </section>
-
-    <div class="e03-notice e03-notice--warning">
-        <i class="fa-solid fa-triangle-exclamation"
-           aria-hidden="true"></i>
-        提出後は管理者の審査待ちになります。
-        提出だけでは勤怠の有効値は変更されません。
-    </div>
-
-    <div class="e03-form-actions">
-        <a
-            class="v2-button v2-button--outline"
-            href="{% url 'corrections:create' work_day.year work_day.month work_day.day %}">
-            入力へ戻る
-        </a>
-
-        <form
-            method="post"
-            action="{% url 'corrections:create' work_day.year work_day.month work_day.day %}">
-            {% csrf_token %}
-
-            <input type="hidden"
-                   name="confirm_token"
-                   value="{{ confirm_token }}">
-
-            <button type="submit"
-                    class="v2-button">
-                <i class="fa-solid fa-paper-plane"
-                   aria-hidden="true"></i>
-                この内容で申請する
-            </button>
-        </form>
-    </div>
-
+  <header class="e03-heading"><div><h1>申請内容の確認 E03</h1><p class="e03-date">{{ work_day|date:"Y年n月j日（D）" }}</p>{% if target_day != work_day %}<p>移動先の勤務日：{{ target_day|date:"Y年n月j日（D）" }}</p>{% endif %}</div></header>
+  <ol class="e03-steps" aria-label="修正申請の進行状況"><li>1. 入力</li><li aria-current="step">2. 内容確認</li><li>3. 提出完了</li></ol>
+  <section class="e03-card"><h2>確認ステップ：変更前 → 変更後</h2>
+    <div class="reference-comparison"><table><thead><tr><th scope="col">項目</th><th scope="col">修正前の有効値</th><th scope="col">変更後（申請内容）</th></tr></thead><tbody>
+      <tr><th scope="row">出勤</th><td>{{ current_display.clock_in }}</td><td>{{ proposal_display.clock_in }}</td></tr>
+      <tr><th scope="row">退勤</th><td>{{ current_display.clock_out }}</td><td>{{ proposal_display.clock_out }}</td></tr>
+      <tr><th scope="row">休憩</th><td>{% for rest in current_display.breaks %}<p>{{ rest.start }} 〜 {{ rest.end }}</p>{% empty %}休憩の設定はありません。{% endfor %}</td><td>{% for rest in proposal_display.breaks %}<p>休憩 {{ rest.number }}：{{ rest.start }} 〜 {{ rest.end }}</p>{% empty %}休憩の設定はありません。{% endfor %}</td></tr>
+    </tbody></table></div>
+    <h3 class="spacing-top-16">修正理由</h3><p>{{ reason|linebreaksbr }}</p>
+    <p class="e03-notice"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> これは申請内容の確認です。まだ申請は完了していません。提出後は管理者の審査待ちになります。</p>
+    <form method="post" action="{% url 'corrections:create' work_day.year work_day.month work_day.day %}" class="e03-form-actions">{% csrf_token %}<input type="hidden" name="confirm_token" value="{{ confirm_token }}"><button type="submit" name="back" value="1" class="v2-button v2-button--outline"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> 入力へ戻る</button><button type="submit" class="v2-button"><i class="fa-solid fa-paper-plane" aria-hidden="true"></i> この内容で申請する</button></form>
+  </section>
 </div>
-
 {% endblock %}

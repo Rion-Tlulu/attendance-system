@@ -1,9 +1,9 @@
 from django.contrib import messages
 from django.contrib.auth import get_user_model
+from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.shortcuts import (
     get_object_or_404,
-    redirect,
     render,
 )
 from django.views.decorators.cache import never_cache
@@ -15,6 +15,7 @@ from corrections.models import CorrectionRequest
 from .access import business_admin_required
 from .forms import EmploymentInfoForm
 from .models import EmploymentInfo
+from .navigation import return_to_list
 
 Employee = get_user_model()
 
@@ -44,6 +45,9 @@ def employement_edit(request, employee_id):
 
     if request.method == "POST":
         with transaction.atomic():
+            actor = Employee.objects.select_for_update().get(pk=request.user.pk)
+            if not actor.is_active or not actor.is_business_admin:
+                raise PermissionDenied("この管理機能を利用する権限がありません。")
             employee = get_object_or_404(
                 Employee.objects.select_for_update(),
                 pk=employee_id,
@@ -56,7 +60,7 @@ def employement_edit(request, employee_id):
             )
 
             if record is None:
-                record = EmploymentInfo(employee=employee)
+                record = EmploymentInfo(employee=employee, department=employee.department)
 
             before = snapshot(record if record.pk else None)
 
@@ -99,9 +103,12 @@ def employement_edit(request, employee_id):
                     })
 
                 updated.save()
+                employee.hire_date = updated.hire_date
+                employee.retirement_date = updated.leave_date
+                employee.save(update_fields=["hire_date", "retirement_date"])
 
                 AuditLog.objects.create(
-                    actor=request.user,
+                    actor=actor,
                     target_employee=employee,
                     action=AuditLog.Action.EMPLOYEE_UPDATE,
                     target_model="EmploymentInfo",
@@ -114,14 +121,12 @@ def employement_edit(request, employee_id):
 
                 messages.success(request, "雇用情報を保存しました")
 
-                return redirect(
-                    "management:employees",
-                )
+                return return_to_list(request, "a03", "management:employees")
     else:
         record = EmploymentInfo.objects.filter(employee=employee).first()
 
         if record is None:
-            record = EmploymentInfo(employee=employee)
+            record = EmploymentInfo(employee=employee, department=employee.department)
 
         form = EmploymentInfoForm(instance=record)
 

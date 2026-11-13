@@ -8,6 +8,7 @@
   <header class="admin-heading"><h1>{{ page_title }}（A07）</h1>
     <p>部署名と割当可能な採番用コードを確認してください。</p>
   </header>
+  <div class="reference-columns">
   <section class="ui-card admin-section admin-form-card">
     <form method="post">
       {% csrf_token %}
@@ -17,7 +18,7 @@
       {% if stop_reason %}<div class="admin-warning" role="alert">{{ stop_reason }}</div>{% endif %}
       {% for field in form %}
         <div class="admin-field">
-          {{ field.label_tag }} {{ field }}
+          <label for="{{ field.id_for_label }}">{{ field.label }} {% if field.field.required %}<span class="reference-required">必須</span>{% endif %}</label> {{ field }}
           {% if field.help_text %}<p class="admin-field-help">{{ field.help_text }}</p>{% endif %}
           {% if field.errors %}<div class="admin-warning" role="alert">{{ field.errors }}</div>{% endif %}
         </div>
@@ -29,5 +30,7 @@
       </div>
     </form>
   </section>
+  <aside class="reference-note"><h2><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i> 重要な注意事項</h2><p class="reference-important">A07登録では社員番号を発行しません。</p><p>社員番号は、社員登録（A03）でこの部署を選択した後、保存時に確定します。</p><p>使用中・過去に使われた採番用コードは再利用できません。</p><a href="{% url 'management:employee_create' %}">社員登録（A03）へ <span aria-hidden="true">›</span></a></aside>
+  </div>
 </div>
 {% endblock %}

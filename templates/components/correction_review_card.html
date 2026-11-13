@@ -1,0 +1,28 @@
+{% load attendance_ui %}
+<section class="v2-panel reference-review-card" aria-labelledby="request-review-title">
+  <h2 id="request-review-title">申請 #R-{{ correction.pk }} の詳細</h2>
+  <dl class="v2-data-list reference-review-meta">
+    <div><dt><i class="fa-solid fa-user" aria-hidden="true"></i> 対象社員</dt><dd>{{ correction.employee.display_name }}（{{ correction.employee.employee_number }}）</dd></div>
+    <div><dt>申請者</dt><dd>{{ correction.requested_by.display_name }}（{{ correction.requested_by.employee_number }}）</dd></div>
+    <div><dt>勤務日・区分</dt><dd>{{ correction.work_date|date:"Y/m/d" }}・{% if correction.is_proxy %}代理申請{% else %}本人申請{% endif %}・{{ correction.get_status_display }}</dd></div>
+  </dl>
+  <div class="reference-comparison"><table>
+    <thead><tr><th scope="col">項目</th><th scope="col">変更前（現在の有効値）</th><th scope="col">変更後（修正案）</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">出勤</th><td>{{ current_values.clock_in_at|jst_datetime }}</td><td>{{ correction.proposal.clock_in_at|jst_datetime }}</td></tr>
+      <tr><th scope="row">退勤</th><td>{{ current_values.clock_out_at|jst_datetime }}</td><td>{{ correction.proposal.clock_out_at|jst_datetime }}</td></tr>
+      <tr><th scope="row">休憩</th><td>{% for rest in current_values.breaks %}<p>{{ rest.started_at|jst_datetime }} 〜 {{ rest.ended_at|jst_datetime }}</p>{% empty %}休憩記録なし{% endfor %}</td><td>{% for rest in correction.proposal.breaks %}<p>{{ rest.started_at|jst_datetime }} 〜 {{ rest.ended_at|jst_datetime }}</p>{% empty %}休憩設定なし{% endfor %}</td></tr>
+    </tbody>
+  </table></div>
+  <p><strong><i class="fa-regular fa-comment" aria-hidden="true"></i> 申請理由：</strong>{{ correction.reason|linebreaksbr }}</p>
+  {% if correction.is_proxy %}<h3>本人申請ができない理由</h3><p>{{ correction.proxy_reason|linebreaksbr }}</p><h3>確認資料・確認方法</h3><p>{{ correction.evidence|linebreaksbr }}</p>{% endif %}
+  {% if correction.return_reason %}<p><strong>差戻し理由：</strong>{{ correction.return_reason|linebreaksbr }}</p>{% endif %}
+  <p class="reference-caption">承認後は現在の有効値を更新します。原打刻の記録は保持されます。</p>
+  {% if can_review %}
+  <div class="reference-review-actions">
+    <form method="post" action="{% url 'management:correction_review' correction.pk %}">{% csrf_token %}<input type="hidden" name="action" value="approve"><button type="submit" class="v2-button"><i class="fa-solid fa-check" aria-hidden="true"></i> この申請を承認する</button></form>
+    <form method="post" action="{% url 'management:correction_review' correction.pk %}" class="reference-return-form">{% csrf_token %}<input type="hidden" name="action" value="return"><div class="v2-field"><label for="return-reason">差戻し理由（必須）</label><textarea id="return-reason" name="return_reason" maxlength="500" rows="2" required aria-describedby="return-reason-help">{{ form.return_reason.value|default_if_none:"" }}</textarea>{{ form.return_reason.errors }}<small id="return-reason-help">500文字以内で入力してください。</small></div><button type="submit" class="v2-button v2-button--outline"><i class="fa-solid fa-rotate-left" aria-hidden="true"></i> 理由を添えて差し戻す</button></form>
+  </div>
+  {% else %}<p class="v2-notice v2-notice--warning">この申請は現在、審査できません。{% if is_self_request %}自分自身の申請は審査できません。{% elif month_finalized %}対象月は確定済みです。{% elif not version_matches %}申請後に勤務データが変更されています。{% elif proxy_author_invalid and correction.is_proxy %}代理申請者の権限が失効しています。{% else %}すでに処理済み、または取下げ済みです。{% endif %}</p>{% endif %}
+  {% if can_proxy_withdraw %}<form method="post" action="{% url 'management:proxy_withdraw' correction.pk %}">{% csrf_token %}{% if proxy_author_invalid %}<div class="v2-field"><label for="withdraw-reason">申請者失効による取下げ理由</label><textarea id="withdraw-reason" name="reason" maxlength="500" required></textarea></div>{% endif %}<button class="v2-button v2-button--outline" type="submit">取り下げる</button></form>{% endif %}
+</section>

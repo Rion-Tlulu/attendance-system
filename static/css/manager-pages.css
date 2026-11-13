@@ -351,6 +351,16 @@
 /* スマートフォン */
 
 @media (max-width: 767px) {
+  .admin-card-table, .admin-card-table tbody, .admin-card-table tr, .admin-card-table td { display: block; min-width: 0; width: 100%; }
+  .admin-card-table thead { display: none; }
+  .admin-card-table tr { margin-bottom: 12px; padding: 8px; border: 1px solid #c8d2e0; border-radius: 8px; }
+  .admin-card-table td { white-space: normal; overflow-wrap: anywhere; }
+  .admin-card-table td[data-label] { display: grid; grid-template-columns: minmax(5em, 32%) minmax(0, 1fr); gap: 8px; }
+  .admin-card-table td[data-label]::before { content: attr(data-label); font-weight: 700; }
+  .admin-card-table a { display: inline-flex; align-items: center; min-height: 44px; }
+}
+
+@media (max-width: 767px) {
   .admin-section {
     padding: 15px;
   }

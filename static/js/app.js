@@ -2,6 +2,51 @@
 "use strict";
 
 document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll('[role="tablist"]').forEach((list) => {
+    const tabs = [...list.querySelectorAll("[data-reference-tab]")];
+    function select(tab) {
+      tabs.forEach((item) => {
+        const selected = item === tab;
+        item.setAttribute("aria-selected", String(selected));
+        item.tabIndex = selected ? 0 : -1;
+        const panel = document.getElementById(item.getAttribute("aria-controls"));
+        if (panel) panel.hidden = !selected;
+      });
+    }
+    tabs.forEach((tab, index) => {
+      tab.addEventListener("click", () => select(tab));
+      tab.addEventListener("keydown", (event) => {
+        let next;
+        if (event.key === "ArrowRight") next = (index + 1) % tabs.length;
+        else if (event.key === "ArrowLeft") next = (index + tabs.length - 1) % tabs.length;
+        else if (event.key === "Home") next = 0;
+        else if (event.key === "End") next = tabs.length - 1;
+        else return;
+        event.preventDefault(); select(tabs[next]); tabs[next].focus();
+      });
+    });
+  });
+  const form = document.getElementById("reference-role-form");
+  if (!form) return;
+  const preview = document.querySelector("[data-role-preview]");
+  const submit = document.querySelector("[data-role-submit]");
+  const result = document.querySelector("[data-role-result]");
+  const status = document.querySelector("[data-role-preview-status]");
+  preview?.addEventListener("click", () => {
+    if (!form.reportValidity()) return;
+    const granting = new FormData(form).get("desired_role") === "admin";
+    result.textContent = granting ? "管理権限を付与する" : "管理権限を取り消す";
+    submit.textContent = result.textContent;
+    submit.hidden = false;
+    status.textContent = "対象社員と変更理由を確認してから確定してください。";
+    submit.focus();
+  });
+  form.addEventListener("input", () => {
+    submit.hidden = true; status.textContent = "入力が変わりました。変更内容を再確認してください。";
+  });
+});
+
+document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll("form").forEach((form) => {
     const errors = [...form.querySelectorAll("ul.errorlist")];
     if (!errors.length) return;
@@ -47,10 +92,22 @@ document.addEventListener("DOMContentLoaded", () => {
 document.addEventListener("DOMContentLoaded", () => {
   const menu = document.querySelector(".mobile-more");
   if (!menu) return;
+  const headerButton = document.querySelector(".app-menu-toggle");
+  const summary = menu.querySelector("summary");
+  let origin = summary;
+  summary?.addEventListener("click", () => { origin = summary; });
+  headerButton?.addEventListener("click", () => {
+    origin = headerButton;
+    menu.open = !menu.open;
+    if (menu.open) menu.querySelector(".mobile-more-panel button, .mobile-more-panel a")?.focus();
+  });
+  menu.addEventListener("toggle", () => {
+    headerButton?.setAttribute("aria-expanded", String(menu.open));
+  });
   menu.addEventListener("keydown", (event) => {
     if (event.key !== "Escape" || !menu.open) return;
     menu.open = false;
-    menu.querySelector("summary")?.focus();
+    origin?.focus();
   });
   menu.querySelectorAll("[data-mobile-section]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -173,7 +230,6 @@ document.addEventListener("DOMContentLoaded", () => {
     timeZone: "Asia/Tokyo",
     hour: "2-digit",
     minute: "2-digit",
-    second: "2-digit",
     hourCycle: "h23",
   });
 
@@ -330,6 +386,7 @@ document.addEventListener("click", (event) => {
     const message = root.querySelector("[data-f11-message]");
 
     const jsonElement = root.querySelector('script[type="application/json"]');
+    const linkedTable = document.getElementById(root.dataset.f11LinkedTable || "");
 
     if (!toggle || !table || !panel || !canvas || !message || !jsonElement) {
       return;
@@ -349,7 +406,8 @@ document.addEventListener("click", (event) => {
     }
 
     function displayTable() {
-      table.hidden = false;
+      table.hidden = Boolean(linkedTable);
+      if (linkedTable) linkedTable.hidden = false;
       panel.hidden = true;
 
       toggle.textContent = "グラフを表示";
@@ -513,6 +571,7 @@ document.addEventListener("click", (event) => {
         }
 
         table.hidden = true;
+        if (linkedTable) linkedTable.hidden = true;
 
         toggle.textContent = "表を表示";
         toggle.setAttribute("aria-expanded", "true");
@@ -539,7 +598,8 @@ document.addEventListener("click", (event) => {
       }
     });
 
-    displayTable();
+    if (root.dataset.f11Default === "graph") displayGraph();
+    else displayTable();
   }
 
   function initialize() {

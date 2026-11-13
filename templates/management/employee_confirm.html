@@ -25,7 +25,7 @@
       <input type="hidden" name="hire_date" value="{{ employee_data.hire_date|date:'Y-m-d' }}">
       <input type="hidden" name="displayed_candidate" value="{{ candidate }}">
       <div class="admin-actions">
-        <a class="ui-button ui-button--secondary" href="{% url 'management:employee_create' %}" onclick="history.back(); return false;">入力に戻る</a>
+        <button class="ui-button ui-button--secondary" type="submit" name="back" value="1">入力に戻る</button>
         <button class="ui-button ui-button--primary" type="submit">社員を登録する</button>
       </div>
     </form>

@@ -42,6 +42,7 @@
 
                 {{ field.label_tag }}
                 {{ field }}
+                {% if field.help_text %}<p>{{ field.help_text }}</p>{% endif %}
 
                 {% if field.errors %}
                 <div role="alert">
@@ -59,6 +60,7 @@
                 アカウントの利用停止は
                 既存の社員編集画面で行ってください。
             </p>
+            <p><a href="{% url 'management:employee_edit' employee.pk %}">社員情報の編集・部署異動へ</a></p>
 
             <div class="v2-actions spacing-top-16">
 
@@ -70,7 +72,7 @@
                 </button>
 
                 <a
-                    href="{% url 'management:employees' %}"
+                    href="{% url 'management:employees' %}{% if request.session.a03_return_query %}?{{ request.session.a03_return_query }}{% endif %}"
                     class="v2-button v2-button--outline"
                 >
                     社員一覧へ戻る

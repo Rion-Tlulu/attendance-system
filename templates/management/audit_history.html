@@ -38,7 +38,7 @@
                     class="fa-solid fa-clock-rotate-left"
                     aria-hidden="true"
                 ></i>
-                操作履歴
+                操作履歴 A05
             </h1>
 
             <p>
@@ -257,11 +257,11 @@
                         </td>
 
                         <td>
-                            {{ row.actor_number }}
+                            {{ row.actor_name }}<br><small>{{ row.actor_number }}</small>
                         </td>
 
                         <td>
-                            {{ row.target_number }}
+                            {{ row.target_name }}<br><small>{{ row.target_number }}</small>
                         </td>
 
                         <td>
@@ -416,6 +416,14 @@
     </section>
 
 
+    {% if audit.selected_log %}
+    <section class="a05-panel reference-audit-selected" id="audit-selected" aria-labelledby="audit-selected-title">
+      <h2 id="audit-selected-title" class="reference-section-bar"><i class="fa-solid fa-arrow-down" aria-hidden="true"></i> 選択した操作の詳細</h2>
+      <dl class="v2-data-list"><div><dt>操作日時</dt><dd>{{ audit.selected_log.occurred_at|date:"Y/m/d H:i" }}</dd></div><div><dt>操作</dt><dd>{{ audit.selected_log.get_action_display }}</dd></div><div><dt>実行者</dt><dd>{{ audit.selected_log.actor.display_name|default:"システム" }}（{{ audit.selected_log.actor.employee_number|default:"—" }}）</dd></div><div><dt>対象・ID</dt><dd>{{ audit.selected_log.target_model }}・{{ audit.selected_log.target_id }}</dd></div><div><dt>理由</dt><dd>{{ audit.selected_log.reason|default:"—" }}</dd></div></dl>
+      <details><summary>変更前後・補足情報を確認</summary><h3>変更前</h3><pre class="admin-audit-data">{{ audit.selected_log.before_data }}</pre><h3>変更後</h3><pre class="admin-audit-data">{{ audit.selected_log.after_data }}</pre><h3>補足情報</h3><pre class="admin-audit-data">{{ audit.selected_log.details }}</pre></details>
+      <p><a href="{% url 'management:audit_detail' audit.selected_log.pk %}">操作履歴詳細を開く <span aria-hidden="true">›</span></a></p>
+    </section>
+    {% endif %}
     <!-- 注意事項 -->
     <aside
         class="a05-information"

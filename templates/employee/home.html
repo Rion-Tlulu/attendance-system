@@ -32,7 +32,7 @@
                     class="fa-regular fa-clock"
                     aria-hidden="true"
                 ></i>
-                打刻
+                打刻ホーム E01
             </h1>
 
             <p>
@@ -119,12 +119,11 @@
                     datetime="{{ now|date:'c' }}"
                     data-server-time="{{ now|date:'c' }}"
                 >
-                    {{ now|date:"H:i:s" }}
+                    {{ now|date:"H:i" }}
                 </time>
 
                 <p class="e01-time-note">
-                    表示時刻は目安です。
-                    打刻記録にはサーバー時刻を使用します。
+                    時刻は日本時間です。
                 </p>
 
             </div>
@@ -192,7 +191,7 @@
                 <span>
                     最後の記録：
                     {{ last_event.get_kind_display }}
-                    {{ last_event.recorded_at|date:"H:i:s" }}
+                    {{ last_event.recorded_at|date:"H:i" }}
                 </span>
             </div>
 
@@ -444,6 +443,7 @@
 
             </div>
 
+            <a class="reference-clock-link" href="{% url 'attendance:monthly' %}"><i class="fa-regular fa-file-lines" aria-hidden="true"></i> 自分の勤怠を確認 <i class="fa-solid fa-chevron-right" aria-hidden="true"></i></a>
             <p class="e01-security-note">
                 <i
                     class="fa-solid fa-circle-info"
@@ -465,7 +465,7 @@
             <div class="e01-panel-heading">
 
                 <h2 id="today-records-title">
-                    今日の記録
+                    本日の打刻タイムライン
                 </h2>
 
                 <span class="e01-panel-subtitle">
@@ -480,6 +480,7 @@
 
             {% if session %}
 
+            <details class="reference-clock-summary"><summary>勤務時間・休憩の集計を見る</summary>
             <dl class="e01-today-summary">
 
                 <div>
@@ -519,6 +520,7 @@
                 </div>
 
             </dl>
+            </details>
 
 
             <h3 class="e01-history-title">
@@ -534,7 +536,7 @@
                 <li>
 
                     <time datetime="{{ event.recorded_at|date:'c' }}">
-                        {{ event.recorded_at|date:"H:i:s" }}
+                        {{ event.recorded_at|date:"H:i" }}
                     </time>
 
                     <span>

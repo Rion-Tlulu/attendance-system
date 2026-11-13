@@ -325,6 +325,11 @@ class BusinessAdminRoleForm(forms.Form):
 class EmploymentInfoForm(forms.ModelForm):
     """社員の部署・入退社日を編集する。"""
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["department"].disabled = True
+        self.fields["department"].help_text = "部署異動は社員情報の編集画面から行ってください。"
+
     hire_date = forms.DateField(
         label="入社日",
         required=True,
@@ -376,6 +381,9 @@ class EmploymentInfoForm(forms.ModelForm):
 
     def clean(self):
         cleaned = super().clean()
+
+        if "department" in self.data and self.data.get("department", "") != self.instance.department:
+            self.add_error("department", "部署異動は社員情報の編集画面で登録済みの部署を選択してください。")
 
         if (
             self.instance.pk

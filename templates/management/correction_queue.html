@@ -1,116 +1,21 @@
-
 {% extends "base.html" %}
 {% load static %}
-
 {% block title %}修正申請の管理 | 勤怠管理{% endblock %}
 {% block screen_label %}管理者｜修正申請{% endblock %}
-
-{% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/manager-pages.css' %}">
-{% endblock %}
-
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/manager-pages.css' %}">{% endblock %}
 {% block content %}
-
 <div class="admin-page">
-
-    <header class="admin-heading">
-        <h1>修正申請</h1>
-        <p>社員から提出された申請を確認します。</p>
-    </header>
-
-    <section class="ui-card admin-section">
-
-        <form method="get" class="admin-search">
-            <div>
-                <label for="review-status">申請状態</label>
-                <select id="review-status" name="status">
-                    <option value="all"
-                      {% if status_filter == "all" %}selected{% endif %}>すべて</option>
-                    <option value="pending"
-                      {% if status_filter == "pending" %}selected{% endif %}>審査中</option>
-                    <option value="approved"
-                      {% if status_filter == "approved" %}selected{% endif %}>承認済み</option>
-                    <option value="returned"
-                      {% if status_filter == "returned" %}selected{% endif %}>差戻し</option>
-                    <option value="withdrawn"
-                      {% if status_filter == "withdrawn" %}selected{% endif %}>取下げ済み</option>
-                </select>
-            </div>
-
-            <div>
-                <label for="review-kind">申請区分</label>
-                <select id="review-kind" name="kind">
-                    <option value="all" {% if kind_filter == 'all' %}selected{% endif %}>通常・代理すべて</option>
-                    <option value="normal" {% if kind_filter == 'normal' %}selected{% endif %}>通常</option>
-                    <option value="proxy" {% if kind_filter == 'proxy' %}selected{% endif %}>代理</option>
-                </select>
-            </div>
-            <div>
-                <label for="review-query">社員番号・氏名</label>
-                <input id="review-query" name="q" value="{{ keyword }}" maxlength="100">
-            </div>
-
-            <button type="submit"
-                    class="ui-button ui-button--primary">
-                絞り込む
-            </button>
-        </form>
-
-    </section>
-
-    <section class="ui-card admin-section">
-        <h2>申請一覧</h2>
-
-        <div class="table-scroll" role="region"
-             aria-label="修正申請一覧" tabindex="0">
-            <table class="ui-table admin-table">
-                <thead>
-                    <tr>
-                        <th scope="col">申請日時</th>
-                        <th scope="col">対象社員</th>
-                        <th scope="col">申請者</th>
-                        <th scope="col">区分</th>
-                        <th scope="col">勤務日</th>
-                        <th scope="col">申請状態</th>
-                        <th scope="col">詳細</th>
-                    </tr>
-                </thead>
-
-                <tbody>
-                {% for item in page_obj %}
-                    <tr>
-                        <td>{{ item.created_at|date:"Y/m/d H:i" }}</td>
-                        <td>{{ item.employee.display_name }}（{{ item.employee.employee_number }}）</td>
-                        <td>{{ item.requested_by.display_name }}（{{ item.requested_by.employee_number }}）</td>
-                        <td>{% if item.is_proxy %}代理{% else %}通常{% endif %}</td>
-                        <td>{{ item.work_date|date:"Y/m/d" }}</td>
-                        <td>{{ item.get_status_display }}</td>
-                        <td>
-                            <a href="{% url 'management:correction_detail' item.pk %}">
-                                審査詳細
-                            </a>
-                        </td>
-                    </tr>
-                {% empty %}
-                    <tr>
-                        <td colspan="7">該当する申請はありません。</td>
-                    </tr>
-                {% endfor %}
-                </tbody>
-            </table>
-        </div>
-
-        <nav class="admin-pagination" aria-label="ページ切替">
-            {% if page_obj.has_previous %}
-            <a href="?{{ filter_query }}&amp;page={{ page_obj.previous_page_number }}">前へ</a>
-            {% endif %}
-            <span>{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
-            {% if page_obj.has_next %}
-            <a href="?{{ filter_query }}&amp;page={{ page_obj.next_page_number }}">次へ</a>
-            {% endif %}
-        </nav>
-    </section>
-
+  <header class="admin-heading"><h1>申請一覧（審査）A02</h1></header>
+  <form method="get" class="admin-search reference-filter-bar">
+    <div><label for="review-status">申請状態</label><select id="review-status" name="status"><option value="all" {% if status_filter == 'all' %}selected{% endif %}>すべて</option><option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>審査中</option><option value="approved" {% if status_filter == 'approved' %}selected{% endif %}>承認済み</option><option value="returned" {% if status_filter == 'returned' %}selected{% endif %}>差戻し</option><option value="withdrawn" {% if status_filter == 'withdrawn' %}selected{% endif %}>取下げ済み</option></select></div>
+    <div><label for="review-kind">申請区分</label><select id="review-kind" name="kind"><option value="all" {% if kind_filter == 'all' %}selected{% endif %}>通常・代理すべて</option><option value="normal" {% if kind_filter == 'normal' %}selected{% endif %}>通常</option><option value="proxy" {% if kind_filter == 'proxy' %}selected{% endif %}>代理</option></select></div>
+    <div><label for="review-query">社員番号・氏名</label><input id="review-query" name="q" value="{{ keyword }}" maxlength="100"></div><button type="submit" class="ui-button ui-button--primary"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i> 検索</button>
+  </form>
+  <div class="reference-review-grid">
+    <section class="v2-panel"><h2>申請一覧（{{ page_obj.paginator.count }}件）</h2><div class="reference-request-list">
+      {% for item in page_obj %}<a class="reference-request" href="?{{ filter_query }}&amp;page={{ page_obj.number }}&amp;selected={{ item.pk }}" {% if item.pk == correction.pk %}aria-current="true"{% endif %}><strong><i class="fa-regular fa-file-lines" aria-hidden="true"></i> 申請 #R-{{ item.pk }}</strong><span>{{ item.employee.display_name }}（{{ item.employee.employee_number }}）</span><span>{{ item.work_date|date:"Y年n月j日" }}</span><small>{% if item.is_proxy %}代理{% else %}通常{% endif %}｜{{ item.get_status_display }}</small></a>{% empty %}<p>該当する申請はありません。</p>{% endfor %}
+    </div><nav class="admin-pagination" aria-label="申請のページ切替">{% if page_obj.has_previous %}<a href="?{{ filter_query }}&amp;page={{ page_obj.previous_page_number }}">前へ</a>{% endif %}<span>{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>{% if page_obj.has_next %}<a href="?{{ filter_query }}&amp;page={{ page_obj.next_page_number }}">次へ</a>{% endif %}</nav></section>
+    {% if correction %}{% include "components/correction_review_card.html" %}{% else %}<section class="v2-panel"><h2>申請の詳細</h2><p>検索条件に合う申請はありません。</p></section>{% endif %}
+  </div>
 </div>
-
 {% endblock %}

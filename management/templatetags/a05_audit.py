@@ -68,8 +68,11 @@ def a05_audit(context):
 
     errors = []
 
-    date_from = parse_date(filters["from_date"])
-    date_to = parse_date(filters["to_date"])
+    try:
+        date_from = parse_date(filters["from_date"])
+        date_to = parse_date(filters["to_date"])
+    except ValueError:
+        date_from = date_to = None
 
     if not date_from or not date_to:
         errors.append("開始日と終了日は正しい日付を指定してください。")
@@ -159,12 +162,17 @@ def a05_audit(context):
                 "occurred_at": log.occurred_at,
                 "action_label": action_label,
                 "actor_number": (getattr(actor, "employee_number", "") or "システム"),
+                "actor_name": getattr(actor, "display_name", "") or "システム",
                 "target_number": (getattr(target, "employee_number", "") or "—"),
+                "target_name": getattr(target, "display_name", "") or (log.after_data or {}).get("name", "") or log.target_model,
                 "reason": (getattr(log, "reason", "") or ""),
-                "detail_url": _detail_url(log.pk),
+                "detail_url": "?" + urlencode({**filters, "page": page_obj.number, "selected": log.pk}) + "#audit-selected",
             }
         )
 
+    selected = next((log for log in page_obj if str(log.pk) == request.GET.get("selected")), None)
+    if selected is None:
+        selected = next(iter(page_obj), None)
     return {
         "allowed": True,
         "filters": filters,
@@ -173,6 +181,7 @@ def a05_audit(context):
         "total_count": paginator.count,
         "page_obj": page_obj,
         "rows": rows,
+        "selected_log": selected,
         "previous_query": (
             _page_query(
                 filters,

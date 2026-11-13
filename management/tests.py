@@ -1802,13 +1802,11 @@ class A05AuditUiTests(TestCase):
         self.assertFalse(result["allowed"])
 
     def test_04_invalid_date_is_reported(self):
-        result = self.snapshot(
-            from_date="invalid",
-            to_date="2026-11-09",
-        )
-
-        self.assertTrue(result["errors"])
-        self.assertEqual(result["total_count"], 0)
+        for value in ("invalid", "2026-02-31", "2026-13-01"):
+            with self.subTest(value=value):
+                result = self.snapshot(from_date=value, to_date="2026-11-09")
+                self.assertTrue(result["errors"])
+                self.assertEqual(result["total_count"], 0)
 
     def test_05_valid_filter_has_paginator(self):
         result = self.snapshot(
@@ -1935,6 +1933,12 @@ class ManagementUiV2Tests(TestCase):
             "v2-mobile-records",
         )
 
+    def test_month_selector_changes_employee_and_month(self):
+        url = reverse("management:employee_month", args=[self.employee.pk, 2026, 9])
+        response = self.client.get(url, {"employee": self.manager.pk, "month": "2026-10"})
+        self.assertRedirects(response, reverse("management:employee_month", args=[self.manager.pk, 2026, 10]))
+        self.assertEqual(self.client.get(url, {"employee": "invalid", "month": "2026-10"}).status_code, 404)
+
     def test_03_self_month_action_blocked_in_ui(self):
         """自分の月次確定ボタンを表示しない。"""
 
@@ -1985,6 +1989,17 @@ class ManagementUiV2Tests(TestCase):
             response,
             "2026/09/15 18:30",
         )
+
+    def test_invalid_review_preserves_reason_and_field_error(self):
+        correction = self.create_correction()
+        response = self.client.post(reverse("management:correction_review", args=[correction.pk]), {
+            "action": "return", "return_reason": "確認" * 251,
+        })
+        self.assertTemplateUsed(response, "management/correction_review.html")
+        self.assertContains(response, "確認" * 251)
+        self.assertTrue(response.context["form"].errors)
+        correction.refresh_from_db()
+        self.assertEqual(correction.status, CorrectionRequest.Status.PENDING)
 
     def test_05_stale_request_ui_blocked(self):
         """勤務データ版が古い申請を審査できない。"""
@@ -2175,6 +2190,27 @@ class V2ManagementTests(TestCase):
 
         self.assertIsNone(record.leave_date)
 
+    def test_employment_form_cannot_bypass_department_numbering(self):
+        self.client.force_login(self.manager)
+        response = self.client.post(reverse("management:employment_edit", args=[self.employee_a.pk]), {
+            "department": "未登録部署", "hire_date": "2024-04-01", "leave_date": "",
+        })
+        self.assertContains(response, "部署異動は社員情報の編集画面")
+        self.assertEqual(EmploymentInfo.objects.get(employee=self.employee_a).department, "営業部")
+        self.employee_a.refresh_from_db()
+        self.assertEqual(self.employee_a.employee_number, "98002")
+        self.assertFalse(AuditLog.objects.filter(target_model="EmploymentInfo").exists())
+
+    def test_employment_update_rechecks_actor_inside_transaction(self):
+        from django.core.exceptions import PermissionDenied
+        from .employee_details import employement_edit
+        request = RequestFactory().post("/", {"hire_date": "2024-04-01", "leave_date": ""})
+        request.user = self.manager
+        get_user_model().objects.filter(pk=self.manager.pk).update(is_business_admin=False)
+        with self.assertRaises(PermissionDenied):
+            employement_edit(request, self.employee_a.pk)
+        self.assertFalse(AuditLog.objects.filter(target_model="EmploymentInfo").exists())
+
     def test_06_employment_edit_audited(self):
         self.client.force_login(self.manager)
 
@@ -2184,7 +2220,7 @@ class V2ManagementTests(TestCase):
                 args=[self.employee_a.pk],
             ),
             {
-                "department": "開発部",
+                "department": "営業部",
                 "hire_date": "2024-04-01",
                 "leave_date": "",
             },
@@ -2198,7 +2234,7 @@ class V2ManagementTests(TestCase):
 
         self.assertEqual(
             record.department,
-            "開発部",
+            "営業部",
         )
 
         self.assertTrue(
@@ -2207,6 +2243,19 @@ class V2ManagementTests(TestCase):
                 action=AuditLog.Action.EMPLOYEE_UPDATE,
             ).exists()
         )
+        self.employee_a.refresh_from_db()
+        self.assertEqual(self.employee_a.hire_date, record.hire_date)
+
+    def test_employee_and_audit_detail_restore_list_filters(self):
+        self.client.force_login(self.manager)
+        filters = {"q": "98002", "status": "all", "page": "2"}
+        self.client.get(reverse("management:employees"), filters)
+        response = self.client.get(reverse("management:employment_edit", args=[self.employee_a.pk]))
+        self.assertContains(response, '?q=98002&amp;status=all&amp;page=2')
+        log = AuditLog.objects.create(actor=self.manager, action=AuditLog.Action.EMPLOYEE_UPDATE, target_model="Employee", target_id=str(self.employee_a.pk))
+        self.client.get(reverse("management:audit_history"), {"q": "98002", "action": log.action, "page": "2"})
+        response = self.client.get(reverse("management:audit_detail", args=[log.pk]))
+        self.assertContains(response, f'?action={log.action}&amp;q=98002&amp;page=2')
 
 
 # ==========================================
@@ -2478,6 +2527,16 @@ class BusinessAdminRoleTests(TestCase):
             "desired_role": desired,
             "change_reason": reason,
         }
+
+    def test_role_list_search_keeps_global_manager_count(self):
+        self.other.is_business_admin = True
+        self.other.save(update_fields=["is_business_admin"])
+        response = self.client.get(reverse("management:role_list"), {"q": self.employee.employee_number, "role": "employee"})
+        self.assertEqual([item.pk for item in response.context["employees"]], [self.employee.pk])
+        self.assertEqual(response.context["active_manager_count"], 2)
+        self.assertContains(response, self.url())
+        detail = self.client.get(self.url())
+        self.assertContains(detail, '?q=91002&amp;role=employee')
 
     def test_sole_manager_can_grant_second_manager_with_audit(self):
         directory = self.client.get(reverse("management:employees"))
@@ -2960,6 +3019,18 @@ class EmployeeDepartmentSelectionTests(TestCase):
         )
         self.client.force_login(self.manager)
 
+    def test_employee_confirmation_back_preserves_input_without_creation(self):
+        data = {"first_name": "太郎", "last_name": "佐藤", "department_choice": str(self.department.pk),
+                "hire_date": "2026-04-01", "operation_id": str(uuid.uuid4())}
+        url = reverse("management:employee_create")
+        self.assertTemplateUsed(self.client.post(url, {**data, "preview": "1"}), "management/employee_confirm.html")
+        response = self.client.post(url, {**data, "back": "1"})
+        self.assertTemplateUsed(response, "management/employee_form.html")
+        self.assertEqual(response.context["form"]["first_name"].value(), "太郎")
+        self.assertEqual(response.context["operation_id"], data["operation_id"])
+        self.assertFalse(EmployeeNumberOperation.objects.exists())
+        self.assertFalse(EmployeeNumberHistory.objects.exists())
+
     def test_zero_employee_department_is_available_on_create_form(self):
         response = self.client.get(reverse("management:employee_create"))
         self.assertEqual(response.status_code, 200)
@@ -3163,6 +3234,16 @@ class DepartmentManagementAcceptanceTests(TestCase):
         }
         data.update(changes)
         return data
+
+    def test_department_confirmation_back_preserves_input_without_creation(self):
+        data = self.create_data(name="営業部")
+        self.assertTemplateUsed(self.client.post(self.create_url, {**data, "preview": "1"}), "management/departments/confirm.html")
+        response = self.client.post(self.create_url, {**data, "back": "1"})
+        self.assertTemplateUsed(response, "management/departments/form.html")
+        self.assertEqual(response.context["form"]["name"].value(), "営業部")
+        self.assertEqual(response.context["operation_id"], data["operation_id"])
+        self.assertFalse(Department.objects.exists())
+        self.assertFalse(DepartmentRegistration.objects.exists())
 
     def test_department_preview_does_not_register_until_confirmed(self):
         data = self.create_data()

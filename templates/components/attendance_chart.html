@@ -4,6 +4,8 @@
     id="{{ chart.dom_id }}"
     class="f11-chart"
     data-f11-chart
+    data-f11-default="{% if chart.kind == 'incomplete_count' or chart.dom_id == 'f11-a04' %}graph{% else %}table{% endif %}"
+    {% if chart.dom_id == 'f11-e02' %}data-f11-linked-table="employee-month-records"{% endif %}
     aria-labelledby="{{ chart.dom_id }}-heading"
 >
     <div class="f11-chart__header">

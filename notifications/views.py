@@ -112,8 +112,11 @@ def mark_all_read(request):
 @require_GET
 def notification_panel(request):
     """右パネルの最新20件と未読件数を返す。"""
-    items = list(visible_notifications(request.user)[:20])
-    count = visible_notifications(request.user).filter(read_at__isnull=True).count()
+    notifications = visible_notifications(request.user)
+    count = notifications.filter(read_at__isnull=True).count()
+    if request.GET.get("status") == "unread":
+        notifications = notifications.filter(read_at__isnull=True)
+    items = list(notifications[:20])
     return JsonResponse({
         "unread_count": count,
         "items": [{
@@ -123,6 +126,7 @@ def notification_panel(request):
             "created_at": timezone.localtime(item.created_at).strftime("%Y/%m/%d %H:%M"),
             "read": item.is_read,
             "resolved": item.is_resolved,
+            "workflow_label": item.workflow_label,
             "open_url": reverse("notifications:open", args=[item.pk]),
         } for item in items],
     })

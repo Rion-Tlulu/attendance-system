@@ -81,6 +81,20 @@ class NotificationTests(TestCase):
             ),
         )
 
+    def test_panel_unread_filter_includes_older_than_latest_twenty(self):
+        old = self.make_user_notification()
+        for _ in range(21):
+            item = self.make_user_notification()
+            item.read_at = timezone.now()
+            item.save(update_fields=["read_at"])
+        self.client.force_login(self.employee)
+        all_items = self.client.get(reverse("notifications:panel")).json()
+        self.assertEqual(len(all_items["items"]), 20)
+        self.assertNotIn(old.pk, [item["id"] for item in all_items["items"]])
+        unread = self.client.get(reverse("notifications:panel"), {"status": "unread"}).json()
+        self.assertEqual([item["id"] for item in unread["items"]], [old.pk])
+        self.assertEqual(unread["unread_count"], 1)
+
     def test_stopped_employee_result_opens_application_detail_for_manager(self):
         self.employee.is_active = False
         self.employee.save(update_fields=["is_active"])

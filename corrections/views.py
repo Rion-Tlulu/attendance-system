@@ -297,6 +297,26 @@ def correction_create(request, year, month, day):
     # 申請の最終確定
     # --------------------------------------
 
+    if request.method == "POST" and "confirm_token" in request.POST and request.POST.get("back") == "1":
+        try:
+            payload = _verify_confirm_token(request, request.POST["confirm_token"], employee, work_day)
+        except CorrectionError as exc:
+            messages.error(request, str(exc))
+            return redirect("corrections:create", year=year, month=month, day=day)
+        proposal = payload["proposal"]
+        form = CorrectionValuesForm(initial={
+            "clock_in_at": _field_initial(parse_datetime(proposal["clock_in_at"])) if proposal.get("clock_in_at") else None,
+            "clock_out_at": _field_initial(parse_datetime(proposal["clock_out_at"])) if proposal.get("clock_out_at") else None,
+            "reason": payload["reason"],
+        })
+        break_formset = CorrectionBreakFormSet(initial=[{
+            "started_at": _field_initial(parse_datetime(item["started_at"])) if item.get("started_at") else None,
+            "ended_at": _field_initial(parse_datetime(item["ended_at"])) if item.get("ended_at") else None,
+        } for item in proposal.get("breaks", [])] or [{}], prefix="breaks")
+        return render(request, "corrections/form.html", {
+            "work_day": work_day, "form": form, "break_formset": break_formset, "session": session,
+        })
+
     if request.method == "POST" and "confirm_token" in request.POST:
 
         token = request.POST.get(
@@ -438,6 +458,7 @@ def correction_create(request, year, month, day):
                         "work_day": work_day,
                         "target_day": proposal_work_day(proposal, work_day),
                         "proposal_display": (_display_proposal(proposal)),
+                        "current_display": _display_proposal(current_values(session)),
                         "reason": (form.cleaned_data["reason"]),
                         "confirm_token": token,
                     },

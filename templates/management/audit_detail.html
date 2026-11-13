@@ -56,7 +56,7 @@
         <pre class="admin-audit-data">{{ item.details }}</pre>
     </section>
 
-    <a href="{% url 'management:audit_history' %}">
+    <a href="{% url 'management:audit_history' %}{% if request.session.a05_return_query %}?{{ request.session.a05_return_query }}{% endif %}">
         操作履歴一覧へ戻る
     </a>
 

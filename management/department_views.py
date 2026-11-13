@@ -134,6 +134,11 @@ def department_create(request):
                 form.add_error(None, "同じ操作IDで異なる内容は登録できません。")
                 response_status = 409
 
+        if operation_id is not None and response_status == 200 and request.POST.get("back") == "1":
+            return render(request, "management/departments/form.html", {
+                "form": form, "page_title": "部署の新規登録",
+                "operation_id": str(operation_id), "no_codes": not available_department_codes(),
+            })
         if operation_id is not None and response_status == 200 and form.is_valid():
             if request.POST.get("preview") == "1":
                 try:
