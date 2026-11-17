@@ -53,7 +53,8 @@
 | アプリケーション | Python、Django 5.2 LTS（基準候補）、Django Templates |
 | データベース | 本番・受入試験はPostgreSQL。開発時はSQLiteも利用可 |
 | 画面 | HTML、CSS、JavaScript、Chart.js |
-| 書体・アイコン | ・Google FontsのNoto Sans JP（https://fonts.google.com/noto/specimen/Noto+Sans+JP?query=Noto+Sans+JP）| ・Font Awesome Free（CDN）（https://cdnjs.com/libraries/font-awesome） ||
+| 書体・アイコン | ・Google FontsのNoto Sans JP（https://fonts.google.com/noto/specimen/Noto+Sans+JP?query=Noto+Sans+JP）
+・Font Awesome Free（CDN）（https://cdnjs.com/libraries/font-awesome） |
 
 スマートフォンとPCに対応し、WCAG 2.2 レベルAAを適合目標とします。キーボードとスクリーンリーダーで主要操作を検証し、グラフと同じ数値を表でも確認できるようにします。
 
