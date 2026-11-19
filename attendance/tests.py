@@ -1857,6 +1857,60 @@ class Version143RulesTests(TestCase):
         )
         self.assertTrue(month_integrity_issues(self.employee, date(2024, 1, 1)) == [])
 
+    def test_two_independent_legacy_overlaps_are_fixed_one_by_one_before_finalization(self):
+        """T12・16章の受入例: 11月の勤務A〜D（重複2組）を1組ずつ訂正し、両方の解消まで確定不可。"""
+        from management.services import finalize_month
+
+        def work(day, start_hour, end_day, end_hour):
+            return WorkSession.objects.create(
+                employee=self.employee, work_date=date(2025, 11, day),
+                clock_in_at=at(date(2025, 11, day), start_hour),
+                clock_out_at=at(date(2025, 11, end_day), end_hour),
+                status=WorkSession.Status.COMPLETED,
+            )
+
+        work(1, 22, 2, 7)        # A: 1日22:00〜2日07:00
+        b = work(2, 6, 2, 15)    # B: 2日06:00〜15:00（Aと重複）
+        work(3, 22, 4, 7)        # C: 3日22:00〜4日07:00
+        d = work(4, 6, 4, 15)    # D: 4日06:00〜15:00（Cと重複）
+        november = date(2025, 11, 1)
+        overlap_days = {day for day, reason in month_integrity_issues(self.employee, november) if reason == "他の勤務との時間重複"}
+        self.assertTrue({date(2025, 11, 1), date(2025, 11, 2)} & overlap_days)
+        self.assertTrue({date(2025, 11, 3), date(2025, 11, 4)} & overlap_days)
+
+        def fix(session):
+            day = session.work_date
+            correction = submit_correction(
+                employee_id=self.employee.pk, work_day=day,
+                expected_version=session.version,
+                proposal=proposal(at(day, 7), at(day, 15)),
+                reason="旧データの重複を訂正",
+            )
+            review_correction(
+                manager_id=self.first_manager.pk, correction_id=correction.pk, action="approve",
+            )
+
+        def finalize():
+            return finalize_month(
+                manager_id=self.first_manager.pk, employee_id=self.employee.pk,
+                target_month=november, checked_no_record=True,
+            )
+
+        # C・Dの重複が残っていても、Bの訂正は申請・承認できる（無関係な不整合で拒否しない）。
+        fix(b)
+        b.refresh_from_db()
+        self.assertEqual(b.clock_in_at, at(date(2025, 11, 2), 7))
+        remaining = {day for day, _ in month_integrity_issues(self.employee, november)}
+        self.assertFalse({date(2025, 11, 1), date(2025, 11, 2)} & remaining)
+        self.assertTrue({date(2025, 11, 3), date(2025, 11, 4)} & remaining)
+        with self.assertRaises(AdminActionError):
+            finalize()
+
+        # Dも訂正すると不整合がなくなり、確定できる。
+        fix(d)
+        self.assertEqual(month_integrity_issues(self.employee, november), [])
+        finalize()
+
     def test_proxy_author_cannot_review_but_can_withdraw(self):
         self.employee.is_active = False
         self.employee.save(update_fields=["is_active"])

@@ -4240,3 +4240,145 @@ class ProductionSQLiteSettingsTests(_SimpleTestCase):
             text = (base / "config" / name).read_text(encoding="utf-8")
             self.assertNotIn("postgresql", text, name)
             self.assertNotIn("POSTGRES_", text, name)
+
+
+"""要件定義書 v1.5.7 の受入条件のうち、個別のテストがなかった項目（T11・T13・T19）。"""
+
+import re as _re
+from datetime import date as _date, datetime as _datetime
+from zoneinfo import ZoneInfo as _ZoneInfo
+
+from django.contrib.auth import get_user_model as _get_user_model
+from django.test import RequestFactory as _RequestFactory, TestCase as _AcceptanceTestCase
+from django.urls import reverse as _reverse
+
+
+class RequirementGapAcceptanceTests(_AcceptanceTestCase):
+    def setUp(self):
+        Employee = _get_user_model()
+        self.manager = Employee.objects.create_user(
+            employee_number="95001", password="TestPassword_2026!",
+            first_name="管理", last_name="担当", is_business_admin=True,
+            hire_date=_date(2024, 1, 1),
+        )
+        self.employee = Employee.objects.create_user(
+            employee_number="95002", password="TestPassword_2026!",
+            first_name="花子", last_name="山田", hire_date=_date(2024, 1, 1),
+        )
+
+    # ---------- T11: 26人以上でもページ切替で集計値が変わらない ----------
+    def test_t11_a01_totals_and_chart_are_same_on_every_page_with_26_or_more_employees(self):
+        from attendance.models import WorkSession
+        from management.templatetags.a01_dashboard import a01_snapshot
+
+        Employee = _get_user_model()
+        jst = _ZoneInfo("Asia/Tokyo")
+        for index in range(27):
+            person = Employee.objects.create_user(
+                employee_number=f"96{index:03d}", password="TestPassword_2026!",
+                first_name=f"社員{index}", last_name="検証", hire_date=_date(2024, 1, 1),
+            )
+            day = 1 + index % 9
+            WorkSession.objects.create(
+                employee=person, work_date=_date(2026, 10, day),
+                clock_in_at=_datetime(2026, 10, day, 9, tzinfo=jst),
+                status=WorkSession.Status.WORKING,
+            )
+
+        def snapshot(page):
+            request = _RequestFactory().get("/management/attendance/", {"month": "2026-10", "page": page})
+            request.user = self.manager
+            return a01_snapshot({"request": request})
+
+        first, second = snapshot(1), snapshot(2)
+        self.assertEqual(len(first["page_obj"].object_list), 25)
+        self.assertGreaterEqual(len(second["page_obj"].object_list), 1)
+        self.assertGreaterEqual(first["employee_count"], 26)
+        for key in ("employee_count", "incomplete_count", "pending_count", "finalized_count", "incomplete_chart"):
+            with self.subTest(key=key):
+                self.assertEqual(first[key], second[key])
+        self.assertEqual(first["incomplete_count"], 27)
+
+    # ---------- T13: 審査中の代理申請がある間は再有効化できない ----------
+    def test_t13_reactivation_is_rejected_while_proxy_request_is_pending(self):
+        from corrections.models import CorrectionRequest
+        from corrections.services import submit_correction, withdraw_correction
+        from management.models import Department
+
+        jst = _ZoneInfo("Asia/Tokyo")
+        department = Department.objects.create(name="総務", code=1, is_active=True)
+        self.employee.department = department.name
+        self.employee.is_active = False
+        self.employee.save()
+        day = _date(2025, 10, 6)
+        proxy = submit_correction(
+            employee_id=self.employee.pk, actor_id=self.manager.pk,
+            work_day=day, expected_version=0,
+            proposal={
+                "clock_in_at": _datetime(2025, 10, 6, 9, tzinfo=jst).isoformat(),
+                "clock_out_at": _datetime(2025, 10, 6, 18, tzinfo=jst).isoformat(),
+                "breaks": [],
+            },
+            reason="打刻漏れ", proxy_reason="本人は利用停止中",
+            evidence="勤務表を担当者が照合",
+        )
+        self.assertTrue(proxy.is_proxy)
+
+        self.client.force_login(self.manager)
+        edit_url = _reverse("management:employee_edit", args=[self.employee.pk])
+
+        def reactivate():
+            edit_state = self.client.get(edit_url).context["edit_state"]
+            return self.client.post(edit_url, {
+                "employee_number": self.employee.employee_number,
+                "first_name": "花子", "last_name": "山田",
+                "department_choice": str(department.pk),
+                "is_active": "on", "change_reason": "本人の復職",
+                "edit_state": edit_state,
+            })
+
+        response = reactivate()
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "審査中の代理申請を処理または取下げてください。")
+        self.employee.refresh_from_db()
+        self.assertFalse(self.employee.is_active)
+
+        withdraw_correction(employee_id=self.manager.pk, request_id=proxy.pk)
+        self.assertEqual(
+            CorrectionRequest.objects.get(pk=proxy.pk).status, CorrectionRequest.Status.WITHDRAWN,
+        )
+        self.assertEqual(reactivate().status_code, 302)
+        self.employee.refresh_from_db()
+        self.assertTrue(self.employee.is_active)
+
+    # ---------- T19: 階層メニューと現在地 ----------
+    def _sidebar(self, response):
+        html = response.content.decode()
+        match = _re.search(r'<nav class="side-navigation".*?</nav>', html, _re.S)
+        self.assertIsNotNone(match, "サイドバーが見つかりません。")
+        return match.group(0)
+
+    def test_t19_employee_menu_shows_hierarchy_and_current_location(self):
+        self.client.force_login(self.employee)
+        sidebar = self._sidebar(self.client.get(_reverse("attendance:daily", args=[2026, 11, 2])))
+        self.assertIn('aria-label="社員メニュー"', sidebar)
+        for label in ("打刻メニュー", "勤怠メニュー", "アカウントメニュー"):
+            self.assertIn(label, sidebar)
+        self.assertNotIn("管理者メニュー", sidebar)
+        self.assertNotIn("勤怠管理", sidebar)
+        # 日別詳細を開いている間は親画面「自分の勤怠」を現在地として示す。
+        current = _re.findall(r'<a href="([^"]+)"[^>]*aria-current="page"', sidebar)
+        self.assertEqual(current, [_reverse("attendance:monthly")])
+        self.assertIn("side-link--current", sidebar)
+
+    def test_t19_manager_menu_shows_hierarchy_and_current_location(self):
+        self.client.force_login(self.manager)
+        sidebar = self._sidebar(self.client.get(_reverse("management:employees")))
+        self.assertIn('aria-label="管理者メニュー"', sidebar)
+        for label in ("勤怠管理", "月次管理", "社員・権限管理", "運用メニュー"):
+            self.assertIn(label, sidebar)
+        current = _re.findall(r'<a href="([^"]+)"[^>]*aria-current="page"', sidebar)
+        self.assertEqual(current, [_reverse("management:employees")])
+        # 一般社員は管理画面へ直接アクセスできない。
+        self.client.force_login(self.employee)
+        self.assertEqual(self.client.get(_reverse("management:employees")).status_code, 403)

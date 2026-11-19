@@ -168,6 +168,81 @@ class AuthenticationFlowTests(TestCase):
             reverse("accounts:login"),
         )
 
+    def _issue_initial_password(self, hours_left):
+        from datetime import timedelta
+        from django.utils import timezone
+
+        self.employee.must_change_password = True
+        self.employee.initial_password_issued_at = timezone.now() - timedelta(hours=72 - hours_left)
+        self.employee.initial_password_expires_at = timezone.now() + timedelta(hours=hours_left)
+        self.employee.save()
+
+    def test_initial_password_within_72_hours_only_allows_password_change(self):
+        """T10・15章: 初回変更前は業務画面とAPIを利用できず、変更画面へ案内する。"""
+        self._issue_initial_password(hours_left=1)
+        response = self.client.post(reverse("accounts:login"), {"username": "90001", "password": self.password})
+        self.assertRedirects(response, reverse("accounts:password_change"), fetch_redirect_response=False)
+        self.assertRedirects(
+            self.client.get(reverse("attendance:home")),
+            reverse("accounts:password_change"), fetch_redirect_response=False,
+        )
+        self.assertEqual(
+            self.client.get(reverse("notifications:panel"), HTTP_ACCEPT="application/json").status_code, 302,
+        )
+        self.assertEqual(self.client.post(reverse("attendance:clock_action")).status_code, 403)
+
+    def test_expired_initial_password_cannot_log_in(self):
+        """T10: 発行から72時間に達した初期パスワードではログインできない。"""
+        self._issue_initial_password(hours_left=-1)
+        response = self.client.post(reverse("accounts:login"), {"username": "90001", "password": self.password})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "初期パスワードの有効期限が切れています。")
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    def test_session_is_ended_when_initial_password_expires_before_change(self):
+        """T10: 期限到達後は表示・保存のどちらでもログアウトし、変更を保存しない。"""
+        from datetime import timedelta
+        from django.utils import timezone
+
+        self._issue_initial_password(hours_left=1)
+        self.client.force_login(self.employee)
+        type(self.employee).objects.filter(pk=self.employee.pk).update(
+            initial_password_expires_at=timezone.now() - timedelta(seconds=1),
+        )
+        response = self.client.post(
+            reverse("accounts:password_change"),
+            {"old_password": self.password, "new_password1": "NewPassword_2026!x", "new_password2": "NewPassword_2026!x"},
+        )
+        self.assertRedirects(response, reverse("accounts:login"), fetch_redirect_response=False)
+        self.assertNotIn("_auth_user_id", self.client.session)
+        self.employee.refresh_from_db()
+        self.assertTrue(self.employee.check_password(self.password))
+        self.assertTrue(self.employee.must_change_password)
+
+    def test_reactivation_does_not_revive_session_from_before_deactivation(self):
+        """T01: 停止前のセッションは再有効化後も利用できない。"""
+        from django.test import Client
+
+        other_client = Client()
+        other_client.force_login(self.manager)
+        self.client.force_login(self.employee)
+        self.assertEqual(self.client.get(reverse("attendance:home")).status_code, 200)
+
+        self.employee.is_active = False
+        self.employee.save()
+        self.employee.is_active = True
+        self.employee.save()
+
+        response = self.client.get(reverse("attendance:home"))
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response["Location"].startswith(reverse("accounts:login")))
+        # 他の社員のセッションには影響しない。
+        self.assertEqual(other_client.get(reverse("attendance:home")).status_code, 200)
+
+        # 再有効化後に改めてログインすれば利用できる。
+        self.client.force_login(self.employee)
+        self.assertEqual(self.client.get(reverse("attendance:home")).status_code, 200)
+
 
 class LoginRateLimitTests(TestCase):
     """ログイン試行回数制限を確認する。"""
