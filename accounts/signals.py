@@ -53,3 +53,39 @@ def audit_role_change(sender, instance, created, update_fields=None, **kwargs):
         reason=getattr(instance, "_role_change_reason", "業務管理者権限の変更"),
         details={},
     )
+
+
+@receiver(pre_save, sender=Employee, dispatch_uid="attendance_active_before")
+def capture_active_before(sender, instance, update_fields=None, **kwargs):
+    if update_fields is not None and "is_active" not in update_fields:
+        return
+    if instance.pk:
+        instance._previous_is_active = sender.objects.filter(pk=instance.pk).values_list(
+            "is_active", flat=True
+        ).first()
+
+
+@receiver(post_save, sender=Employee, dispatch_uid="attendance_deactivation_sessions")
+def end_sessions_on_deactivation(sender, instance, created, update_fields=None, **kwargs):
+    """利用停止時は既存セッションを削除し、再有効化後も復活させない（03章・T01）。
+
+    停止の更新と同じトランザクションで削除するため、停止が取り消された場合は
+    セッションの削除も取り消される。
+    """
+    if update_fields is not None and "is_active" not in update_fields:
+        return
+    if created or getattr(instance, "_previous_is_active", None) is not True or instance.is_active:
+        return
+
+    from django.contrib.auth import SESSION_KEY
+    from django.contrib.sessions.models import Session
+    from django.utils import timezone
+
+    user_id = str(instance.pk)
+    stale_keys = [
+        session.session_key
+        for session in Session.objects.filter(expire_date__gt=timezone.now()).iterator()
+        if str(session.get_decoded().get(SESSION_KEY)) == user_id
+    ]
+    if stale_keys:
+        Session.objects.filter(session_key__in=stale_keys).delete()
