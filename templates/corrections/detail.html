@@ -28,7 +28,7 @@
             </p>
         </div>
 
-        <span class="v2-state">
+        <span class="v2-state{% if correction.status == 'pending' %} v2-state--warning{% elif correction.status == 'approved' %} v2-state--success{% elif correction.status == 'returned' %} v2-state--danger{% endif %}">
             {{ correction.get_status_display }}
         </span>
     </header>

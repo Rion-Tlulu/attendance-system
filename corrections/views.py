@@ -129,7 +129,9 @@ def _display_datetime(value):
     if timezone.is_naive(parsed):
         return "タイムゾーンを確認できません"
 
-    return timezone.localtime(parsed).strftime("%Y/%m/%d %H:%M:%S")
+    local = timezone.localtime(parsed)
+    # 画面は時・分で表示する（06章）。秒が入力・記録されている場合だけ秒も示す。
+    return local.strftime("%Y/%m/%d %H:%M:%S" if local.second else "%Y/%m/%d %H:%M")
 
 
 def _display_proposal(proposal):

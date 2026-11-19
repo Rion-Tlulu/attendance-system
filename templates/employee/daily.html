@@ -157,7 +157,7 @@
                     <dt>出勤</dt>
                     <dd>
                         {% if session.clock_in_at %}
-                            {{ session.clock_in_at|date:"Y/m/d H:i:s" }}
+                            {{ session.clock_in_at|date:"Y/m/d H:i" }}
                         {% else %}
                             未記録
                         {% endif %}
@@ -168,7 +168,7 @@
                     <dt>退勤</dt>
                     <dd>
                         {% if session.clock_out_at %}
-                            {{ session.clock_out_at|date:"Y/m/d H:i:s" }}
+                            {{ session.clock_out_at|date:"Y/m/d H:i" }}
                         {% else %}
                             未記録
                         {% endif %}
@@ -230,10 +230,10 @@
                 <tbody>
                     {% for rest in break_rows %}
                     <tr>
-                        <th scope="row">{{ rest.number }}</th>
-                        <td>{{ rest.start }}</td>
-                        <td>{{ rest.end }}</td>
-                        <td>{{ rest.duration }}</td>
+                        <th scope="row">休憩 {{ rest.number }}</th>
+                        <td data-label="休憩開始">{{ rest.start }}</td>
+                        <td data-label="休憩終了">{{ rest.end }}</td>
+                        <td data-label="休憩時間">{{ rest.duration }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -253,22 +253,15 @@
             <h2 id="e03-corrections-title">
                 <i class="fa-solid fa-file-pen"
                    aria-hidden="true"></i>
-                修正申請
+                この日の修正申請
             </h2>
         </div>
 
         {% if can_submit_correction %}
-        <p>
-            出勤・退勤・休憩などの記録に誤りがある場合は、
-            修正内容と理由を入力して申請してください。
+        <p class="e03-inline-help">
+            修正が必要な場合は、上の「修正申請」欄に正しい日時と理由を入力し、
+            「申請内容を確認する」を押してください。
         </p>
-
-        <a class="v2-button"
-           href="{% url 'corrections:create' work_day.year work_day.month work_day.day %}">
-            <i class="fa-solid fa-pen-to-square"
-               aria-hidden="true"></i>
-            この日の修正を申請する
-        </a>
 
         {% elif pending_correction %}
         <p>
