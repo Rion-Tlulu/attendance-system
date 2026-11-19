@@ -9,36 +9,60 @@
     <p>{{ employee.display_name }}（{{ employee.employee_number }}） {{ work_day|date:"Y/m/d" }}</p>
   </div></header>
   <section class="v2-panel">
-    <p>停止中社員の正しい勤務日時と、確認した資料を入力してください。別の管理者が審査します。</p>
-    <form method="post">
+    <p class="v2-notice"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> 停止中社員の正しい勤務日時と、確認した資料を入力してください。別の管理者が審査します。</p>
+    <form method="post" class="proxy-form">
       {% csrf_token %}
       {{ form.non_field_errors }}
-      {% for field in form %}
-        <div class="v2-field">{{ field|plain_label }} {{ field }} {{ field.errors }}</div>
-      {% endfor %}
-      {{ break_formset.management_form }}
-      {{ break_formset.non_form_errors }}
-      <h2>休憩</h2>
-      <div id="e03-break-form-list">
-      {% for break_form in break_formset %}
-        <div class="v2-field">
-          <h3>休憩 {{ forloop.counter }}</h3>
-          {{ break_form.non_field_errors }}
-          {% for field in break_form %}{{ field|plain_label }} {{ field }} {{ field.errors }}{% endfor %}
+      {% for field in form.hidden_fields %}{{ field }}{% endfor %}
+
+      <fieldset class="proxy-group">
+        <legend>勤務日時</legend>
+        <div class="proxy-pair">
+          <div class="v2-field">{{ form.clock_in_at|plain_label }} {{ form.clock_in_at }} {{ form.clock_in_at.errors }}</div>
+          <div class="v2-field">{{ form.clock_out_at|plain_label }} {{ form.clock_out_at }} {{ form.clock_out_at.errors }}</div>
         </div>
-      {% endfor %}
-      </div>
-      <button type="button" class="v2-button v2-button--outline" data-e03-add-break>休憩を追加する</button>
-      <template id="e03-empty-break-template">
-        <div class="v2-field">
-          <h3>追加した休憩</h3>
-          {% for field in break_formset.empty_form %}{{ field|plain_label }} {{ field }}{% endfor %}
+      </fieldset>
+
+      <fieldset class="proxy-group">
+        <legend>休憩</legend>
+        {{ break_formset.management_form }}
+        {{ break_formset.non_form_errors }}
+        <div id="e03-break-form-list" class="proxy-break-list">
+        {% for break_form in break_formset %}
+          <div class="proxy-break">
+            <h3>休憩 {{ forloop.counter }}</h3>
+            {{ break_form.non_field_errors }}
+            {% for field in break_form.hidden_fields %}{{ field }}{% endfor %}
+            <div class="proxy-pair">
+              <div class="v2-field">{{ break_form.started_at|plain_label }} {{ break_form.started_at }} {{ break_form.started_at.errors }}</div>
+              <div class="v2-field">{{ break_form.ended_at|plain_label }} {{ break_form.ended_at }} {{ break_form.ended_at.errors }}</div>
+            </div>
+            {% if break_form.DELETE %}<label class="proxy-break__delete">{{ break_form.DELETE }} この休憩を削除する</label>{% endif %}
+          </div>
+        {% endfor %}
         </div>
-      </template>
-      <h2>代理申請の証跡</h2>
-      {% for field in evidence_form %}
-        <div class="v2-field">{{ field|plain_label }} {{ field }} {{ field.errors }}</div>
-      {% endfor %}
+        <button type="button" class="v2-button v2-button--outline" data-e03-add-break><i class="fa-solid fa-plus" aria-hidden="true"></i> 休憩を追加する</button>
+        <template id="e03-empty-break-template">
+          <div class="proxy-break">
+            <h3>追加した休憩</h3>
+            {% for field in break_formset.empty_form.hidden_fields %}{{ field }}{% endfor %}
+            <div class="proxy-pair">
+              <div class="v2-field">{{ break_formset.empty_form.started_at|plain_label }} {{ break_formset.empty_form.started_at }}</div>
+              <div class="v2-field">{{ break_formset.empty_form.ended_at|plain_label }} {{ break_formset.empty_form.ended_at }}</div>
+            </div>
+            {% if break_formset.empty_form.DELETE %}<label class="proxy-break__delete">{{ break_formset.empty_form.DELETE }} この休憩を削除する</label>{% endif %}
+          </div>
+        </template>
+      </fieldset>
+
+      <fieldset class="proxy-group">
+        <legend>修正理由と代理申請の証跡</legend>
+        <div class="v2-field">{{ form.reason|plain_label }} {{ form.reason }} {{ form.reason.errors }}</div>
+        {% for field in evidence_form %}
+          <div class="v2-field">{{ field|plain_label }} {{ field }} {{ field.errors }}</div>
+        {% endfor %}
+      </fieldset>
+
       <div class="v2-actions">
         <a class="v2-button v2-button--outline" href="{% url 'management:employee_month' employee.pk work_day.year work_day.month %}">月次詳細へ戻る</a>
         <button class="v2-button" type="submit">内容を確認する</button>

@@ -5,30 +5,35 @@
 {% block extra_css %}<link rel="stylesheet" href="{% static 'css/manager-pages.css' %}">{% endblock %}
 {% block content %}
 <div class="admin-page">
-  <header class="admin-heading">
-    <h1>部署登録</h1>
-    <p>登録済みの部署と採番用コードを確認できます。</p>
+  <header class="admin-heading admin-heading--actions">
+    <div>
+      <h1>部署登録</h1>
+      <p>登録済みの部署と採番用コードを確認できます。</p>
+    </div>
+    <div class="admin-actions">
+      <a class="ui-button ui-button--secondary" href="{% url 'management:employee_create' %}"><i class="fa-solid fa-user-plus" aria-hidden="true"></i> 社員を登録する</a>
+      <a class="ui-button ui-button--primary" href="{% url 'management:department_create' %}"><i class="fa-solid fa-plus" aria-hidden="true"></i> 部署を新規登録する</a>
+    </div>
   </header>
   <section class="ui-card admin-section">
-    <div class="admin-actions">
-      <a class="ui-button ui-button--primary" href="{% url 'management:department_create' %}">部署を新規登録する</a>
-      <a class="ui-button ui-button--secondary" href="{% url 'management:employee_create' %}">社員を登録する</a>
-    </div>
-    <form method="get" role="search" class="admin-field">
-      <label for="department-search">部署名で検索</label>
-      <input id="department-search" name="q" value="{{ keyword }}" maxlength="100">
-      <button class="ui-button ui-button--secondary" type="submit">検索</button>
+    <form method="get" class="admin-search" role="search" aria-label="部署を検索">
+      <div><label for="department-search">部署名</label><input id="department-search" name="q" value="{{ keyword }}" maxlength="100" placeholder="部署名で検索"></div>
+      <button class="ui-button ui-button--primary" type="submit"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i> 検索する</button>
+      {% if keyword %}<a class="ui-button ui-button--secondary" href="{% url 'management:department_list' %}">条件をクリア</a>{% endif %}
     </form>
+  </section>
+  <section class="ui-card admin-section">
+    <h2>登録済み部署（{{ departments|length }}件）</h2>
     <div class="table-scroll" role="region" aria-label="登録済み部署の一覧" tabindex="0">
-      <table class="admin-table">
-        <caption>登録済み部署</caption>
-        <thead><tr><th scope="col">コード</th><th scope="col">部署名</th><th scope="col">状態</th><th scope="col">操作</th></tr></thead>
+      <table class="ui-table admin-card-table">
+        <thead><tr><th scope="col">採番用コード</th><th scope="col">部署名</th><th scope="col">状態</th><th scope="col">操作</th></tr></thead>
         <tbody>
           {% for department in departments %}
           <tr>
-            <td>{{ department.code }}</td><td>{{ department.name }}</td>
-            <td>{% if department.is_active %}有効{% else %}停止中{% endif %}</td>
-            <td><a href="{% url 'management:department_edit' department.pk %}">詳細・編集</a></td>
+            <td data-label="採番用コード">{{ department.code }}</td>
+            <td data-label="部署名">{{ department.name }}</td>
+            <td data-label="状態">{% if department.is_active %}<span class="v2-state v2-state--success">有効</span>{% else %}<span class="v2-state">停止中</span>{% endif %}</td>
+            <td data-label="操作"><a class="admin-row-link" href="{% url 'management:department_edit' department.pk %}"><i class="fa-regular fa-pen-to-square" aria-hidden="true"></i> 詳細・編集</a></td>
           </tr>
           {% empty %}<tr><td colspan="4">該当する部署はありません。</td></tr>{% endfor %}
         </tbody>

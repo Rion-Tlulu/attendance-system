@@ -22,7 +22,7 @@
         <option value="admin" {% if role_filter == 'admin' %}selected{% endif %}>付与済み</option>
         <option value="employee" {% if role_filter == 'employee' %}selected{% endif %}>なし</option>
       </select></div>
-      <button type="submit" class="ui-button ui-button--primary">社員を検索する</button>
+      <button type="submit" class="ui-button ui-button--primary"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i> 社員を検索する</button>
     </form>
   </section>
   <section class="ui-card admin-section">
@@ -33,9 +33,9 @@
           {% for employee in employees %}
           <tr>
             <td data-label="社員番号">{{ employee.employee_number }}</td><td data-label="氏名">{{ employee.display_name }}</td>
-            <td data-label="利用状態">{% if employee.is_active %}利用中{% else %}利用停止{% endif %}</td>
-            <td data-label="管理権限">{% if employee.is_business_admin %}付与済み{% else %}なし{% endif %}</td>
-            <td data-label="操作"><a href="{% url 'management:employee_role' employee.pk %}">権限を確認・変更</a></td>
+            <td data-label="利用状態">{% if employee.is_active %}<span class="v2-state v2-state--success">利用中</span>{% else %}<span class="v2-state">利用停止</span>{% endif %}</td>
+            <td data-label="管理権限">{% if employee.is_business_admin %}<span class="v2-state v2-state--info">付与済み</span>{% else %}<span class="v2-state">なし</span>{% endif %}</td>
+            <td data-label="操作"><a class="admin-row-link" href="{% url 'management:employee_role' employee.pk %}"><i class="fa-solid fa-user-shield" aria-hidden="true"></i> 権限を確認・変更</a></td>
           </tr>
           {% empty %}<tr><td colspan="5">対象社員はいません。</td></tr>{% endfor %}
         </tbody>

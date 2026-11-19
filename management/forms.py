@@ -242,6 +242,13 @@ class EmployeeEditForm(
             "last_name",
             "is_active",
         ]
+        labels = {"is_active": "利用中"}
+        help_texts = {
+            "is_active": (
+                "チェックを外すと利用停止になり、本人はログインできなくなります。"
+                "勤怠記録と申請履歴は削除されません。停止・再有効化には変更理由が必要です。"
+            ),
+        }
 
     def clean(self):
         cleaned = super().clean()

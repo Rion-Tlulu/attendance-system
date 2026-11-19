@@ -1978,3 +1978,314 @@ body.app-v6 .account-page-heading {
     white-space: nowrap;
   }
 }
+
+/* ============================================================
+   管理者画面・社員画面の補正（見づらい箇所・スタイル未適用箇所）
+   ============================================================ */
+
+/* チェックボックス・ラジオボタン: 入力欄用の幅100%指定を打ち消し、文字と横並びにする */
+body.app-v6 .app-content input:is([type="checkbox"], [type="radio"]) {
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  flex: none;
+  justify-self: start;
+  align-self: center;
+}
+body.app-v6 .app-content label:has(> input:is([type="checkbox"], [type="radio"])) {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  cursor: pointer;
+}
+/* Django の RadioSelect（div > div > label > input）を横並びにする */
+body.app-v6 .app-content fieldset > div:has(> div > label > input[type="radio"]) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 28px;
+}
+
+/* 変更できない入力欄は見た目で区別する */
+body.app-v6 .app-content :is(input, select, textarea):is(:disabled, [readonly]) {
+  color: #3c4a5d;
+  background: #e8eef5;
+  border-color: #b8c7d8;
+  cursor: not-allowed;
+}
+
+/* 見出しの右側に操作ボタンを置く */
+body.app-v6 .admin-heading--actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+body.app-v6 .admin-heading--actions .admin-actions {
+  margin: 0;
+}
+
+/* 一覧の行内操作（詳細・編集など） */
+body.app-v6 .admin-row-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 6px 12px;
+  color: #004a9f;
+  background: #fff;
+  border: 1px solid #8fb1d6;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+body.app-v6 .admin-row-link:hover {
+  background: #eaf3ff;
+}
+
+/* 月次詳細と出力（A04）: 日別の数値表は高さを抑え、見出しを固定してスクロールする */
+@media (min-width: 901px) {
+  body.app-v6 .reference-month-page > .f11-chart .f11-chart__table-wrap {
+    max-height: 340px;
+    overflow-y: auto;
+  }
+  body.app-v6 .reference-month-page > .f11-chart .f11-chart__table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+}
+
+/* 操作履歴詳細（A05）: 変更前後を横に並べて比較する */
+body.app-v6 .admin-audit-compare {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+body.app-v6 .admin-audit-compare > .admin-section {
+  margin: 0;
+}
+body.app-v6 .admin-detail-list--compact > div {
+  grid-template-columns: minmax(8em, 38%) minmax(0, 1fr);
+  gap: 10px;
+  padding: 9px 0;
+}
+body.app-v6 .admin-audit-raw > summary {
+  min-height: 44px;
+  padding: 8px 0;
+  color: #173b65;
+  font-weight: 700;
+  cursor: pointer;
+}
+body.app-v6 .admin-audit-raw h3 {
+  margin: 12px 0 6px;
+  font-size: 14px;
+}
+@media (max-width: 900px) {
+  body.app-v6 .admin-audit-compare {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 代理で修正を申請: 入力項目をまとまりごとに囲み、日時は2つ並べる */
+body.app-v6 .proxy-form {
+  display: grid;
+  gap: 16px;
+}
+body.app-v6 .proxy-group {
+  margin: 0;
+  padding: 14px 16px 6px;
+  border: 1px solid #b9cfe5;
+  border-radius: 9px;
+  background: #fff;
+  min-width: 0;
+}
+body.app-v6 .proxy-group > legend {
+  padding: 0 6px;
+  color: #063969;
+  font-size: 16px;
+}
+body.app-v6 .proxy-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 14px;
+}
+body.app-v6 .proxy-break-list {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+body.app-v6 .proxy-break {
+  padding: 10px 12px 2px;
+  background: #f4f8fc;
+  border: 1px solid #d0deeb;
+  border-radius: 8px;
+}
+body.app-v6 .proxy-break h3 {
+  margin: 0 0 6px;
+  font-size: 15px;
+}
+body.app-v6 .proxy-break__delete {
+  margin-bottom: 6px;
+  font-weight: 700;
+}
+body.app-v6 .proxy-group [data-e03-add-break] {
+  margin-bottom: 10px;
+}
+@media (max-width: 600px) {
+  body.app-v6 .proxy-pair {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 自分の勤怠（E02）: 対象月の選択を左、対象月の勤怠情報を右に並べる */
+body.app-v6 .e02-overview {
+  display: grid;
+  grid-template-columns: minmax(250px, 320px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: stretch;
+}
+body.app-v6 .e02-overview .e02-filter-panel {
+  margin: 0;
+  padding: 16px;
+  background: #fff;
+  border: 1px solid #b8cfe6;
+  border-radius: 9px;
+}
+body.app-v6 .e02-overview .e02-filter-panel h2 {
+  display: block;
+  margin: 0 0 10px;
+  color: #063969;
+  font-size: 16px;
+}
+body.app-v6 .e02-overview .e02-month-form {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 10px;
+}
+body.app-v6 .e02-overview .e02-month-form .v2-field {
+  flex: none;
+  max-width: none;
+  margin: 0;
+}
+body.app-v6 .e02-overview .e02-month-form .v2-button {
+  justify-content: center;
+}
+body.app-v6 .e02-month-info {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+}
+body.app-v6 .e02-month-info .e02-month-heading {
+  margin: 0;
+}
+body.app-v6 .e02-month-info .e02-kpi-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (max-width: 900px) {
+  body.app-v6 .e02-overview {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ============================================================
+   社員画面の補正（見づらい箇所・スタイル未適用箇所）
+   ============================================================ */
+
+/* 申請履歴: 見出しを他の画面とそろえ、絞り込みを横並びにする */
+body.app-v6 .correction-page .page-heading {
+  margin: 0 0 14px;
+  padding: 0 0 9px;
+  border-bottom: 1px solid #c0d3e7;
+}
+body.app-v6 .correction-page .page-heading h1 {
+  margin: 0;
+  font-size: 23px;
+}
+body.app-v6 .correction-filter {
+  display: grid;
+  grid-template-columns: minmax(0, 320px) auto;
+  justify-content: start;
+  align-items: center;
+  gap: 6px 12px;
+}
+body.app-v6 .correction-filter > label {
+  grid-column: 1 / -1;
+}
+body.app-v6 .correction-filter select {
+  width: 100%;
+  margin: 0;
+}
+body.app-v6 .correction-filter button {
+  margin: 0;
+}
+
+/* パスワード変更: ログアウトも主ボタンと同じ幅にそろえる */
+body.app-v6 .auth-card .reference-logout-form .v2-button {
+  width: 100%;
+  justify-content: center;
+}
+
+/* 日別詳細: 修正申請欄がない（審査中・確定済みなど）ときは空欄を作らず、2つの記録を横に並べる */
+body.app-v6 .reference-daily-workspace:not(:has(> .e03-application-form)) {
+  grid-template-columns: 1fr;
+}
+body.app-v6 .reference-daily-workspace:not(:has(> .e03-application-form)) > .e03-comparison {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* 日別詳細（スマートフォン）: 休憩の表を1件ずつのカードにして切れないようにする */
+@media (max-width: 600px) {
+  body.app-v6 .reference-daily-workspace:not(:has(> .e03-application-form)) > .e03-comparison {
+    grid-template-columns: 1fr;
+  }
+  body.app-v6 .e03-table,
+  body.app-v6 .e03-table tbody,
+  body.app-v6 .e03-table tr,
+  body.app-v6 .e03-table th,
+  body.app-v6 .e03-table td {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+  body.app-v6 .e03-table {
+    min-width: 0;
+  }
+  body.app-v6 .e03-table thead {
+    display: none;
+  }
+  body.app-v6 .e03-table tr {
+    margin-bottom: 10px;
+    padding: 6px 10px;
+    border: 1px solid #c8d6e5;
+    border-radius: 8px;
+    background: #fff;
+  }
+  body.app-v6 .e03-table tbody th {
+    padding: 4px 0;
+    border: 0;
+    text-align: left;
+    background: transparent;
+  }
+  body.app-v6 .e03-table td[data-label] {
+    display: grid;
+    grid-template-columns: 6em minmax(0, 1fr);
+    gap: 8px;
+    padding: 5px 0;
+    border: 0;
+    border-top: 1px solid #e1e9f2;
+  }
+  body.app-v6 .e03-table td[data-label]::before {
+    content: attr(data-label);
+    color: #42546a;
+    font-weight: 700;
+  }
+}

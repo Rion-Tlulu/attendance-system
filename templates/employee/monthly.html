@@ -54,8 +54,10 @@
 
 
     <!-- ====================================
-         対象月の選択
+         対象月の選択（左）と対象月の勤怠情報（右）
     ===================================== -->
+    <div class="e02-overview">
+
     <section
         class="v2-panel e02-filter-panel"
         aria-labelledby="e02-month-title"
@@ -109,6 +111,7 @@
 
 
     {% if report %}
+    <div class="e02-month-info">
 
     <!-- ====================================
          対象月・確定状態
@@ -215,6 +218,11 @@
         </article>
 
     </section>
+
+    </div>
+    {% endif %}
+    </div>
+    {% if report %}
 
 
     <!-- F11：対象月の日別実働時間。表を初期表示 -->

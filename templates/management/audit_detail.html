@@ -1,6 +1,5 @@
-
 {% extends "base.html" %}
-{% load static %}
+{% load static a05_audit %}
 
 {% block title %}操作履歴詳細 | 勤怠管理{% endblock %}
 {% block screen_label %}管理者｜操作履歴詳細{% endblock %}
@@ -13,30 +12,37 @@
 
 <div class="admin-page">
 
-    <header class="admin-heading">
-        <h1>操作履歴詳細</h1>
-        <p>履歴番号：{{ item.pk }}</p>
+    <header class="admin-heading admin-heading--actions">
+        <div>
+            <h1>操作履歴詳細</h1>
+            <p>履歴番号：{{ item.pk }}（閲覧専用）</p>
+        </div>
+        <div class="admin-actions">
+            <a class="ui-button ui-button--secondary" href="{% url 'management:audit_history' %}{% if request.session.a05_return_query %}?{{ request.session.a05_return_query }}{% endif %}">
+                <i class="fa-solid fa-arrow-left" aria-hidden="true"></i> 操作履歴一覧へ戻る
+            </a>
+        </div>
     </header>
 
     <section class="ui-card admin-section">
-        <h2>{{ item.get_action_display }}</h2>
+        <h2><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i> {{ item.get_action_display }}</h2>
 
         <dl class="admin-detail-list">
             <div>
+                <dt>日時</dt>
+                <dd>{{ item.occurred_at|date:"Y/m/d H:i:s" }}</dd>
+            </div>
+            <div>
                 <dt>操作実行者</dt>
-                <dd>{{ item.actor.employee_number|default:"—" }}</dd>
+                <dd>{% if item.actor %}{{ item.actor.display_name }}（{{ item.actor.employee_number }}）{% else %}システム{% endif %}</dd>
             </div>
             <div>
                 <dt>対象社員</dt>
-                <dd>{{ item.target_employee.employee_number|default:"—" }}</dd>
+                <dd>{% if item.target_employee %}{{ item.target_employee.display_name }}（{{ item.target_employee.employee_number }}）{% else %}—{% endif %}</dd>
             </div>
             <div>
-                <dt>対象モデル</dt>
-                <dd>{{ item.target_model }}</dd>
-            </div>
-            <div>
-                <dt>対象ID</dt>
-                <dd>{{ item.target_id }}</dd>
+                <dt>対象</dt>
+                <dd>{{ item.target_model|audit_target_label }}{% if item.target_id %}（ID：{{ item.target_id }}）{% endif %}</dd>
             </div>
             <div>
                 <dt>操作理由</dt>
@@ -45,20 +51,50 @@
         </dl>
     </section>
 
-    <section class="ui-card admin-section">
-        <h2>変更前</h2>
-        <pre class="admin-audit-data">{{ item.before_data }}</pre>
+    <div class="admin-audit-compare">
+        <section class="ui-card admin-section" aria-labelledby="audit-before-title">
+            <h2 id="audit-before-title">変更前</h2>
+            {% with rows=item.before_data|audit_rows %}
+            {% if rows %}
+            <dl class="admin-detail-list admin-detail-list--compact">
+                {% for label, value in rows %}<div><dt>{{ label }}</dt><dd>{{ value }}</dd></div>{% endfor %}
+            </dl>
+            {% else %}<p class="admin-field-help">記録された値はありません。</p>{% endif %}
+            {% endwith %}
+        </section>
 
-        <h2>変更後</h2>
-        <pre class="admin-audit-data">{{ item.after_data }}</pre>
+        <section class="ui-card admin-section" aria-labelledby="audit-after-title">
+            <h2 id="audit-after-title">変更後</h2>
+            {% with rows=item.after_data|audit_rows %}
+            {% if rows %}
+            <dl class="admin-detail-list admin-detail-list--compact">
+                {% for label, value in rows %}<div><dt>{{ label }}</dt><dd>{{ value }}</dd></div>{% endfor %}
+            </dl>
+            {% else %}<p class="admin-field-help">記録された値はありません。</p>{% endif %}
+            {% endwith %}
+        </section>
+    </div>
 
-        <h2>補足情報</h2>
-        <pre class="admin-audit-data">{{ item.details }}</pre>
+    {% with rows=item.details|audit_rows %}
+    {% if rows %}
+    <section class="ui-card admin-section" aria-labelledby="audit-details-title">
+        <h2 id="audit-details-title">補足情報</h2>
+        <dl class="admin-detail-list admin-detail-list--compact">
+            {% for label, value in rows %}<div><dt>{{ label }}</dt><dd>{{ value }}</dd></div>{% endfor %}
+        </dl>
     </section>
+    {% endif %}
+    {% endwith %}
 
-    <a href="{% url 'management:audit_history' %}{% if request.session.a05_return_query %}?{{ request.session.a05_return_query }}{% endif %}">
-        操作履歴一覧へ戻る
-    </a>
+    <details class="ui-card admin-section admin-audit-raw">
+        <summary>記録された元データを表示（技術情報）</summary>
+        <h3>変更前</h3>
+        <pre class="admin-audit-data">{{ item.before_data }}</pre>
+        <h3>変更後</h3>
+        <pre class="admin-audit-data">{{ item.after_data }}</pre>
+        <h3>補足情報</h3>
+        <pre class="admin-audit-data">{{ item.details }}</pre>
+    </details>
 
 </div>
 
