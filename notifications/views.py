@@ -29,6 +29,11 @@ def safe_notification_path(value):
     if not value.startswith("/") or value.startswith("//") or "\\" in value:
         return reverse("notifications:list")
 
+    # ブラウザーはタブや改行を除去して解釈するため（例："/\t/evil.example" → "//evil.example"）、
+    # 制御文字・空白を含むパスは外部への遷移に化ける恐れがあるとして拒否する。
+    if any(ord(char) <= 0x20 or ord(char) == 0x7F for char in value):
+        return reverse("notifications:list")
+
     parts = urlsplit(value)
 
     if parts.scheme or parts.netloc:
