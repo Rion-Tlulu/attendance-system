@@ -98,9 +98,9 @@ class Command(BaseCommand):
                     existed = Notification.objects.filter(event_key=key).exists()
                     create_notification(
                         recipient=recipient, kind=Notification.Kind.INCOMPLETE,
-                        title="未完了の勤務があります",
+                        title="未完了記録があります",
                         body=(
-                            f"{session.employee.get_full_name()}（{session.employee.employee_number}）の"
+                            f"{session.employee.display_name}（{session.employee.employee_number}）の"
                             if is_management else ""
                         ) + f"{session.work_date:%Y/%m/%d}の勤務記録が未完了です。継続勤務の可能性も含めて確認してください。",
                         target_path=target, event_key=key, is_management=is_management,

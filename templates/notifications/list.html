@@ -1,115 +1,113 @@
 {% extends "base.html" %}
-{% load static %}
 
 {% block title %}
-お知らせ・通知 | 勤怠管理
+通知一覧 | 勤怠管理
 {% endblock %}
 
 {% block screen_label %}
-お知らせ・通知
+通知一覧
 {% endblock %}
 
 {% block content %}
 
-<div class="v2-page">
+<div class="v2-page notice-page">
 
     <header class="v2-heading">
         <div>
-            <h1>お知らせ・通知</h1>
+            <h1><i class="fa-solid fa-bell" aria-hidden="true"></i> 通知一覧</h1>
             <p>
-                自分に関するお知らせを確認できます。
+                自分宛の通知を新しい順に確認できます。通知から対象画面を開くと、その通知が既読になります。
             </p>
         </div>
 
-        <span class="v2-state v2-state--info">
-            未読 {{ unread_count }}件
+        <span class="notice-count{% if unread_count %} notice-count--unread{% endif %}">
+            {% if unread_count %}未読 {{ unread_count }}件{% else %}未読はありません{% endif %}
         </span>
     </header>
 
     <section class="v2-panel">
 
-        <div class="v2-actions">
+        <div class="notice-toolbar">
 
-            <a href="{% url 'notifications:list' %}"
-               class="v2-button v2-button--outline">
-                すべて
-            </a>
+            <nav class="notice-tabs" aria-label="表示する通知">
+                <a href="{% url 'notifications:list' %}"
+                   {% if status_filter != 'unread' %}aria-current="page"{% endif %}>すべて</a>
+                <a href="{% url 'notifications:list' %}?status=unread"
+                   {% if status_filter == 'unread' %}aria-current="page"{% endif %}>未読</a>
+            </nav>
 
-            <a href="{% url 'notifications:list' %}?status=unread"
-               class="v2-button v2-button--outline">
-                未読のみ
-            </a>
-
-            <form
-                method="post"
-                action="{% url 'notifications:read_all' %}"
-            >
+            <form method="post" action="{% url 'notifications:read_all' %}">
                 {% csrf_token %}
-
-                <button
-                    type="submit"
-                    class="v2-button"
-                    {% if unread_count == 0 %}disabled{% endif %}
-                >
-                    すべて既読にする
+                <button type="submit" class="notification-read-all"
+                        {% if unread_count == 0 %}disabled{% endif %}>
+                    <i class="fa-solid fa-check" aria-hidden="true"></i> すべて既読
                 </button>
             </form>
 
         </div>
 
-        <div class="v2-notification-list">
+        <div class="notice-list">
 
             {% for item in page_obj %}
 
-            <article class="v2-notification">
+            <article class="notice notice--{{ item.workflow_key }}{% if not item.is_read %} notice--unread{% endif %}">
 
-                <div class="v2-notification__heading">
-
-                    <h2>{{ item.title }}</h2>
-
-                    {% if item.is_read %}
-                    <span class="v2-state">既読</span>
+                <span class="notice__icon">
+                    {% if item.workflow_key == "action" %}
+                    <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                    {% elif item.workflow_key == "done" %}
+                    <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+                    {% elif item.workflow_key == "result" %}
+                    <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
                     {% else %}
-                    <span class="v2-state v2-state--info">
-                        未読
-                    </span>
+                    <i class="fa-solid fa-bell" aria-hidden="true"></i>
                     {% endif %}
-                    <span class="v2-state">{{ item.workflow_label }}</span>
+                </span>
+
+                <div class="notice__main">
+
+                    <div class="notice__head">
+                        <h2 class="notice__title">{{ item.title }}</h2>
+                        <p class="notice__states">
+                            {% if item.is_read %}
+                            <span class="notice-badge notice-badge--read">既読</span>
+                            {% else %}
+                            <span class="notice-badge notice-badge--unread">未読</span>
+                            {% endif %}
+                            <span class="notice-badge notice-badge--{{ item.workflow_key }}">{{ item.workflow_label }}</span>
+                        </p>
+                    </div>
+
+                    <p class="notice__meta">
+                        <span class="notice__kind">{{ item.kind_label }}</span>
+                        <time class="notice__time" datetime="{{ item.created_at|date:'c' }}">{{ item.created_at|date:"Y/m/d H:i" }}</time>
+                    </p>
+
+                    <p class="notice__body">{{ item.body }}</p>
+
+                    <form class="notice__open-form" method="post" action="{% url 'notifications:open' item.pk %}">
+                        {% csrf_token %}
+                        <button type="submit" class="notice__open" aria-label="対象画面を開く：{{ item.title }}">
+                            <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i> 対象画面を開く
+                        </button>
+                    </form>
 
                 </div>
-
-                <p>{{ item.body }}</p>
-
-                <time datetime="{{ item.created_at|date:'c' }}">
-                    {{ item.created_at|date:"Y/m/d H:i" }}
-                </time>
-
-                <form
-                    method="post"
-                    action="{% url 'notifications:open' item.pk %}"
-                >
-                    {% csrf_token %}
-
-                    <button
-                        type="submit"
-                        class="v2-button v2-button--outline"
-                    >
-                        内容を確認する
-                    </button>
-                </form>
 
             </article>
 
             {% empty %}
 
-            <p>表示できる通知はありません。</p>
+            <p class="notification-panel__empty">
+                <i class="fa-solid fa-inbox" aria-hidden="true"></i>
+                {% if status_filter == 'unread' %}未読の通知はありません。{% else %}通知はありません。{% endif %}
+            </p>
 
             {% endfor %}
 
         </div>
 
-        <nav class="v2-pagination"
-             aria-label="通知のページ切替">
+        <nav class="v2-pagination" aria-label="通知のページ切替">
 
             {% if page_obj.has_previous %}
             <a href="?status={{ status_filter }}&amp;page={{ page_obj.previous_page_number }}">

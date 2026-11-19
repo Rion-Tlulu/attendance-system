@@ -1592,90 +1592,6 @@ body.app-v6 .reference-month-page {
   flex: 1;
 }
 
-/* C03 */
-body.app-v6 .notification-panel {
-  width: min(540px, 100vw);
-  color: #152338;
-  border-left: 1px solid #a5bfdc;
-  border-radius: 10px 0 0 10px;
-}
-body.app-v6 .notification-panel__header {
-  padding: 12px 16px;
-  background: linear-gradient(#f9fcff, #eaf3ff);
-}
-body.app-v6 .notification-panel__header h2 {
-  color: #063969;
-  font-size: 21px;
-}
-body.app-v6 .notification-panel__header button {
-  color: #00396e;
-  background: transparent;
-  border: 0;
-  font-size: 25px;
-}
-body.app-v6 .notification-panel__actions {
-  padding: 10px 16px;
-}
-body.app-v6 .notification-panel__actions button {
-  color: #fff;
-  background: linear-gradient(#0866cb, #00438d);
-}
-body.app-v6 .notification-panel__item {
-  position: relative;
-  padding: 15px 0 15px 36px;
-}
-body.app-v6 .notification-panel__item::before {
-  content: "●";
-  position: absolute;
-  left: 3px;
-  top: 13px;
-  font-size: 23px;
-  color: #0064cd;
-}
-body.app-v6 .notification-panel__item h3 {
-  font-size: 17px;
-  color: #122336;
-}
-body.app-v6 .notification-panel__item button {
-  color: #0053b8;
-  background: transparent;
-  padding-left: 0;
-  border: 0;
-  font-weight: 700;
-}
-.reference-notification-states {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin: 5px 0;
-}
-.reference-notification-states span {
-  padding: 1px 7px;
-  border-radius: 4px;
-  color: #132c4b;
-  background: #e2edf9;
-  font-size: 12px;
-  font-weight: 700;
-}
-.reference-notification-states .reference-unread {
-  color: #981e29;
-  background: #ffdbdf;
-}
-.reference-notification-states .reference-read {
-  color: #34465b;
-  background: #e3eaf1;
-}
-body.app-v6 .notification-panel__all {
-  margin: 10px;
-  padding: 10px;
-  color: #0046a3;
-  border: 1px solid #9dbbdb;
-  border-radius: 5px;
-  font-weight: 700;
-  text-align: center;
-  text-decoration: none;
-}
-
 @media (max-width: 1100px) and (min-width: 901px) {
   body.app-v6 {
     --sidebar-width: 218px;
@@ -2023,9 +1939,6 @@ body.app-v6 .notification-panel__all {
   body.app-v6 .auth-heading h1 {
     font-size: 22px;
   }
-  body.app-v6 .notification-panel {
-    border-radius: 0;
-  }
 }
 @media (prefers-reduced-motion: reduce) {
   body.app-v6 *,
@@ -2056,15 +1969,6 @@ body.app-v6 .account-page-heading {
 .reference-account-actions .v2-button {
   width: 100%;
   justify-content: center;
-}
-
-/* 通知: 既読／未読と対応状態のバッジを右側にまとめて表示する */
-body.app-v6 .v2-notification__heading {
-  gap: 8px;
-}
-body.app-v6 .v2-notification__heading h2 {
-  flex: 1 1 auto;
-  min-width: 0;
 }
 
 /* 自分の勤怠（スマートフォン）: 「8時間00分」を途中で改行しない */

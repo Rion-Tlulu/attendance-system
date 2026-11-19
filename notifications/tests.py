@@ -95,6 +95,65 @@ class NotificationTests(TestCase):
         self.assertEqual([item["id"] for item in unread["items"]], [old.pk])
         self.assertEqual(unread["unread_count"], 1)
 
+    def test_panel_items_show_kind_and_workflow_status_as_text(self):
+        """14章: 種別・対応状況を文字で返す（対応が必要／対応済み／結果通知）。"""
+        notify_correction_submitted(self.correction)
+        self.client.force_login(self.manager)
+        item = self.client.get(reverse("notifications:panel")).json()["items"][0]
+        self.assertEqual(item["kind_label"], "修正申請の到着")
+        self.assertEqual((item["workflow_key"], item["workflow_label"]), ("action", "対応が必要"))
+        # 管理業務通知の氏名は「姓 名」の順で表示する。
+        notice = Notification.objects.get(recipient=self.manager)
+        self.assertIn("社員 一般（97001）", notice.body)
+
+        self.correction.status = CorrectionRequest.Status.APPROVED
+        self.correction.save(update_fields=["status"])
+        item = self.client.get(reverse("notifications:panel")).json()["items"][0]
+        self.assertEqual((item["workflow_key"], item["workflow_label"]), ("done", "対応済み"))
+
+        notify_correction_reviewed(self.correction)
+        self.client.force_login(self.employee)
+        item = self.client.get(reverse("notifications:panel")).json()["items"][0]
+        self.assertEqual(item["kind_label"], "申請の処理結果")
+        self.assertEqual((item["workflow_key"], item["workflow_label"]), ("result", "結果通知"))
+        self.assertIn("承認されました。修正内容を確認してください。", Notification.objects.get(recipient=self.employee).body)
+
+    def test_panel_markup_meets_accessibility_requirements(self):
+        """T09・14章: 読み上げ名・開閉状態・名称付きモーダル・絞込み・すべて見るを備える。"""
+        for _ in range(3):
+            self.make_user_notification()
+        self.client.force_login(self.employee)
+        html = self.client.get(reverse("attendance:home")).content.decode()
+        self.assertIn('aria-label="通知 未読 3 件"', html)
+        self.assertIn('aria-expanded="false"', html)
+        self.assertIn('aria-controls="notification-panel"', html)
+        self.assertRegex(html, r'id="notification-panel"[^>]*role="dialog"[^>]*aria-modal="true"[^>]*aria-labelledby="notification-panel-title"')
+        self.assertRegex(html, r'<h2 id="notification-panel-title" tabindex="-1">')
+        self.assertIn('name="notification-filter" value="unread"', html)
+        self.assertIn('id="notification-read-all-form"', html)
+        self.assertIn(f'href="{reverse("notifications:list")}">すべて見る', html)
+        self.assertIn('role="status"', html)
+
+    def test_panel_read_all_returns_json_without_leaving_the_page(self):
+        """パネルの「すべて既読」は画面遷移せず、結果をJSONで返す。"""
+        self.make_user_notification()
+        self.client.force_login(self.employee)
+        response = self.client.post(reverse("notifications:read_all"), HTTP_ACCEPT="application/json")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"ok": True})
+        self.assertEqual(self.client.get(reverse("notifications:panel")).json()["unread_count"], 0)
+
+    def test_list_page_shows_read_state_kind_and_workflow_labels(self):
+        self.make_user_notification()
+        self.client.force_login(self.employee)
+        response = self.client.get(reverse("notifications:list"))
+        self.assertContains(response, "通知一覧")
+        self.assertContains(response, "notice-badge--unread")
+        self.assertContains(response, "お知らせ")
+        self.assertContains(response, "未読 1件")
+        unread = self.client.get(reverse("notifications:list"), {"status": "unread"})
+        self.assertContains(unread, 'aria-current="page">未読</a>', html=False)
+
     def test_stopped_employee_result_opens_application_detail_for_manager(self):
         self.employee.is_active = False
         self.employee.save(update_fields=["is_active"])

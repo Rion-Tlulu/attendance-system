@@ -106,6 +106,8 @@ def notification_open(request, pk):
 def mark_all_read(request):
     """本人の未読通知だけを既読にする"""
 
+    # 通知パネルからの操作はパネルを開いたまま結果を返す（14章）。
+    wants_json = "application/json" in request.headers.get("Accept", "")
     started_at = timezone.now()
     try:
         visible_notifications(request.user).filter(
@@ -114,8 +116,12 @@ def mark_all_read(request):
         ).update(read_at=started_at)
     except SAVE_FAILURE_ERRORS:
         log_save_failure("notification_mark_all_read", employee_id=request.user.pk)
+        if wants_json:
+            return JsonResponse({"ok": False, "error": UNCONFIRMED_SAVE_MESSAGE}, status=503)
         messages.error(request, UNCONFIRMED_SAVE_MESSAGE)
 
+    if wants_json:
+        return JsonResponse({"ok": True})
     return HttpResponseRedirect(reverse("notifications:list"))
 
 
@@ -137,7 +143,9 @@ def notification_panel(request):
             "body": item.body,
             "created_at": timezone.localtime(item.created_at).strftime("%Y/%m/%d %H:%M"),
             "read": item.is_read,
-            "resolved": item.is_resolved,
+            "resolved": item.workflow_key == "done",
+            "kind_label": item.kind_label,
+            "workflow_key": item.workflow_key,
             "workflow_label": item.workflow_label,
             "open_url": reverse("notifications:open", args=[item.pk]),
         } for item in items],

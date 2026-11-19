@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
+from django.utils.functional import cached_property
 
 
 class Notification(models.Model):
@@ -144,13 +145,41 @@ class Notification(models.Model):
                 ).exists()
         return False
 
+    # 対応状況（13章）。既読状態とは別に、対象の業務状態から判定する。
+    WORKFLOW_LABELS = {
+        "action": "対応が必要",
+        "done": "対応済み",
+        "result": "結果通知",
+        "info": "お知らせ",
+    }
+
+    # 通知の種別（13章 N01〜N04）。画面には種別名を文字で表示する。
+    KIND_LABELS = {
+        Kind.CORRECTION_SUBMITTED: "修正申請の到着",
+        Kind.CORRECTION_APPROVED: "申請の処理結果",
+        Kind.CORRECTION_RETURNED: "申請の処理結果",
+        Kind.INCOMPLETE: "未完了記録の確認",
+        Kind.ATTENDANCE_INCOMPLETE: "未完了記録の確認",
+        Kind.MONTH_FINALIZED: "月次確定と解除",
+        Kind.MONTH_REOPENED: "月次確定と解除",
+        Kind.GENERAL: "お知らせ",
+    }
+
+    @cached_property
+    def workflow_key(self):
+        if self.kind in (self.Kind.CORRECTION_SUBMITTED, self.Kind.INCOMPLETE, self.Kind.ATTENDANCE_INCOMPLETE):
+            return "done" if self.is_resolved else "action"
+        if self.kind in (self.Kind.CORRECTION_APPROVED, self.Kind.CORRECTION_RETURNED, self.Kind.MONTH_FINALIZED, self.Kind.MONTH_REOPENED):
+            return "result"
+        return "info"
+
     @property
     def workflow_label(self):
-        if self.kind in (self.Kind.CORRECTION_SUBMITTED, self.Kind.INCOMPLETE, self.Kind.ATTENDANCE_INCOMPLETE):
-            return "対応済み" if self.is_resolved else "未対応"
-        if self.kind in (self.Kind.CORRECTION_APPROVED, self.Kind.CORRECTION_RETURNED, self.Kind.MONTH_FINALIZED, self.Kind.MONTH_REOPENED):
-            return "処理結果"
-        return "お知らせ"
+        return self.WORKFLOW_LABELS[self.workflow_key]
+
+    @property
+    def kind_label(self):
+        return self.KIND_LABELS.get(self.kind, "お知らせ")
 
     def __str__(self):
         return self.title

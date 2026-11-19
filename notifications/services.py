@@ -74,7 +74,7 @@ def notify_correction_submitted(correction):
             kind=Notification.Kind.CORRECTION_SUBMITTED,
             title="新しい修正申請があります",
             body=(
-                f"{correction.employee.get_full_name()}"
+                f"{correction.employee.display_name}"
                 f"（{correction.employee.employee_number}）の"
                 f"{correction.work_date:%Y/%m/%d}の修正申請を確認してください。"
             ),
@@ -92,13 +92,13 @@ def notify_correction_reviewed(correction):
     if status == "approved":
         kind = Notification.Kind.CORRECTION_APPROVED
         title = "修正申請が承認されました"
-        body = "提出した勤怠修正申請が承認されました" "修正内容を確認してください"
+        body = "提出した勤怠修正申請が承認されました。修正内容を確認してください。"
 
     elif status == "returned":
         kind = Notification.Kind.CORRECTION_RETURNED
         title = "修正申請が差し戻されました"
         body = (
-            "提出した勤怠修正申請が差し戻されました" "理由と申請内容を確認してください"
+            "提出した勤怠修正申請が差し戻されました。理由と申請内容を確認してください。"
         )
 
     else:
@@ -120,7 +120,7 @@ def notify_correction_reviewed(correction):
         management = True
     for recipient in recipients:
         management_body = (
-            f"{target_employee.get_full_name()}（{target_employee.employee_number}）の"
+            f"{target_employee.display_name}（{target_employee.employee_number}）の"
             f"{correction.work_date:%Y/%m/%d}の申請結果を確認してください。"
         ) if management else body
         create_notification(
@@ -158,7 +158,7 @@ def notify_month_changed(closing):
             kind=kind,
             title="月次勤怠が確定しました" if finalized else "月次勤怠の確定が解除されました",
             body=(
-                f"{closing.employee.get_full_name()}（{closing.employee.employee_number}）の"
+                f"{closing.employee.display_name}（{closing.employee.employee_number}）の"
                 f"{month:%Y年%m月}の勤怠を確認してください。"
                 if management else f"{month:%Y年%m月}の勤怠を確認してください。"
             ),
