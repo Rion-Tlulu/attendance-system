@@ -5,7 +5,7 @@
 {% block extra_css %}<link rel="stylesheet" href="{% static 'css/manager-pages.css' %}">{% endblock %}
 {% block content %}
 <div class="admin-page">
-  <header class="admin-heading"><h1>申請一覧（審査）A02</h1></header>
+  <header class="admin-heading"><h1>申請一覧（審査）</h1></header>
   <form method="get" class="admin-search reference-filter-bar">
     <div><label for="review-status">申請状態</label><select id="review-status" name="status"><option value="all" {% if status_filter == 'all' %}selected{% endif %}>すべて</option><option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>審査中</option><option value="approved" {% if status_filter == 'approved' %}selected{% endif %}>承認済み</option><option value="returned" {% if status_filter == 'returned' %}selected{% endif %}>差戻し</option><option value="withdrawn" {% if status_filter == 'withdrawn' %}selected{% endif %}>取下げ済み</option></select></div>
     <div><label for="review-kind">申請区分</label><select id="review-kind" name="kind"><option value="all" {% if kind_filter == 'all' %}selected{% endif %}>通常・代理すべて</option><option value="normal" {% if kind_filter == 'normal' %}selected{% endif %}>通常</option><option value="proxy" {% if kind_filter == 'proxy' %}selected{% endif %}>代理</option></select></div>

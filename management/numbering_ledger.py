@@ -349,7 +349,7 @@ def restore_departments(*, path=None, actor):
               existing.before_data, existing.after_data, existing.reason, existing.details) != (
                   row["actor_id"], row["action"], row["target_model"], row["target_id"],
                   row["before_data"], row["after_data"], row["reason"], row["details"]):
-            raise NumberingLedgerError("A05の成功履歴に衝突があります。")
+            raise NumberingLedgerError("操作履歴の成功記録に衝突があります。")
 
     if current_snapshot() != expected:
         raise NumberingLedgerError("復元後の照合に失敗しました。採番を停止します。")

@@ -42,3 +42,10 @@ def jst_datetime(value):
     )
 
     return local_value.strftime("%Y/%m/%d %H:%M")
+
+
+@register.filter
+def plain_label(bound_field):
+    """画面設計に合わせ、ラベル末尾の「:」を付けずに label タグを出力する。"""
+
+    return bound_field.label_tag(label_suffix="")

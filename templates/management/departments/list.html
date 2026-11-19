@@ -6,13 +6,13 @@
 {% block content %}
 <div class="admin-page">
   <header class="admin-heading">
-    <h1>部署登録（A07）</h1>
+    <h1>部署登録</h1>
     <p>登録済みの部署と採番用コードを確認できます。</p>
   </header>
   <section class="ui-card admin-section">
     <div class="admin-actions">
       <a class="ui-button ui-button--primary" href="{% url 'management:department_create' %}">部署を新規登録する</a>
-      <a class="ui-button ui-button--secondary" href="{% url 'management:employee_create' %}">社員を登録する（A03）</a>
+      <a class="ui-button ui-button--secondary" href="{% url 'management:employee_create' %}">社員を登録する</a>
     </div>
     <form method="get" role="search" class="admin-field">
       <label for="department-search">部署名で検索</label>

@@ -821,7 +821,7 @@ body.app-v6 .e01-action-button:disabled {
 .e01-actions .clock-form:has(input[name="action"][value="clock_out"]) {
   order: 1;
 }
-body.app-v6 .e01-actions .clock-form:only-child {
+body.app-v6 .e01-actions .clock-form:only-of-type {
   grid-column: 1 / -1;
 }
 body.app-v6 .e01-feedback {
@@ -2034,5 +2034,43 @@ body.app-v6 .notification-panel__all {
     animation: none !important;
     transition: none !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* 画面設計への補正: 見出しは左揃え、保存とログアウトは横並び（狭い画面では縦並び） */
+body.app-v6 .account-page-heading {
+  align-items: flex-start;
+}
+.reference-account-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+}
+.reference-account-actions > * {
+  flex: 1 1 200px;
+}
+.reference-account-actions .reference-logout-form {
+  margin-top: 0;
+}
+.reference-account-actions .v2-button {
+  width: 100%;
+  justify-content: center;
+}
+
+/* 通知: 既読／未読と対応状態のバッジを右側にまとめて表示する */
+body.app-v6 .v2-notification__heading {
+  gap: 8px;
+}
+body.app-v6 .v2-notification__heading h2 {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* 自分の勤怠（スマートフォン）: 「8時間00分」を途中で改行しない */
+@media (min-width: 360px) and (max-width: 480px) {
+  body.app-v6 .e02-kpi strong {
+    font-size: 18px;
+    white-space: nowrap;
   }
 }

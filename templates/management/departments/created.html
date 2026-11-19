@@ -5,7 +5,7 @@
 {% block extra_css %}<link rel="stylesheet" href="{% static 'css/manager-pages.css' %}">{% endblock %}
 {% block content %}
 <div class="admin-page">
-  <header class="admin-heading"><h1>部署登録が完了しました（A07）</h1>
+  <header class="admin-heading"><h1>部署登録が完了しました</h1>
     <p>登録時の結果を表示しています。同じ操作を再送しても履歴は増えません。</p>
   </header>
   <section class="ui-card admin-section admin-form-card">
@@ -17,7 +17,7 @@
     </dl>
     <div class="admin-actions">
       <a class="ui-button ui-button--secondary" href="{% url 'management:department_list' %}">部署一覧へ戻る</a>
-      {% if registration.department.is_active %}<a class="ui-button ui-button--primary" href="{% url 'management:employee_create' %}">A03で社員を登録する</a>{% endif %}
+      {% if registration.department.is_active %}<a class="ui-button ui-button--primary" href="{% url 'management:employee_create' %}">社員を登録する</a>{% endif %}
     </div>
   </section>
 </div>

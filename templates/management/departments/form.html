@@ -5,7 +5,7 @@
 {% block extra_css %}<link rel="stylesheet" href="{% static 'css/manager-pages.css' %}">{% endblock %}
 {% block content %}
 <div class="admin-page">
-  <header class="admin-heading"><h1>{{ page_title }}（A07）</h1>
+  <header class="admin-heading"><h1>{{ page_title }}</h1>
     <p>部署名と割当可能な採番用コードを確認してください。</p>
   </header>
   <div class="reference-columns">
@@ -16,7 +16,8 @@
       {% if form.non_field_errors %}<div class="admin-warning" role="alert">{{ form.non_field_errors }}</div>{% endif %}
       {% if no_codes %}<div class="admin-warning" role="alert">割当可能な部署コードがありません。</div>{% endif %}
       {% if stop_reason %}<div class="admin-warning" role="alert">{{ stop_reason }}</div>{% endif %}
-      {% for field in form %}
+      {% for field in form.hidden_fields %}{{ field }}{% endfor %}
+      {% for field in form.visible_fields %}
         <div class="admin-field">
           <label for="{{ field.id_for_label }}">{{ field.label }} {% if field.field.required %}<span class="reference-required">必須</span>{% endif %}</label> {{ field }}
           {% if field.help_text %}<p class="admin-field-help">{{ field.help_text }}</p>{% endif %}
@@ -30,7 +31,7 @@
       </div>
     </form>
   </section>
-  <aside class="reference-note"><h2><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i> 重要な注意事項</h2><p class="reference-important">A07登録では社員番号を発行しません。</p><p>社員番号は、社員登録（A03）でこの部署を選択した後、保存時に確定します。</p><p>使用中・過去に使われた採番用コードは再利用できません。</p><a href="{% url 'management:employee_create' %}">社員登録（A03）へ <span aria-hidden="true">›</span></a></aside>
+  <aside class="reference-note"><h2><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i> 重要な注意事項</h2><p class="reference-important">部署登録では社員番号を発行しません。</p><p>社員番号は、社員登録でこの部署を選択した後、保存時に確定します。</p><p>使用中・過去に使われた採番用コードは再利用できません。</p><a href="{% url 'management:employee_create' %}">社員登録へ <span aria-hidden="true">›</span></a></aside>
   </div>
 </div>
 {% endblock %}

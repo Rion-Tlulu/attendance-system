@@ -1,3 +1,4 @@
+{% load attendance_ui %}
 <form method="post" action="{% url 'corrections:create' work_day.year work_day.month work_day.day %}" class="e03-application-form">
   {% csrf_token %}
   {% for field in form.hidden_fields %}{{ field }}{% endfor %}
@@ -5,8 +6,8 @@
     <h2>修正申請</h2>
     {% if form.non_field_errors %}<div class="e03-notice e03-notice--error" role="alert">{{ form.non_field_errors }}</div>{% endif %}
     <div class="reference-correction-times">
-      <div class="e03-form-field">{{ form.clock_in_at.label_tag }}{{ form.clock_in_at }}{{ form.clock_in_at.errors }}</div>
-      <div class="e03-form-field">{{ form.clock_out_at.label_tag }}{{ form.clock_out_at }}{{ form.clock_out_at.errors }}</div>
+      <div class="e03-form-field">{{ form.clock_in_at|plain_label }}{{ form.clock_in_at }}{{ form.clock_in_at.errors }}</div>
+      <div class="e03-form-field">{{ form.clock_out_at|plain_label }}{{ form.clock_out_at }}{{ form.clock_out_at.errors }}</div>
     </div>
     <h3 class="spacing-top-16">休憩の修正</h3>
     {{ break_formset.management_form }}
@@ -17,8 +18,8 @@
         <h3>休憩 {{ forloop.counter }}</h3>
         {% for field in rest.hidden_fields %}{{ field }}{% endfor %}
         <div class="reference-break-times">
-          <div class="e03-form-field">{{ rest.started_at.label_tag }}{{ rest.started_at }}{{ rest.started_at.errors }}</div>
-          <div class="e03-form-field">{{ rest.ended_at.label_tag }}{{ rest.ended_at }}{{ rest.ended_at.errors }}</div>
+          <div class="e03-form-field">{{ rest.started_at|plain_label }}{{ rest.started_at }}{{ rest.started_at.errors }}</div>
+          <div class="e03-form-field">{{ rest.ended_at|plain_label }}{{ rest.ended_at }}{{ rest.ended_at.errors }}</div>
         </div>
         <label class="reference-delete-break">{{ rest.DELETE }} この休憩を削除</label>
         {% if rest.non_field_errors %}<div class="e03-field-error" role="alert">{{ rest.non_field_errors }}</div>{% endif %}
@@ -26,7 +27,7 @@
       {% endfor %}
     </div>
     <button type="button" class="reference-add-break" data-e03-add-break><i class="fa-solid fa-plus" aria-hidden="true"></i> 休憩を追加</button>
-    <template id="e03-empty-break-template"><div class="e03-break-form"><h3>追加した休憩</h3>{% for field in break_formset.empty_form.hidden_fields %}{{ field }}{% endfor %}<div class="reference-break-times"><div class="e03-form-field">{{ break_formset.empty_form.started_at.label_tag }}{{ break_formset.empty_form.started_at }}</div><div class="e03-form-field">{{ break_formset.empty_form.ended_at.label_tag }}{{ break_formset.empty_form.ended_at }}</div></div><label class="reference-delete-break">{{ break_formset.empty_form.DELETE }} この休憩を削除</label></div></template>
+    <template id="e03-empty-break-template"><div class="e03-break-form"><h3>追加した休憩</h3>{% for field in break_formset.empty_form.hidden_fields %}{{ field }}{% endfor %}<div class="reference-break-times"><div class="e03-form-field">{{ break_formset.empty_form.started_at|plain_label }}{{ break_formset.empty_form.started_at }}</div><div class="e03-form-field">{{ break_formset.empty_form.ended_at|plain_label }}{{ break_formset.empty_form.ended_at }}</div></div><label class="reference-delete-break">{{ break_formset.empty_form.DELETE }} この休憩を削除</label></div></template>
     <div class="e03-form-field spacing-top-16"><label for="{{ form.reason.id_for_label }}">修正理由 <span class="reference-required">必須・500文字以内</span></label>{{ form.reason }}{{ form.reason.errors }}</div>
     <p class="reference-caption">原打刻の履歴は保持されます。承認されるまでは現在の有効値は変わりません。</p>
     <div class="e03-form-actions"><a class="v2-button v2-button--outline" href="{% url 'attendance:daily' work_day.year work_day.month work_day.day %}">戻る</a><button type="submit" class="v2-button"><i class="fa-regular fa-file-lines" aria-hidden="true"></i> 申請内容を確認する</button></div>

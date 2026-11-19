@@ -5,21 +5,23 @@
 {% block extra_css %}<link rel="stylesheet" href="{% static 'css/account-pages.css' %}">{% endblock %}
 {% block content %}
 <div class="account-page">
-  <header class="account-page-heading"><h1>アカウントと使い方 C02</h1></header>
+  <header class="account-page-heading"><h1>アカウントと使い方</h1></header>
   <div class="reference-columns">
     <section class="reference-form-card" aria-label="アカウントの設定">
       <div class="reference-tabs" role="tablist" aria-label="アカウントメニュー">
         <button type="button" role="tab" id="account-password-tab" aria-controls="account-password" aria-selected="true" data-reference-tab><i class="fa-solid fa-lock" aria-hidden="true"></i> パスワード変更</button>
-        <button type="button" role="tab" id="account-guide-tab" aria-controls="account-guide" aria-selected="false" tabindex="-1" data-reference-tab><i class="fa-regular fa-book-open" aria-hidden="true"></i> 使い方</button>
+        <button type="button" role="tab" id="account-guide-tab" aria-controls="account-guide" aria-selected="false" tabindex="-1" data-reference-tab><i class="fa-solid fa-book-open" aria-hidden="true"></i> 使い方</button>
       </div>
       <div id="account-password" role="tabpanel" aria-labelledby="account-password-tab">
-        <form method="post" action="{% url 'accounts:password_change' %}">
+        <form method="post" action="{% url 'accounts:password_change' %}" id="account-password-form">
           {% csrf_token %}
           {% include "components/password_fields.html" %}
           <p class="v2-notice"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> パスワードは12文字以上で設定してください。</p>
-          <button class="v2-button" type="submit"><i class="fa-regular fa-floppy-disk" aria-hidden="true"></i> 変更内容を保存</button>
         </form>
-        <form method="post" action="{% url 'accounts:logout' %}" class="reference-logout-form">{% csrf_token %}<button type="submit" class="v2-button v2-button--outline"><i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i> ログアウト</button></form>
+        <div class="reference-account-actions">
+          <button class="v2-button" type="submit" form="account-password-form"><i class="fa-regular fa-floppy-disk" aria-hidden="true"></i> 変更内容を保存</button>
+          <form method="post" action="{% url 'accounts:logout' %}" class="reference-logout-form">{% csrf_token %}<button type="submit" class="v2-button v2-button--outline"><i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i> ログアウト</button></form>
+        </div>
       </div>
       <div id="account-guide" role="tabpanel" aria-labelledby="account-guide-tab" hidden>
         <h2>使い方ガイド</h2>

@@ -1,11 +1,12 @@
 {% extends "base.html" %}
+{% load attendance_ui %}
 {% block title %}代理で修正を申請 | 勤怠管理{% endblock %}
 {% block screen_label %}管理者｜代理申請{% endblock %}
 {% block content %}
 <div class="v2-page">
   <header class="v2-heading"><div>
     <h1>代理で修正を申請</h1>
-    <p>{{ employee.get_full_name }}（{{ employee.employee_number }}） {{ work_day|date:"Y/m/d" }}</p>
+    <p>{{ employee.display_name }}（{{ employee.employee_number }}） {{ work_day|date:"Y/m/d" }}</p>
   </div></header>
   <section class="v2-panel">
     <p>停止中社員の正しい勤務日時と、確認した資料を入力してください。別の管理者が審査します。</p>
@@ -13,7 +14,7 @@
       {% csrf_token %}
       {{ form.non_field_errors }}
       {% for field in form %}
-        <div class="v2-field">{{ field.label_tag }} {{ field }} {{ field.errors }}</div>
+        <div class="v2-field">{{ field|plain_label }} {{ field }} {{ field.errors }}</div>
       {% endfor %}
       {{ break_formset.management_form }}
       {{ break_formset.non_form_errors }}
@@ -23,7 +24,7 @@
         <div class="v2-field">
           <h3>休憩 {{ forloop.counter }}</h3>
           {{ break_form.non_field_errors }}
-          {% for field in break_form %}{{ field.label_tag }} {{ field }} {{ field.errors }}{% endfor %}
+          {% for field in break_form %}{{ field|plain_label }} {{ field }} {{ field.errors }}{% endfor %}
         </div>
       {% endfor %}
       </div>
@@ -31,12 +32,12 @@
       <template id="e03-empty-break-template">
         <div class="v2-field">
           <h3>追加した休憩</h3>
-          {% for field in break_formset.empty_form %}{{ field.label_tag }} {{ field }}{% endfor %}
+          {% for field in break_formset.empty_form %}{{ field|plain_label }} {{ field }}{% endfor %}
         </div>
       </template>
       <h2>代理申請の証跡</h2>
       {% for field in evidence_form %}
-        <div class="v2-field">{{ field.label_tag }} {{ field }} {{ field.errors }}</div>
+        <div class="v2-field">{{ field|plain_label }} {{ field }} {{ field.errors }}</div>
       {% endfor %}
       <div class="v2-actions">
         <a class="v2-button v2-button--outline" href="{% url 'management:employee_month' employee.pk work_day.year work_day.month %}">月次詳細へ戻る</a>

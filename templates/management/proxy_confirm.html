@@ -5,7 +5,7 @@
 <div class="v2-page">
   <header class="v2-heading"><div><h1>代理申請の確認</h1></div></header>
   <section class="v2-panel">
-    <p>対象: {{ employee.get_full_name }}（{{ employee.employee_number }}） 勤務日: {{ work_day|date:"Y/m/d" }}</p>
+    <p>対象: {{ employee.display_name }}（{{ employee.employee_number }}） 勤務日: {{ work_day|date:"Y/m/d" }}</p>
     {% if target_day != work_day %}<p>移動先: {{ target_day|date:"Y/m/d" }}</p>{% endif %}
     <h2>現在の有効値</h2>
     <p>出勤 {{ current.clock_in_at|default:"未記録" }} ／ 退勤 {{ current.clock_out_at|default:"未記録" }}</p>

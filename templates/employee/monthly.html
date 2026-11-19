@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load attendance_ui %}
 {% load f11_charts %}
 {% load static %}
 
@@ -29,7 +30,7 @@
                     class="fa-solid fa-calendar-days"
                     aria-hidden="true"
                 ></i>
-                自分の勤怠 E02
+                自分の勤怠
             </h1>
 
             <p>
@@ -71,7 +72,7 @@
         >
 
             <div class="v2-field">
-                {{ form.month.label_tag }}
+                {{ form.month|plain_label }}
 
                 {{ form.month }}
 

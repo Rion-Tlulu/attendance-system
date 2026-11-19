@@ -64,37 +64,37 @@
               <strong>管理者メニュー</strong>
               <button type="button" data-mobile-section aria-expanded="true" aria-controls="mobile-attendance-links">勤怠管理</button>
               <div id="mobile-attendance-links" class="mobile-more-links">
-                <a href="{% url 'management:attendance_list' %}" {% if request.resolver_match.view_name == 'management:attendance_list' %}aria-current="page"{% endif %}>勤怠一覧（A01）</a>
-                <a href="{% url 'management:corrections' %}" {% if request.resolver_match.view_name == 'management:corrections' or request.resolver_match.view_name == 'management:correction_detail' %}aria-current="page"{% endif %}>申請一覧（A02）</a>
+                <a href="{% url 'management:attendance_list' %}" {% if request.resolver_match.view_name == 'management:attendance_list' %}aria-current="page"{% endif %}>勤怠一覧</a>
+                <a href="{% url 'management:corrections' %}" {% if request.resolver_match.view_name == 'management:corrections' or request.resolver_match.view_name == 'management:correction_detail' %}aria-current="page"{% endif %}>申請一覧</a>
               </div>
               <button type="button" data-mobile-section aria-expanded="true" aria-controls="mobile-month-links">月次管理</button>
               <div id="mobile-month-links" class="mobile-more-links">
-                <a href="{% url 'management:attendance_list' %}">月次詳細と出力（A04）</a>
+                <a href="{% url 'management:attendance_list' %}">月次詳細と出力</a>
               </div>
               <button type="button" data-mobile-section aria-expanded="true" aria-controls="mobile-people-links">社員・権限管理</button>
               <div id="mobile-people-links" class="mobile-more-links">
-                <a href="{% url 'management:employees' %}" {% if request.resolver_match.view_name == 'management:employees' or request.resolver_match.view_name == 'management:employee_create' or request.resolver_match.view_name == 'management:employee_edit' %}aria-current="page"{% endif %}>社員管理（A03）</a>
-                <a href="{% url 'management:department_list' %}" {% if request.resolver_match.view_name == 'management:department_list' or request.resolver_match.view_name == 'management:department_create' or request.resolver_match.view_name == 'management:department_edit' %}aria-current="page"{% endif %}>部署登録（A07）</a>
-                <a href="{% url 'management:role_list' %}" {% if request.resolver_match.view_name == 'management:role_list' or request.resolver_match.view_name == 'management:employee_role' %}aria-current="page"{% endif %}>業務管理者の権限管理（A06）</a>
+                <a href="{% url 'management:employees' %}" {% if request.resolver_match.view_name == 'management:employees' or request.resolver_match.view_name == 'management:employee_create' or request.resolver_match.view_name == 'management:employee_edit' %}aria-current="page"{% endif %}>社員管理</a>
+                <a href="{% url 'management:department_list' %}" {% if request.resolver_match.view_name == 'management:department_list' or request.resolver_match.view_name == 'management:department_create' or request.resolver_match.view_name == 'management:department_edit' %}aria-current="page"{% endif %}>部署登録</a>
+                <a href="{% url 'management:role_list' %}" {% if request.resolver_match.view_name == 'management:role_list' or request.resolver_match.view_name == 'management:employee_role' %}aria-current="page"{% endif %}>業務管理者の権限管理</a>
               </div>
               <button type="button" data-mobile-section aria-expanded="true" aria-controls="mobile-operations-links">運用メニュー</button>
               <div id="mobile-operations-links" class="mobile-more-links">
-                <a href="{% url 'management:audit_history' %}" {% if request.resolver_match.view_name == 'management:audit_history' or request.resolver_match.view_name == 'management:audit_detail' %}aria-current="page"{% endif %}>操作履歴（A05）</a>
-                <a href="{% url 'accounts:overview' %}">アカウントと使い方（C02）</a>
+                <a href="{% url 'management:audit_history' %}" {% if request.resolver_match.view_name == 'management:audit_history' or request.resolver_match.view_name == 'management:audit_detail' %}aria-current="page"{% endif %}>操作履歴</a>
+                <a href="{% url 'accounts:overview' %}">アカウントと使い方</a>
               </div>
             {% else %}
               <strong>社員メニュー</strong>
               <button type="button" data-mobile-section aria-expanded="true" aria-controls="mobile-clock-links">打刻メニュー</button>
               <div id="mobile-clock-links" class="mobile-more-links">
-                <a href="{% url 'attendance:home' %}" {% if request.resolver_match.view_name == 'attendance:home' %}aria-current="page"{% endif %}>打刻ホーム（E01）</a>
+                <a href="{% url 'attendance:home' %}" {% if request.resolver_match.view_name == 'attendance:home' %}aria-current="page"{% endif %}>打刻ホーム</a>
               </div>
               <button type="button" data-mobile-section aria-expanded="true" aria-controls="mobile-own-attendance-links">勤怠メニュー</button>
               <div id="mobile-own-attendance-links" class="mobile-more-links">
-                <a href="{% url 'attendance:monthly' %}" {% if request.resolver_match.view_name == 'attendance:monthly' or request.resolver_match.view_name == 'attendance:daily' %}aria-current="page"{% endif %}>自分の勤怠（E02）</a>
+                <a href="{% url 'attendance:monthly' %}" {% if request.resolver_match.view_name == 'attendance:monthly' or request.resolver_match.view_name == 'attendance:daily' %}aria-current="page"{% endif %}>自分の勤怠</a>
               </div>
               <button type="button" data-mobile-section aria-expanded="true" aria-controls="mobile-account-links">アカウントメニュー</button>
               <div id="mobile-account-links" class="mobile-more-links">
-                <a href="{% url 'accounts:overview' %}" {% if request.resolver_match.view_name == 'accounts:overview' %}aria-current="page"{% endif %}>アカウントと使い方（C02）</a>
+                <a href="{% url 'accounts:overview' %}" {% if request.resolver_match.view_name == 'accounts:overview' %}aria-current="page"{% endif %}>アカウントと使い方</a>
               </div>
               {% if request.user.is_business_admin %}
                 <a href="{% url 'management:home' %}">管理者画面へ</a>

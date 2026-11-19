@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load attendance_ui %}
 {% block title %}月次CSV出力 | 勤怠管理{% endblock %}
 {% block screen_label %}管理者｜CSV出力{% endblock %}
 {% block content %}
@@ -13,10 +14,10 @@
     <form method="post">
       {% csrf_token %}
       {% if form.non_field_errors %}<div class="v2-notice v2-notice--warning" role="alert">{{ form.non_field_errors }}</div>{% endif %}
-      <div class="v2-field">{{ form.month.label_tag }} {{ form.month }} {{ form.month.errors }}</div>
+      <div class="v2-field">{{ form.month|plain_label }} {{ form.month }} {{ form.month.errors }}</div>
       <fieldset class="v2-field"><legend>{{ form.scope.label }}</legend>{{ form.scope }} {{ form.scope.errors }}</fieldset>
-      <div class="v2-field">{{ form.department.label_tag }} {{ form.department }} {{ form.department.errors }}</div>
-      <div class="v2-field">{{ form.employee_number.label_tag }} {{ form.employee_number }} {{ form.employee_number.errors }}</div>
+      <div class="v2-field">{{ form.department|plain_label }} {{ form.department }} {{ form.department.errors }}</div>
+      <div class="v2-field">{{ form.employee_number|plain_label }} {{ form.employee_number }} {{ form.employee_number.errors }}</div>
       <div class="v2-actions">
         <button class="v2-button v2-button--outline" type="submit" name="mode" value="preview">対象を確認する</button>
         <button class="v2-button" type="submit" name="mode" value="create">出力IDを作成する</button>

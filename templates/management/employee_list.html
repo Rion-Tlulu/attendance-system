@@ -40,7 +40,7 @@
                     class="fa-solid fa-users"
                     aria-hidden="true"
                 ></i>
-                社員管理 A03
+                社員管理
             </h1>
 
             <p>
@@ -51,7 +51,7 @@
 
         <div class="a03-heading-actions">
             <a href="{% url 'management:department_create' %}"
-               class="a03-button a03-button--outline">部署を新規登録する（A07）</a>
+               class="a03-button a03-button--outline">部署を新規登録する</a>
             <a href="{% url 'management:employee_create' %}"
                class="a03-button a03-button--primary">
                 <i class="fa-solid fa-user-plus" aria-hidden="true"></i>
@@ -391,7 +391,7 @@
                         <th scope="row">
                             <div class="a03-employee-name">
                                 <strong>
-                                    {{ row.employee.get_full_name|default:"氏名未設定" }}
+                                    {{ row.employee.display_name|default:"氏名未設定" }}
                                 </strong>
                                 <span>
                                     {{ row.employee.employee_number }}
@@ -503,7 +503,7 @@
 
                     <div>
                         <h3>
-                            {{ row.employee.get_full_name|default:"氏名未設定" }}
+                            {{ row.employee.display_name|default:"氏名未設定" }}
                         </h3>
 
                         <p>

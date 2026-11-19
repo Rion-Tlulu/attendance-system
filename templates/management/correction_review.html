@@ -3,7 +3,7 @@
 {% block screen_label %}管理者｜修正申請{% endblock %}
 {% block content %}
 <div class="v2-page">
-  <header class="v2-heading"><h1>修正申請の確認 A02</h1><a href="{% url 'management:corrections' %}{% if request.session.a02_return_query %}?{{ request.session.a02_return_query }}{% endif %}" class="v2-button v2-button--outline">申請一覧へ戻る</a></header>
+  <header class="v2-heading"><h1>修正申請の確認</h1><a href="{% url 'management:corrections' %}{% if request.session.a02_return_query %}?{{ request.session.a02_return_query }}{% endif %}" class="v2-button v2-button--outline">申請一覧へ戻る</a></header>
   {% include "components/correction_review_card.html" %}
 </div>
 {% endblock %}

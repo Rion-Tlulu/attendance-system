@@ -60,7 +60,7 @@
 
                 ></i>
 
-                勤怠一覧 A01
+                勤怠一覧
 
             </h1>
 
@@ -644,7 +644,7 @@
 
                                 <strong>
 
-                                    {{ row.employee.get_full_name|default:"氏名未設定" }}
+                                    {{ row.employee.display_name|default:"氏名未設定" }}
 
                                 </strong>
 
@@ -828,7 +828,7 @@
 
                         <h3>
 
-                            {{ row.employee.get_full_name|default:"氏名未設定" }}
+                            {{ row.employee.display_name|default:"氏名未設定" }}
 
                         </h3>
 

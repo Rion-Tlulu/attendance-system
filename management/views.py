@@ -1038,7 +1038,7 @@ def employee_month(request, employee_id, year, month):
             "display_employee_number": frozen_info.get(
                 "employee_number", employee.employee_number
             ),
-            "display_employee_name": frozen_info.get("name", employee.get_full_name()),
+            "display_employee_name": frozen_info.get("name", employee.display_name),
             "selector_form": selector_form,
             "month_employees": Employee.objects.order_by("employee_number"),
             "completed_day_count": sum(row.work_seconds is not None for row in report.rows),

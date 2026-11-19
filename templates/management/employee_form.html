@@ -20,7 +20,7 @@
         <p>
             {% if creating %}
                 社員情報を登録すると、初回ログイン用パスワードが自動発行されます。
-                新しい部署は先に部署登録（A07）で登録してください。
+                新しい部署は先に部署登録で登録してください。
             {% else %}
                 社員の基本情報とアカウントの有効状態を管理します。
             {% endif %}
@@ -29,7 +29,7 @@
 
     {% include "components/employee_tabs.html" %}
     {% if creating %}
-    <a href="{% url 'management:department_create' %}">部署を新規登録する（A07）</a>
+    <a href="{% url 'management:department_create' %}">部署を新規登録する</a>
     {% endif %}
 
     {% if not creating and employee.is_active %}

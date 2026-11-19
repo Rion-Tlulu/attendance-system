@@ -78,7 +78,7 @@
 
             <!-- 社員番号 -->
             <div class="form-group">
-                {{ form.username.label_tag }}
+                <label for="{{ form.username.id_for_label }}"><i class="fa-solid fa-id-card" aria-hidden="true"></i> {{ form.username.label }}</label>
 
                 {{ form.username }}
 
@@ -104,7 +104,7 @@
             <!-- パスワード -->
             <div class="form-group">
 
-                {{ form.password.label_tag }}
+                <label for="{{ form.password.id_for_label }}"><i class="fa-solid fa-lock" aria-hidden="true"></i> {{ form.password.label }}</label>
 
                 <div class="password-control password-control--v2">
 

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load attendance_ui %}
 {% load static %}
 {% load f11_charts %}
 
@@ -18,7 +19,7 @@
     <!-- ページ見出し -->
     <header class="v2-heading">
         <div>
-            <h1>月次詳細と出力 A04</h1>
+            <h1>月次詳細と出力</h1>
             <p>
                 社員の月次勤怠詳細を確認し、
                 対象月の確定・解除を行います。
@@ -36,7 +37,7 @@
 
     <form method="get" class="reference-month-selector reference-filter-bar">
       <div><label for="month-employee">対象社員</label><select id="month-employee" name="employee">{% for item in month_employees %}<option value="{{ item.pk }}" {% if item.pk == employee.pk %}selected{% endif %}>{{ item.display_name }}（{{ item.employee_number }}）{% if not item.is_active %}・利用停止{% endif %}</option>{% endfor %}</select></div>
-      <div>{{ selector_form.month.label_tag }}{{ selector_form.month }}{{ selector_form.month.errors }}</div>
+      <div>{{ selector_form.month|plain_label }}{{ selector_form.month }}{{ selector_form.month.errors }}</div>
       <button type="submit" class="v2-button"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i> 表示</button>
     </form>
     <!-- 対象社員 -->
