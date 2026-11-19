@@ -135,7 +135,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
       input.type = isVisible ? "password" : "text";
 
-      button.textContent = isVisible ? "表示" : "非表示";
+      // 画面設計（C01・C02）に合わせ「表示する／隠す」とし、目のアイコンを保持する。
+      const icon = button.querySelector("i");
+      button.textContent = "";
+      if (icon) {
+        icon.className = isVisible ? "fa-regular fa-eye" : "fa-regular fa-eye-slash";
+        button.append(icon, " ");
+      }
+      button.append(isVisible ? "表示する" : "隠す");
 
       button.setAttribute("aria-pressed", String(!isVisible));
     });

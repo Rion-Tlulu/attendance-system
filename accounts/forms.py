@@ -9,6 +9,13 @@ from django.contrib.auth.forms import (
 class EmployeeAuthenticationForm(AuthenticationForm):
     """社員番号によるログインフォーム。"""
 
+    # 11章：アカウントの有無や停止状態は表示せず、共通の文言で案内する（画面設計 C01）。
+    LOGIN_ERROR_MESSAGE = "社員番号またはパスワードを確認してください。"
+    error_messages = {
+        "invalid_login": LOGIN_ERROR_MESSAGE,
+        "inactive": LOGIN_ERROR_MESSAGE,
+    }
+
     username = forms.CharField(
         label="社員番号",
         max_length=20,

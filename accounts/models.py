@@ -95,12 +95,15 @@ class Employee(AbstractUser):
                 new_active = self.is_active if update_fields is None or "is_active" in update_fields else previous.is_active
                 new_admin = (self.is_business_admin if update_fields is None or
                              "is_business_admin" in update_fields else previous.is_business_admin)
-                if previous.is_active and previous.is_business_admin and not (
+                # 技術管理用アカウントは対象にも人数にも含めない（03章）。
+                counted = not (previous.is_staff or previous.is_superuser)
+                if counted and previous.is_active and previous.is_business_admin and not (
                     new_active and new_admin
                 ):
                     active_ids = list(
                         type(self).objects.using(using).select_for_update()
-                        .filter(is_active=True, is_business_admin=True)
+                        .filter(is_active=True, is_business_admin=True,
+                                is_staff=False, is_superuser=False)
                         .order_by("pk").values_list("pk", flat=True)
                     )
                     if len(active_ids) <= 2:

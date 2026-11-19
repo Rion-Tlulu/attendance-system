@@ -6,7 +6,11 @@ import sys
 
 def main():
     """Run administrative tasks."""
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+    # テストは本番と同じ SQLite 設定をファイル DB で検証する（config/settings_test.py）。
+    default_settings = (
+        'config.settings_test' if sys.argv[1:2] == ['test'] else 'config.settings'
+    )
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', default_settings)
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:

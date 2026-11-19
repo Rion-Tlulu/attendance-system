@@ -21,8 +21,9 @@ def change_business_admin_role(*, actor_id, employee_id, grant, expected_role, r
         raise RoleChangeError("変更理由を1〜500文字で入力してください。")
 
     # すべての権限変更で同じ順序にロックし、同時の権限取消を直列化する。
+    # 技術管理用アカウントは有効な業務管理者の人数に含めない（03章）。
     active_admin_ids = list(Employee.objects.select_for_update().filter(
-        is_active=True, is_business_admin=True,
+        is_active=True, is_business_admin=True, is_staff=False, is_superuser=False,
     ).order_by("pk").values_list("pk", flat=True))
     actor = Employee.objects.select_for_update().get(pk=actor_id)
     if not actor.is_active or not actor.is_business_admin:

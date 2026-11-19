@@ -3961,8 +3961,8 @@ class ReleaseAcceptanceTests(TestCase):
                 "部署",
                 "対象月",
                 "勤務記録日数",
-                "実働秒数",
-                "休憩秒数",
+                "実働秒数合計",
+                "休憩秒数合計",
                 "未完了件数",
                 "確定日時",
                 "データ版",
@@ -4032,334 +4032,211 @@ class ReleaseAcceptanceTests(TestCase):
         )
 
 
-# PostgreSQL 並行処理
+# 要件定義書 v1.5.7 との照合で見つかった差異の修正
 
-"""PostgreSQL の別接続で実際の同時送信を検証する。"""
+import csv as _csv
+import io as _io
+import os as _os
+import subprocess as _subprocess
+import sys as _sys
+import tempfile as _tempfile
+from datetime import date as _date, datetime as _datetime
+from zoneinfo import ZoneInfo as _ZoneInfo
 
-import uuid
-import tempfile
-from concurrent.futures import ThreadPoolExecutor
-from datetime import date, datetime
-from pathlib import Path
-from threading import Barrier
-from unittest import skipUnless
-from unittest.mock import patch
-from zoneinfo import ZoneInfo
+from django.conf import settings as _settings
+from django.contrib.auth import get_user_model as _get_user_model
+from django.core.exceptions import ValidationError as _ValidationError
+from django.test import SimpleTestCase as _SimpleTestCase, TestCase as _TestCase
+from django.urls import reverse as _reverse
 
-from django.contrib.auth import get_user_model
-from django.db import close_old_connections, connection
-from django.test import Client, TransactionTestCase, override_settings
-from django.urls import reverse
-from django.utils import timezone
-
-from auditlog.models import AuditLog
-from attendance.models import ClockEvent, MonthlyClosing, WorkSession
-from attendance.services import ClockActionError, record_clock_action
-from corrections.models import CorrectionRequest
-from corrections.services import CorrectionError, current_values, withdraw_correction
-from management.models import Department, DepartmentRegistration, EmployeeNumberHistory
-from management.numbering_ledger import export_snapshot, verify_snapshot
-from management.services import AdminActionError, finalize_month, review_correction
+from attendance.models import WorkSession as _WorkSession
+from management.models import Department as _Department, ExportBatch as _ExportBatch
+from management.role_management import (
+    RoleChangeError as _RoleChangeError,
+    change_business_admin_role as _change_business_admin_role,
+)
+from management.services import finalize_month as _finalize_month
 
 
-@skipUnless(connection.vendor == "postgresql", "PostgreSQL 専用の並行試験")
-class PostgreSQLConcurrencyTests(TransactionTestCase):
+class RequirementV157ConformanceTests(_TestCase):
+    password = "TestPassword_2026!"
+
     def setUp(self):
-        Employee = get_user_model()
+        Employee = _get_user_model()
         self.manager = Employee.objects.create_user(
-            employee_number="91001", password="TestPassword_2026!", is_business_admin=True,
+            employee_number="91001", password=self.password, is_business_admin=True,
+        )
+        self.second_manager = Employee.objects.create_user(
+            employee_number="91002", password=self.password, is_business_admin=True,
+        )
+        # 技術管理用アカウント（業務管理者権限が付いていても人数に含めない）。
+        self.technical = Employee.objects.create_superuser(
+            employee_number="99001", password=self.password, is_business_admin=True,
         )
 
-    def concurrent_posts(self, requests):
-        barrier = Barrier(len(requests))
+    # ---- 差異1：A04 の CSV は出力IDを発行し、確定版から日次・月次を取得する ----
 
-        def run(url, data):
-            close_old_connections()
-            try:
-                client = Client()
-                client.force_login(self.manager)
-                barrier.wait(timeout=15)
-                return client.post(url, data).status_code
-            finally:
-                close_old_connections()
+    def test_a04_csv_button_issues_output_id_and_monthly_totals_header(self):
+        employee = _get_user_model().objects.create_user(
+            employee_number="10001", password=self.password, hire_date=_date(2026, 1, 1),
+        )
+        jst = _ZoneInfo("Asia/Tokyo")
+        _WorkSession.objects.create(
+            employee=employee, work_date=_date(2026, 9, 15),
+            clock_in_at=_datetime(2026, 9, 15, 9, tzinfo=jst),
+            clock_out_at=_datetime(2026, 9, 15, 18, tzinfo=jst),
+            status=_WorkSession.Status.COMPLETED,
+        )
+        _finalize_month(manager_id=self.manager.pk, employee_id=employee.pk,
+                        target_month=_date(2026, 9, 1), checked_no_record=True)
+        self.client.force_login(self.manager)
 
-        with ThreadPoolExecutor(max_workers=len(requests)) as pool:
-            futures = [pool.submit(run, url, data) for url, data in requests]
-            return [future.result(timeout=30) for future in futures]
+        response = self.client.post(_reverse("management:month_csv", args=[employee.pk, 2026, 9]))
+        batch = _ExportBatch.objects.get()
+        self.assertRedirects(response, _reverse("management:batch_detail", args=[batch.output_id]))
 
-    def test_a07_same_code_concurrent_registration_writes_one_history(self):
-        url = reverse("management:department_create")
-        responses = self.concurrent_posts([
-            (url, {"name": "営業部", "code": "3", "is_active": "on", "operation_id": str(uuid.uuid4())}),
-            (url, {"name": "総務部", "code": "3", "is_active": "on", "operation_id": str(uuid.uuid4())}),
+        monthly = self.client.post(_reverse("management:batch_download", args=[batch.output_id, "monthly"]))
+        self.assertIn(str(batch.output_id), monthly["Content-Disposition"])
+        rows = list(_csv.reader(_io.StringIO(monthly.content.decode("utf-8-sig"))))
+        self.assertEqual(rows[0], [
+            "社員番号", "氏名", "部署", "対象月", "勤務記録日数", "実働秒数合計",
+            "休憩秒数合計", "未完了件数", "確定日時", "データ版",
         ])
-        self.assertEqual(responses.count(302), 1)
-        self.assertTrue(all(status in {200, 302, 409} for status in responses))
-        self.assertEqual(Department.objects.filter(code=3).count(), 1)
-        self.assertEqual(DepartmentRegistration.objects.filter(code=3).count(), 1)
-        self.assertEqual(AuditLog.objects.filter(action=AuditLog.Action.DEPARTMENT_CREATE).count(), 1)
+        self.assertEqual(rows[1][5], "32400")
 
-    def test_a07_same_normalized_name_concurrent_registration_writes_one_history(self):
-        url = reverse("management:department_create")
-        responses = self.concurrent_posts([
-            (url, {"name": "  開発部  ", "code": "3", "is_active": "on", "operation_id": str(uuid.uuid4())}),
-            (url, {"name": "開発部", "code": "4", "is_active": "on", "operation_id": str(uuid.uuid4())}),
-        ])
-        self.assertEqual(responses.count(302), 1)
-        self.assertTrue(all(status in {200, 302, 409} for status in responses))
-        self.assertEqual(Department.objects.count(), 1)
-        self.assertEqual(DepartmentRegistration.objects.count(), 1)
-        self.assertEqual(AuditLog.objects.filter(action=AuditLog.Action.DEPARTMENT_CREATE).count(), 1)
+    def test_legacy_direct_csv_view_is_removed(self):
+        from management import views
+        self.assertFalse(hasattr(views, "month_csv"))
 
-    def test_a07_concurrency_with_external_ledger_keeps_one_result(self):
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "ledger.json"
-            with override_settings(NUMBERING_LEDGER_PATH=path), patch(
-                "management.numbering_ledger._test_database", return_value=False
-            ):
-                export_snapshot(path)
-                url = reverse("management:department_create")
-                responses = self.concurrent_posts([
-                    (url, {"name": "営業部", "code": "3", "is_active": "on",
-                           "operation_id": str(uuid.uuid4())}),
-                    (url, {"name": "総務部", "code": "3", "is_active": "on",
-                           "operation_id": str(uuid.uuid4())}),
-                ])
-                self.assertEqual(responses.count(302), 1)
-                self.assertTrue(all(status in {200, 302, 409, 503} for status in responses))
-                self.assertEqual(len(verify_snapshot(path)["departments"]), 1)
-                self.assertEqual(DepartmentRegistration.objects.count(), 1)
-                self.assertEqual(AuditLog.objects.filter(
-                    action=AuditLog.Action.DEPARTMENT_CREATE,
-                ).count(), 1)
+    # ---- 差異5：PC の管理者メニュー「運用メニュー」に C02 ----
 
-    def test_a03_simultaneous_creates_get_distinct_numbers(self):
-        department = Department.objects.create(name="開発部", code=3)
-        url = reverse("management:employee_create")
-        responses = self.concurrent_posts([
-            (url, {"first_name": "太郎", "last_name": "佐藤", "department_choice": str(department.pk),
-                   "hire_date": "2026-04-01", "operation_id": str(uuid.uuid4())}),
-            (url, {"first_name": "花子", "last_name": "山田", "department_choice": str(department.pk),
-                   "hire_date": "2026-04-01", "operation_id": str(uuid.uuid4())}),
-        ])
-        self.assertEqual(responses, [200, 200])
-        self.assertEqual(set(EmployeeNumberHistory.objects.values_list("employee_number", flat=True)),
-                         {"30001", "30002"})
+    def test_admin_sidebar_operations_menu_has_account_and_guide(self):
+        self.client.force_login(self.manager)
+        html = self.client.get(_reverse("management:audit_history")).content.decode()
+        sidebar = html[html.index('<nav class="side-navigation"'):]
+        sidebar = sidebar[:sidebar.index("</nav>")]
+        operations = sidebar[sidebar.index("運用メニュー"):]
+        self.assertIn(f'href="{_reverse("accounts:overview")}"', operations)
+        self.assertIn("アカウントと使い方", operations)
 
-    def test_a06_simultaneous_revocations_keep_two_active_managers(self):
-        Employee = get_user_model()
-        first = Employee.objects.create_user(
-            employee_number="91002", password="TestPassword_2026!", is_business_admin=True,
-        )
-        second = Employee.objects.create_user(
-            employee_number="91003", password="TestPassword_2026!", is_business_admin=True,
-        )
-        responses = self.concurrent_posts([
-            (reverse("management:employee_role", args=[first.pk]),
-             {"expected_role": "admin", "desired_role": "employee", "change_reason": "交代"}),
-            (reverse("management:employee_role", args=[second.pk]),
-             {"expected_role": "admin", "desired_role": "employee", "change_reason": "交代"}),
-        ])
-        self.assertEqual(sorted(responses), [200, 302])
-        self.assertEqual(Employee.objects.filter(is_active=True, is_business_admin=True).count(), 2)
-        self.assertEqual(AuditLog.objects.filter(action=AuditLog.Action.ROLE_CHANGE).count(), 1)
+    # ---- 差異6：技術管理用アカウントは有効な業務管理者の人数に含めない ----
 
-    def test_t02_parallel_clock_replay_writes_one_event(self):
-        employee = get_user_model().objects.create_user(
-            employee_number="91004", password="TestPassword_2026!",
-            hire_date=date(2026, 1, 1),
-        )
-        today = timezone.localdate()
-        operation_id = uuid.uuid4()
-        barrier = Barrier(2)
-
-        def clock():
-            close_old_connections()
-            try:
-                barrier.wait(timeout=15)
-                return record_clock_action(
-                    employee_id=employee.pk, kind=ClockEvent.Kind.CLOCK_IN,
-                    operation_id=operation_id, expected_work_date=today,
-                )
-            finally:
-                close_old_connections()
-
-        with ThreadPoolExecutor(max_workers=2) as pool:
-            futures = [pool.submit(clock) for _ in range(2)]
-            results = [future.result(timeout=30) for future in futures]
-        self.assertEqual(ClockEvent.objects.filter(operation_id=operation_id).count(), 1)
-        self.assertEqual(WorkSession.objects.filter(employee=employee).count(), 1)
-        self.assertEqual(sorted(result.already_recorded for result in results), [False, True])
-
-    def test_t02_parallel_distinct_clock_ins_reject_second(self):
-        employee = get_user_model().objects.create_user(
-            employee_number="91004", password="TestPassword_2026!",
-            hire_date=date(2026, 1, 1),
-        )
-        today = timezone.localdate()
-        barrier = Barrier(2)
-
-        def clock():
-            close_old_connections()
-            try:
-                barrier.wait(timeout=15)
-                try:
-                    return record_clock_action(
-                        employee_id=employee.pk, kind=ClockEvent.Kind.CLOCK_IN,
-                        operation_id=uuid.uuid4(), expected_work_date=today,
-                    )
-                except ClockActionError as exc:
-                    return exc
-            finally:
-                close_old_connections()
-
-        with ThreadPoolExecutor(max_workers=2) as pool:
-            futures = [pool.submit(clock) for _ in range(2)]
-            results = [future.result(timeout=30) for future in futures]
-        self.assertEqual(sum(not isinstance(item, ClockActionError) for item in results), 1)
-        self.assertEqual(ClockEvent.objects.filter(kind=ClockEvent.Kind.CLOCK_IN).count(), 1)
-
-    def test_t04_parallel_withdrawal_and_approval_have_one_outcome(self):
-        employee = get_user_model().objects.create_user(
-            employee_number="91004", password="TestPassword_2026!",
-            hire_date=date(2026, 1, 1),
-        )
-        jst = ZoneInfo("Asia/Tokyo")
-        work = WorkSession.objects.create(
-            employee=employee, work_date=date(2026, 9, 15),
-            clock_in_at=datetime(2026, 9, 15, 9, tzinfo=jst),
-            clock_out_at=datetime(2026, 9, 15, 18, tzinfo=jst),
-            status=WorkSession.Status.COMPLETED,
-        )
-        proposal = current_values(work)
-        proposal["clock_out_at"] = datetime(2026, 9, 15, 18, 30, tzinfo=jst).isoformat()
-        correction = CorrectionRequest.objects.create(
-            work_session=work, employee=employee, work_date=work.work_date,
-            requested_by=employee, original_version=work.version,
-            proposal=proposal, reason="退勤の訂正", status=CorrectionRequest.Status.PENDING,
-        )
-        barrier = Barrier(2)
-
-        def run(action):
-            close_old_connections()
-            try:
-                barrier.wait(timeout=15)
-                try:
-                    if action == "approve":
-                        review_correction(manager_id=self.manager.pk,
-                                          correction_id=correction.pk, action="approve")
-                    else:
-                        withdraw_correction(employee_id=employee.pk, request_id=correction.pk)
-                    return "success"
-                except (AdminActionError, CorrectionError):
-                    return "rejected"
-            finally:
-                close_old_connections()
-
-        with ThreadPoolExecutor(max_workers=2) as pool:
-            futures = [pool.submit(run, action) for action in ("approve", "withdraw")]
-            results = [future.result(timeout=30) for future in futures]
-        correction.refresh_from_db()
-        self.assertEqual(sorted(results), ["rejected", "success"])
-        self.assertIn(correction.status, {
-            CorrectionRequest.Status.APPROVED, CorrectionRequest.Status.WITHDRAWN,
-        })
-        work.refresh_from_db()
-        self.assertEqual(work.version, 2 if correction.status == CorrectionRequest.Status.APPROVED else 1)
-
-    def test_t05_parallel_month_finalization_keeps_one_current_version(self):
-        employee = get_user_model().objects.create_user(
-            employee_number="91004", password="TestPassword_2026!",
-            hire_date=date(2026, 1, 1),
-        )
-        barrier = Barrier(2)
-
-        def finalize():
-            close_old_connections()
-            try:
-                barrier.wait(timeout=15)
-                try:
-                    finalize_month(
-                        manager_id=self.manager.pk, employee_id=employee.pk,
-                        target_month=date(2026, 9, 1), checked_no_record=True,
-                    )
-                    return "success"
-                except AdminActionError:
-                    return "rejected"
-            finally:
-                close_old_connections()
-
-        with ThreadPoolExecutor(max_workers=2) as pool:
-            futures = [pool.submit(finalize) for _ in range(2)]
-            results = [future.result(timeout=30) for future in futures]
-        self.assertEqual(sorted(results), ["rejected", "success"])
-        self.assertEqual(MonthlyClosing.objects.filter(
-            employee=employee, target_month=date(2026, 9, 1),
-            status=MonthlyClosing.Status.FINALIZED,
-        ).count(), 1)
-
-    def test_t17_parallel_stop_and_revoke_keep_two_managers(self):
-        department = Department.objects.create(name="総務部", code=1)
-        Employee = get_user_model()
-        first = Employee.objects.create_user(
-            employee_number="91002", password="TestPassword_2026!",
-            is_business_admin=True, department=department.name,
-        )
-        second = Employee.objects.create_user(
-            employee_number="91003", password="TestPassword_2026!",
-            is_business_admin=True, department=department.name,
-        )
-        edit_url = reverse("management:employee_edit", args=[second.pk])
-        state = Client()
-        state.force_login(self.manager)
-        edit_state = state.get(edit_url).context["edit_state"]
-        responses = self.concurrent_posts([
-            (reverse("management:employee_role", args=[first.pk]),
-             {"expected_role": "admin", "desired_role": "employee", "change_reason": "交代"}),
-            (edit_url, {
-                "employee_number": second.employee_number, "first_name": "Test",
-                "last_name": "Manager", "department_choice": str(department.pk),
-                "change_reason": "交代", "edit_state": edit_state,
-                "operation_id": str(uuid.uuid4()),
-            }),
-        ])
-        self.assertEqual(sorted(responses), [200, 302])
-        self.assertEqual(Employee.objects.filter(is_active=True, is_business_admin=True).count(), 2)
-
-    def test_t18_parallel_transfers_issue_distinct_numbers(self):
-        source = Department.objects.create(name="旧部署", code=1)
-        target = Department.objects.create(name="新部署", code=3)
-        Employee = get_user_model()
-        employees = [
-            Employee.objects.create_user(
-                employee_number=f"1000{index}", password="TestPassword_2026!",
-                first_name=f"社員{index}", last_name="試験",
-                department=source.name, hire_date=date(2026, 1, 1),
-            ) for index in (1, 2)
-        ]
-        for employee in employees:
-            EmployeeNumberHistory.objects.create(
-                employee=employee, department=source,
-                employee_number=employee.employee_number,
+    def test_role_revocation_does_not_count_technical_account(self):
+        with self.assertRaises(_RoleChangeError):
+            _change_business_admin_role(
+                actor_id=self.manager.pk, employee_id=self.second_manager.pk,
+                grant=False, expected_role=True, reason="交代",
             )
-        client = Client()
-        client.force_login(self.manager)
-        requests = []
-        for employee in employees:
-            url = reverse("management:employee_edit", args=[employee.pk])
-            state = client.get(url).context["edit_state"]
-            requests.append((url, {
-                "employee_number": employee.employee_number,
-                "first_name": employee.first_name,
-                "last_name": employee.last_name,
-                "department_choice": str(target.pk), "is_active": "on",
-                "change_reason": "異動", "edit_state": state,
-                "operation_id": str(uuid.uuid4()),
-            }))
-        self.assertEqual(self.concurrent_posts(requests), [302, 302])
-        self.assertEqual(set(Employee.objects.filter(pk__in=[e.pk for e in employees]).values_list(
-            "employee_number", flat=True,
-        )), {"30001", "30002"})
-        self.assertEqual(set(EmployeeNumberHistory.objects.filter(
-            department=target,
-        ).values_list("employee_number", flat=True)), {"30001", "30002"})
+        self.second_manager.refresh_from_db()
+        self.assertTrue(self.second_manager.is_business_admin)
+
+    def test_model_guard_does_not_count_technical_account(self):
+        self.second_manager.is_active = False
+        with self.assertRaises(_ValidationError):
+            self.second_manager.save()
+        # 技術管理用アカウント自身は対象外のため、人数条件に関係なく変更できる。
+        self.technical.is_business_admin = False
+        self.technical.save()
+
+    def test_deactivation_does_not_count_technical_account(self):
+        department = _Department.objects.create(name="総務部", code=1)
+        _get_user_model().objects.filter(pk=self.second_manager.pk).update(department="総務部")
+        self.client.force_login(self.manager)
+        url = _reverse("management:employee_edit", args=[self.second_manager.pk])
+        response = self.client.post(url, {
+            "employee_number": "91002", "first_name": "Test", "last_name": "Manager",
+            "department_choice": str(department.pk), "change_reason": "退職",
+            "edit_state": self.client.get(url).context["edit_state"],
+            "operation_id": "8d3f1b9e-2c55-4c1f-9f1a-7f2d6c3b9a10",
+        })
+        self.assertContains(response, "有効な管理者は2人以上必要です。")
+        self.second_manager.refresh_from_db()
+        self.assertTrue(self.second_manager.is_active)
+
+    # ---- C01：画面設計の文言 ----
+
+    def test_login_failure_uses_common_message(self):
+        response = self.client.post(_reverse("accounts:login"), {
+            "username": "91001", "password": "wrong-password",
+        })
+        self.assertContains(response, "社員番号またはパスワードを確認してください。")
+        _get_user_model().objects.filter(pk=self.second_manager.pk).update(is_active=False)
+        response = self.client.post(_reverse("accounts:login"), {
+            "username": "91002", "password": self.password,
+        })
+        # 停止状態は明かさず、同じ文言で案内する（11章）。
+        self.assertContains(response, "社員番号またはパスワードを確認してください。")
+
+    def test_login_page_has_design_links_and_toggle_label(self):
+        response = self.client.get(_reverse("accounts:login"))
+        self.assertContains(response, "勤怠管理システムにログインしてください。")
+        self.assertContains(response, 'href="#login-trouble"')
+        self.assertContains(response, 'href="#login-contact"')
+        self.assertContains(response, "ログインできない場合")
+        self.assertContains(response, "社内問い合わせ窓口")
+        self.assertContains(response, "表示する")
+
+
+class ProductionSQLiteSettingsTests(_SimpleTestCase):
+    """差異2：本番設定は SQLite（IMMEDIATE）で、配置先を検証する（11章）。"""
+
+    def load(self, sqlite_path=None):
+        env = {
+            **_os.environ,
+            "DJANGO_SETTINGS_MODULE": "config.settings_production",
+            "DJANGO_SECRET_KEY": "s" * 60,
+            "DJANGO_ALLOWED_HOSTS": "example.com",
+            "PYTHONIOENCODING": "utf-8",
+        }
+        env.pop("DJANGO_SQLITE_PATH", None)
+        if sqlite_path is not None:
+            env["DJANGO_SQLITE_PATH"] = sqlite_path
+        code = (
+            "import django; django.setup(); from django.conf import settings as s; "
+            "d = s.DATABASES['default']; "
+            "print(d['ENGINE'], d['OPTIONS']['transaction_mode'], d['OPTIONS']['timeout']); "
+            "print(d['NAME'])"
+        )
+        return _subprocess.run(
+            [_sys.executable, "-c", code], cwd=_settings.BASE_DIR, env=env,
+            capture_output=True, text=True, encoding="utf-8", timeout=60,
+        )
+
+    def test_valid_local_path_uses_sqlite_immediate(self):
+        with _tempfile.TemporaryDirectory() as directory:
+            result = self.load(_os.path.join(directory, "attendance.sqlite3"))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines()[0].split(),
+                         ["django.db.backends.sqlite3", "IMMEDIATE", "20"])
+
+    def test_default_is_project_db_sqlite3(self):
+        result = self.load()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines()[0].split(),
+                         ["django.db.backends.sqlite3", "IMMEDIATE", "20"])
+        self.assertEqual(result.stdout.splitlines()[1],
+                         str((_settings.BASE_DIR / "db.sqlite3").resolve()))
+
+    def test_rejects_unsafe_locations(self):
+        with _tempfile.TemporaryDirectory() as directory:
+            cases = [
+                "attendance.sqlite3",
+                "//fileserver/share/attendance.sqlite3",
+                str(_settings.BASE_DIR / "static" / "attendance.sqlite3"),
+                _os.path.join(directory, "missing", "attendance.sqlite3"),
+            ]
+            for path in cases:
+                with self.subTest(path=path):
+                    result = self.load(path)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("ImproperlyConfigured", result.stderr)
+
+    def test_postgresql_is_not_configured_anywhere(self):
+        """SQLite（db.sqlite3）に一本化し、PostgreSQL の設定・依存・スクリプトを残さない。"""
+        base = _settings.BASE_DIR
+        self.assertFalse((base / "scripts" / "backup_postgres.py").exists())
+        self.assertNotIn("psycopg", (base / "requirements.txt").read_text(encoding="utf-8"))
+        for name in ("settings.py", "settings_production.py", "settings_test.py"):
+            text = (base / "config" / name).read_text(encoding="utf-8")
+            self.assertNotIn("postgresql", text, name)
+            self.assertNotIn("POSTGRES_", text, name)

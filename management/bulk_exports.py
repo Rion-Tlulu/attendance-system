@@ -30,6 +30,7 @@ from attendance.models import MonthlyClosing, WorkSession
 from attendance.reporting import build_monthly_report
 from attendance.validation import employed_during_month, month_integrity_issues
 from auditlog.models import AuditLog
+from config.db_errors import SAVE_FAILURE_ERRORS, UNCONFIRMED_SAVE_MESSAGE, log_save_failure
 from django.utils import timezone
 
 from .access import business_admin_required
@@ -289,8 +290,8 @@ def write_csv(
                 "部署",
                 "対象月",
                 "勤務記録日数",
-                "実働秒数",
-                "休憩秒数",
+                "実働秒数合計",
+                "休憩秒数合計",
                 "未完了件数",
                 "確定日時",
                 "データ版",
@@ -491,7 +492,15 @@ def bulk_export(request):
             }),
         )
 
-    return process_bulk_export(request)
+    try:
+        return process_bulk_export(request)
+    except SAVE_FAILURE_ERRORS:
+        # 出力IDの発行はロールバック済み。成功と表示せず、再操作を案内する。
+        log_save_failure("bulk_export")
+        form = BulkExportForm(request.POST)
+        form.is_valid()
+        form.add_error(None, UNCONFIRMED_SAVE_MESSAGE)
+        return render_export_form(request, form, status=503)
 
 
 @transaction.atomic

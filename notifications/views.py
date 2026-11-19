@@ -1,6 +1,7 @@
 from urllib.parse import urlsplit, urlencode, parse_qsl, urlunsplit
 
 from django.core import signing
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.http import HttpResponseRedirect, JsonResponse
@@ -12,6 +13,8 @@ from django.views.decorators.http import (
     require_GET,
     require_POST,
 )
+
+from config.db_errors import SAVE_FAILURE_ERRORS, UNCONFIRMED_SAVE_MESSAGE, log_save_failure
 
 from .models import Notification
 from .services import visible_notifications
@@ -99,10 +102,14 @@ def mark_all_read(request):
     """本人の未読通知だけを既読にする"""
 
     started_at = timezone.now()
-    visible_notifications(request.user).filter(
-        read_at__isnull=True,
-        created_at__lte=started_at,
-    ).update(read_at=started_at)
+    try:
+        visible_notifications(request.user).filter(
+            read_at__isnull=True,
+            created_at__lte=started_at,
+        ).update(read_at=started_at)
+    except SAVE_FAILURE_ERRORS:
+        log_save_failure("notification_mark_all_read", employee_id=request.user.pk)
+        messages.error(request, UNCONFIRMED_SAVE_MESSAGE)
 
     return HttpResponseRedirect(reverse("notifications:list"))
 

@@ -636,6 +636,41 @@ body.app-v6 .auth-help p {
   margin: 0;
   font-size: 14px;
 }
+/* C01：ログインできない場合／社内問い合わせ窓口 */
+body.app-v6 .auth-help-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-top: 16px;
+}
+body.app-v6 .auth-help-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  color: var(--ref-blue);
+  font-size: 15px;
+  font-weight: 700;
+  text-decoration: none;
+}
+body.app-v6 .auth-help-links a:hover {
+  text-decoration: underline;
+}
+body.app-v6 .auth-help--v2 {
+  flex-direction: column;
+  gap: 12px;
+  text-align: left;
+}
+body.app-v6 .auth-help--v2 h2 {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+body.app-v6 .auth-help--v2 section:target,
+body.app-v6 .auth-help--v2 section:focus {
+  outline: 3px solid #d47b00;
+  outline-offset: 4px;
+}
 body.app-v6 .auth-submit--v2 {
   width: 100%;
   margin-top: 8px;

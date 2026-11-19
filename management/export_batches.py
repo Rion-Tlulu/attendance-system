@@ -4,6 +4,7 @@ import csv
 import io
 from datetime import datetime
 
+from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.http import HttpResponse, HttpResponseBadRequest
@@ -15,6 +16,7 @@ from django.views.decorators.http import require_GET, require_POST
 from attendance.models import MonthlyClosing
 from attendance.validation import month_integrity_issues
 from auditlog.models import AuditLog
+from config.db_errors import SAVE_FAILURE_ERRORS, UNCONFIRMED_SAVE_MESSAGE, log_save_failure
 
 from .access import business_admin_required
 from .csv_format import csv_safe
@@ -97,8 +99,8 @@ def write_snapshot_csv(snapshots, output_format):
                     day["record_state"], "確定済み", snapshot["data_version"],
                 ])
     else:
-        writer.writerow(["社員番号", "氏名", "部署", "対象月", "勤務記録日数", "実働秒数",
-                         "休憩秒数", "未完了件数", "確定日時", "データ版"])
+        writer.writerow(["社員番号", "氏名", "部署", "対象月", "勤務記録日数", "実働秒数合計",
+                         "休憩秒数合計", "未完了件数", "確定日時", "データ版"])
         for snapshot in snapshots:
             common = [csv_safe(snapshot[key]) for key in ("employee_number", "name", "department")]
             writer.writerow([
@@ -120,10 +122,21 @@ def batch_detail(request, output_id):
 @never_cache
 @business_admin_required
 @require_POST
-@transaction.atomic
 def batch_download(request, output_id, output_format):
     if output_format not in {"daily", "monthly"}:
         return HttpResponseBadRequest("出力種別が不正です。")
+    try:
+        with transaction.atomic():
+            return _batch_download(request, output_id, output_format)
+    except SAVE_FAILURE_ERRORS:
+        log_save_failure("batch_download", output_id=str(output_id), output_format=output_format)
+        batch = get_object_or_404(ExportBatch, output_id=output_id)
+        return render(request, "management/export_batch.html", {
+            "batch": batch, "error": UNCONFIRMED_SAVE_MESSAGE,
+        }, status=503)
+
+
+def _batch_download(request, output_id, output_format):
     batch = get_object_or_404(ExportBatch.objects.select_for_update(), output_id=output_id)
     try:
         snapshots = current_snapshots(batch)
@@ -150,16 +163,22 @@ def batch_download(request, output_id, output_format):
 @never_cache
 @business_admin_required
 @require_POST
-@transaction.atomic
 def single_month_batch(request, employee_id, year, month):
     from datetime import date
     try:
         target_month = date(year, month, 1)
     except ValueError:
         return HttpResponseBadRequest("対象月が不正です。")
-    employee = get_object_or_404(get_user_model().objects.select_for_update(), pk=employee_id)
     try:
-        batch = create_export_batch(request.user, [employee], target_month)
+        with transaction.atomic():
+            employee = get_object_or_404(
+                get_user_model().objects.select_for_update(), pk=employee_id,
+            )
+            batch = create_export_batch(request.user, [employee], target_month)
     except ValueError as exc:
         return HttpResponseBadRequest(str(exc))
+    except SAVE_FAILURE_ERRORS:
+        log_save_failure("single_month_batch", employee_id=employee_id, month=target_month)
+        messages.error(request, UNCONFIRMED_SAVE_MESSAGE)
+        return redirect("management:employee_month", employee_id=employee_id, year=year, month=month)
     return redirect("management:batch_detail", output_id=batch.output_id)

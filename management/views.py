@@ -4,8 +4,6 @@
 このファイルのみで認証仕様が完成するわけではない。
 """
 
-import csv
-import io
 import logging
 import uuid
 from datetime import timedelta
@@ -32,6 +30,7 @@ from attendance.models import MonthlyClosing, WorkSession
 from attendance.reporting import build_monthly_report
 from attendance.validation import employed_during_month, month_integrity_issues
 from auditlog.models import AuditLog
+from config.db_errors import SAVE_FAILURE_ERRORS, UNCONFIRMED_SAVE_MESSAGE, log_save_failure
 from corrections.models import CorrectionRequest
 from corrections.services import current_values as correction_current_values
 
@@ -470,32 +469,13 @@ def employee_number_candidate(request):
 @never_cache
 @business_admin_required
 def employee_list(request):
-    """社員アカウントを検索する。"""
+    """社員アカウントを検索する。
+
+    検索・絞り込み・1ページ25人の表示はテンプレートタグ a03_directory が行う。
+    """
     remember_list_query(request, "a03", ("q", "department", "status", "role"))
 
-    keyword = request.GET.get("q", "").strip()[:100]
-
-    queryset = Employee.objects.select_related("employement_info").order_by(
-        "employee_number"
-    )
-
-    if keyword:
-        queryset = queryset.filter(
-            Q(employee_number__icontains=keyword)
-            | Q(first_name__icontains=keyword)
-            | Q(last_name__icontains=keyword)
-        )
-
-    page_obj = Paginator(queryset, 20).get_page(request.GET.get("page"))
-
-    return render(
-        request,
-        "management/employee_list.html",
-        {
-            "page_obj": page_obj,
-            "keyword": keyword,
-        },
-    )
+    return render(request, "management/employee_list.html")
 
 
 @never_cache
@@ -678,6 +658,9 @@ def employee_edit(request, employee_id):
                             .filter(
                                 is_active=True,
                                 is_business_admin=True,
+                                # 技術管理用アカウントは人数に含めない（03章）。
+                                is_staff=False,
+                                is_superuser=False,
                             )
                             .order_by("pk")
                             .values_list("pk", flat=True)
@@ -801,6 +784,11 @@ def employee_edit(request, employee_id):
                         return return_to_list(request, "a03", "management:employees")
                     form.add_error(None, "更新が競合しました。内容を確認して再試行してください。")
 
+                if form.errors:
+                    # ロールバック後も Python 上の値（未確定の新番号など）は残るため、
+                    # 画面には DB の確定値を表示する。
+                    employee = get_object_or_404(Employee, pk=employee_id)
+
                 if not form.errors:
                     if (request.POST.get("displayed_candidate")
                             and request.POST["displayed_candidate"] != employee.employee_number):
@@ -893,8 +881,39 @@ def employee_reset_password(request, employee_id):
     ):
         return HttpResponseBadRequest("確認情報が一致しません。")
 
+    try:
+        locked_employee, new_password = _reissue_initial_password(request, employee, payload)
+    except SAVE_FAILURE_ERRORS:
+        # 再発行が確定したか分からないため平文は表示しない（15章：成否を確認して再発行）。
+        log_save_failure("employee_reset_password", employee_id=employee.pk)
+        messages.error(request, UNCONFIRMED_SAVE_MESSAGE)
+        return redirect("management:employee_edit", employee_id=employee.pk)
+    if locked_employee is None:
+        return HttpResponseBadRequest(
+            "この確認操作は使用済みです。画面を開き直してください。"
+        )
+
+    # set_password により以前のログインセッションは次回照合時に失効する。
+    response = render(
+        request,
+        "management/employee_created.html",
+        {
+            "employee": locked_employee,
+            "initial_password": new_password,
+            "expires_at": locked_employee.initial_password_expires_at,
+            "operation_label": "初期パスワード再発行",
+        },
+    )
+    response["Referrer-Policy"] = "no-referrer"
+    response["X-Robots-Tag"] = "noindex, nofollow"
+    return response
+
+
+def _reissue_initial_password(request, employee, payload):
+    """再発行を1トランザクションで行う。確認チケットが使用済みなら (None, None)。"""
+
     with transaction.atomic():
-        # PostgreSQLでは行ロックにより同一チケットの重複再発行を防ぐ。
+        # SQLite の書き込み直列化により、同一チケットの重複再発行を防ぐ。
         locked_employee = Employee.objects.select_for_update().get(pk=employee.pk)
         current_version = (
             locked_employee.initial_password_issued_at.isoformat()
@@ -902,9 +921,7 @@ def employee_reset_password(request, employee_id):
             else None
         )
         if payload.get("issued_version") != current_version:
-            return HttpResponseBadRequest(
-                "この確認操作は使用済みです。画面を開き直してください。"
-            )
+            return None, None
 
         previous_issued_at = locked_employee.initial_password_issued_at
         new_password = set_initial_password(locked_employee)
@@ -942,20 +959,7 @@ def employee_reset_password(request, employee_id):
             details={},
         )
 
-    # set_password により以前のログインセッションは次回照合時に失効する。
-    response = render(
-        request,
-        "management/employee_created.html",
-        {
-            "employee": locked_employee,
-            "initial_password": new_password,
-            "expires_at": locked_employee.initial_password_expires_at,
-            "operation_label": "初期パスワード再発行",
-        },
-    )
-    response["Referrer-Policy"] = "no-referrer"
-    response["X-Robots-Tag"] = "noindex, nofollow"
-    return response
+    return locked_employee, new_password
 
 
 # 社員の月次勤怠詳細
@@ -1084,6 +1088,10 @@ def month_finalize(request, employee_id, year, month):
         except (AdminActionError, Employee.DoesNotExist) as exc:
             messages.error(request, str(exc))
 
+        except SAVE_FAILURE_ERRORS:
+            log_save_failure("month_finalize", employee_id=employee_id, month=target_month)
+            messages.error(request, UNCONFIRMED_SAVE_MESSAGE)
+
         else:
             messages.success(
                 request,
@@ -1117,6 +1125,10 @@ def month_reopen(request, employee_id, year, month):
     except (AdminActionError, Employee.DoesNotExist) as exc:
         messages.error(request, str(exc))
 
+    except SAVE_FAILURE_ERRORS:
+        log_save_failure("month_reopen", employee_id=employee_id, month=target_month)
+        messages.error(request, UNCONFIRMED_SAVE_MESSAGE)
+
     else:
         messages.success(
             request,
@@ -1129,144 +1141,6 @@ def month_reopen(request, employee_id, year, month):
         year=year,
         month=month,
     )
-
-
-# 確定済みCSV出力
-@never_cache
-@business_admin_required
-@require_POST
-@transaction.atomic
-def month_csv(request, employee_id, year, month):
-    """確定済みの月次勤怠をCSV出力する"""
-
-    employee = get_object_or_404(
-        Employee.objects.select_for_update(),
-        pk=employee_id,
-    )
-
-    target_month = _month_from_url(year, month)
-
-    closing = (
-        MonthlyClosing.objects.select_for_update()
-        .filter(
-            employee=employee,
-            target_month=target_month,
-        )
-        .first()
-    )
-
-    finalized = bool(closing and closing.status == MonthlyClosing.Status.FINALIZED)
-
-    if not finalized:
-        messages.error(
-            request,
-            "確定済みの月だけCSV出力できます",
-        )
-
-        return redirect(
-            "management:employee_month",
-            employee_id=employee_id,
-            year=year,
-            month=month,
-        )
-    if month_integrity_issues(employee, target_month):
-        messages.error(request, "勤務の不整合を解消して再確定してください。")
-        return redirect(
-            "management:employee_month",
-            employee_id=employee_id,
-            year=year,
-            month=month,
-        )
-    report = build_monthly_report(
-        employee,
-        target_month,
-    )
-
-    output = io.StringIO(newline="")
-
-    writer = csv.writer(
-        output,
-        lineterminator="\r\n",
-    )
-
-    writer.writerow(
-        [
-            "社員番号",
-            "氏名",
-            "勤務日",
-            "出勤",
-            "退勤",
-            "休憩秒数",
-            "実働秒数",
-            "休憩時間",
-            "実働時間",
-            "記録状態",
-            "修正状態",
-            "確定状態",
-        ]
-    )
-
-    name = employee.get_full_name()
-
-    # CSVは日付順
-    for row in reversed(report.rows):
-        writer.writerow(
-            [
-                _csv_safe(employee.employee_number),
-                _csv_safe(name),
-                row.day.isoformat(),
-                row.clock_in,
-                row.clock_out,
-                row.break_seconds if row.break_seconds is not None else "",
-                row.work_seconds if row.work_seconds is not None else "",
-                row.break_display,
-                row.work_display,
-                row.record_label,
-                row.correction_label,
-                row.closing_label,
-            ]
-        )
-
-    csv_text = "\ufeff" + output.getvalue()
-
-    response = HttpResponse(
-        csv_text,
-        content_type="text/csv; charset=utf-8",
-    )
-
-    safe_employee_number = "".join(
-        char if char.isascii() and (char.isalnum() or char in "-_") else "_"
-        for char in str(employee.employee_number)
-    )[:50]
-
-    response["Content-Disposition"] = (
-        "attachment; "
-        f'filename="attendance_{safe_employee_number}_'
-        f'{year:04d}{month:02d}.csv"'
-    )
-
-    response["Cache-Control"] = "no-store"
-
-    # CSV出力操作を監査ログに記録
-    AuditLog.objects.create(
-        actor=request.user,
-        target_employee=employee,
-        action=AuditLog.Action.CSV_EXPORT,
-        target_model="MonthlyClosing",
-        target_id=(f"{employee.pk}:" f"{target_month.isoformat()}"),
-        before_data={},
-        after_data={
-            "exported": True,
-            "target_month": target_month.isoformat(),
-        },
-        reason="確定済み勤怠データのCSV出力",
-        details={
-            "target_month": target_month.isoformat(),
-            "row_count": len(report.rows),
-        },
-    )
-
-    return response
 
 
 # 監査履歴一覧

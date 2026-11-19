@@ -68,7 +68,7 @@ def record_clock_action(
 
     Employee = get_user_model()
 
-    # PostgreSQLでは同じ社員の操作を直列化する
+    # 同じ社員の操作は SQLite の IMMEDIATE トランザクションで直列化される。
     employee = Employee.objects.select_for_update().get(pk=employee_id)
 
     if not employee.is_active:

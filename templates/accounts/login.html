@@ -36,7 +36,7 @@
             </h1>
 
             <p>
-                社員番号とパスワードを入力してください。
+                勤怠管理システムにログインしてください。
             </p>
 
         </div>
@@ -116,9 +116,7 @@
                         data-toggle-password="{{ form.password.id_for_label }}"
                         aria-controls="{{ form.password.id_for_label }}"
                         aria-pressed="false"
-                    >
-                        表示
-                    </button>
+                    ><i class="fa-regular fa-eye" aria-hidden="true"></i> 表示する</button>
 
                 </div>
 
@@ -151,19 +149,27 @@
 
         </form>
 
-        <!-- 問い合わせ -->
+        <!-- 問い合わせ（画面設計 C01：ログインできない場合／社内問い合わせ窓口） -->
+        <nav class="auth-help-links" aria-label="ログインの手助け">
+            <a href="#login-trouble"><i class="fa-regular fa-circle-question" aria-hidden="true"></i> ログインできない場合 <span aria-hidden="true">›</span></a>
+            <a href="#login-contact"><i class="fa-solid fa-phone" aria-hidden="true"></i> 社内問い合わせ窓口</a>
+        </nav>
+
         <div class="auth-help auth-help--v2">
-
-            <i
-                class="fa-regular fa-circle-question"
-                aria-hidden="true"
-            ></i>
-
-            <p>
-                パスワードを忘れた場合は、
-                社内の管理担当者にお問い合わせください。
-            </p>
-
+            <section id="login-trouble" aria-labelledby="login-trouble-title" tabindex="-1">
+                <h2 id="login-trouble-title">ログインできない場合</h2>
+                <p>
+                    社員番号とパスワードを確認して、もう一度入力してください。
+                    初期パスワードの有効期限切れや紛失、続けて失敗した場合は、
+                    社内問い合わせ窓口へ連絡してください。
+                </p>
+            </section>
+            <section id="login-contact" aria-labelledby="login-contact-title" tabindex="-1">
+                <h2 id="login-contact-title">社内問い合わせ窓口</h2>
+                <p>
+                    勤怠管理システムの操作や不明点については、社内の管理担当者にお問い合わせください。
+                </p>
+            </section>
         </div>
 
     </div>

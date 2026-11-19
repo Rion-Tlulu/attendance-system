@@ -13,6 +13,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
 from attendance.models import WorkSession
+from config.db_errors import SAVE_FAILURE_ERRORS, UNCONFIRMED_SAVE_MESSAGE, log_save_failure
 from corrections.forms import CorrectionBreakFormSet, CorrectionValuesForm, DATETIME_FORMAT
 from corrections.services import (
     CorrectionError, current_values, is_month_finalized,
@@ -91,6 +92,9 @@ def proxy_correction(request, employee_id, year, month, day):
                     )
                 except (KeyError, CorrectionError) as exc:
                     messages.error(request, str(exc))
+                except SAVE_FAILURE_ERRORS:
+                    log_save_failure("proxy_submit", employee_id=employee.pk, work_day=work_day)
+                    messages.error(request, UNCONFIRMED_SAVE_MESSAGE)
                 else:
                     messages.success(request, "代理申請を受け付けました。")
                     return redirect("management:correction_detail", pk=correction.pk)
@@ -156,6 +160,9 @@ def proxy_withdraw(request, pk):
         )
     except CorrectionError as exc:
         messages.error(request, str(exc))
+    except SAVE_FAILURE_ERRORS:
+        log_save_failure("proxy_withdraw", request_id=pk)
+        messages.error(request, UNCONFIRMED_SAVE_MESSAGE)
     else:
         messages.success(request, "代理申請を取り下げました。")
     return redirect("management:correction_detail", pk=pk)

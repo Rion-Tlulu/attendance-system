@@ -6,12 +6,15 @@
 
 注意：
 - 開発用settings.pyを変更しない
-- 秘密鍵とDB接続情報は環境変数から取得
+- 秘密鍵とDBの配置先は環境変数から取得
 - HTTPSでの運用を前提とする
-- 本番用PostgreSQL接続が必要
+- DB は SQLite の db.sqlite3（既定はプロジェクト直下。移す場合だけ
+  DJANGO_SQLITE_PATH に永続ローカル領域の絶対パスを指定）
+- バックアップは scripts/backup_sqlite.py（SQLite Online Backup API）
 """
 
 import os
+from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
 
@@ -82,29 +85,44 @@ CSRF_TRUSTED_ORIGINS = comma_separated_env("DJANGO_CSRF_TRUSTED_ORIGINS")
 # データベース
 # ==========================================
 
-# 本番はPostgreSQLを想定
-# SQLite設定をそのまま引き継がない
+# 本番も SQLite を継続使用する（要件定義書 v1.5.7 11章）。
+# DB は単一ホストの永続ローカル領域に置き、公開先やネットワーク共有に置かない。
+# トランザクション方式とロック待ちは開発用 settings.py と同じ値を使う。
+
+
+def sqlite_database_path():
+    """本番 SQLite の配置先を検証して返す。"""
+
+    raw = os.environ.get("DJANGO_SQLITE_PATH", "").strip() or str(BASE_DIR / "db.sqlite3")
+    path = Path(raw)
+
+    if not path.is_absolute():
+        raise ImproperlyConfigured("DJANGO_SQLITE_PATH は絶対パスで指定してください。")
+
+    if raw.startswith(("\\\\", "//")):
+        raise ImproperlyConfigured("SQLite をネットワーク共有に置かないでください。")
+
+    resolved = path.resolve()
+    public_roots = [(BASE_DIR / "staticfiles").resolve(), (BASE_DIR / "static").resolve()]
+    if any(resolved == root or root in resolved.parents for root in public_roots):
+        raise ImproperlyConfigured("SQLite を公開ディレクトリに置かないでください。")
+
+    if not resolved.parent.is_dir():
+        raise ImproperlyConfigured("DJANGO_SQLITE_PATH の親ディレクトリが存在しません。")
+
+    return resolved
+
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": required_env("POSTGRES_DB"),
-        "USER": required_env("POSTGRES_USER"),
-        "PASSWORD": required_env("POSTGRES_PASSWORD"),
-        "HOST": required_env("POSTGRES_HOST"),
-        "PORT": os.environ.get(
-            "POSTGRES_PORT",
-            "5432",
-        ),
-        "CONN_MAX_AGE": 60,
-        "OPTIONS": {
-            "sslmode": os.environ.get(
-                "POSTGRES_SSLMODE",
-                "verify-full",
-            ),
-        },
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": sqlite_database_path(),
+        "OPTIONS": dict(DATABASES["default"].get("OPTIONS", {})),
     }
 }
+
+if DATABASES["default"]["OPTIONS"].get("transaction_mode") != "IMMEDIATE":
+    raise ImproperlyConfigured("本番の SQLite は IMMEDIATE 方式で開始してください。")
 
 
 # ==========================================

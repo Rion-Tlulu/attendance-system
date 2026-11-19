@@ -16,6 +16,7 @@
     <a href="{% url 'management:role_list' %}" class="side-link {% if current == 'management:role_list' or current == 'management:employee_role' %}side-link--current{% endif %}" {% if current == 'management:role_list' or current == 'management:employee_role' %}aria-current="page"{% endif %}><i class="fa-solid fa-shield-halved" aria-hidden="true"></i><span>業務管理者の権限管理</span></a>
     <div class="side-section-label">運用メニュー</div>
     <a href="{% url 'management:audit_history' %}" class="side-link {% if current == 'management:audit_history' or current == 'management:audit_detail' %}side-link--current{% endif %}" {% if current == 'management:audit_history' or current == 'management:audit_detail' %}aria-current="page"{% endif %}><i class="fa-regular fa-clock" aria-hidden="true"></i><span>操作履歴</span></a>
+    <a href="{% url 'accounts:overview' %}" class="side-link"><i class="fa-solid fa-gear" aria-hidden="true"></i><span>アカウントと使い方</span></a>
   {% else %}
     <div class="side-section-label">打刻メニュー</div>
     <a href="{% url 'attendance:home' %}" class="side-link {% if current == 'attendance:home' %}side-link--current{% endif %}" {% if current == 'attendance:home' %}aria-current="page"{% endif %}><i class="fa-regular fa-clock" aria-hidden="true"></i><span>打刻ホーム</span></a>

@@ -57,13 +57,9 @@ def _registration_matches(previous, posted):
 def _is_database_contention(error):
     if isinstance(error, IntegrityError):
         return True
-    # SQLite のロックと PostgreSQL の直列化失敗・デッドロック・ロック待ち。
-    sqlstate = getattr(error, "pgcode", None) or getattr(
-        getattr(error, "__cause__", None), "sqlstate", None
-    )
-    return sqlstate in {"40001", "40P01", "55P03"} or (
-        "locked" in str(error).lower() or "busy" in str(error).lower()
-    )
+    # SQLite のロック待ち上限超過（database is locked / busy）。
+    message = str(error).lower()
+    return "locked" in message or "busy" in message
 
 
 @never_cache

@@ -353,14 +353,7 @@ def restore_departments(*, path=None, actor):
 
     if current_snapshot() != expected:
         raise NumberingLedgerError("復元後の照合に失敗しました。採番を停止します。")
-    if connection.vendor == "postgresql":
-        from django.core.management.color import no_style
-        statements = connection.ops.sequence_reset_sql(
-            no_style(), [Department, DepartmentRegistration, EmployeeNumberHistory, AuditLog]
-        )
-        with connection.cursor() as cursor:
-            for statement in statements:
-                cursor.execute(statement)
+    # SQLite の AUTOINCREMENT は ID を指定した挿入でも採番位置を自動で進めるため、再設定は不要。
     AuditLog.objects.create(
         actor=restorer, action=AuditLog.Action.DEPARTMENT_UPDATE,
         target_model="NumberingLedger", target_id="1", before_data={},

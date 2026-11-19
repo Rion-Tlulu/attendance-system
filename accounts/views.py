@@ -16,6 +16,8 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET
 
+from config.db_errors import SAVE_FAILURE_ERRORS, UNCONFIRMED_SAVE_MESSAGE, log_save_failure
+
 from .forms import (
     EmployeeAuthenticationForm,
     EmployeePasswordChangeForm,
@@ -61,6 +63,15 @@ class EmployeePasswordChangeView(PasswordChangeView):
     success_url = reverse_lazy("attendance:home")
 
     def form_valid(self, form):
+        try:
+            return self._save_password(form)
+        except SAVE_FAILURE_ERRORS:
+            # ロールバック済み。旧パスワードのままの可能性があるため成功と表示しない。
+            log_save_failure("password_change", employee_id=self.request.user.pk)
+            form.add_error(None, UNCONFIRMED_SAVE_MESSAGE)
+            return self.form_invalid(form)
+
+    def _save_password(self, form):
         with transaction.atomic():
             current = get_user_model().objects.select_for_update().get(pk=self.request.user.pk)
             expires_at = current.initial_password_expires_at

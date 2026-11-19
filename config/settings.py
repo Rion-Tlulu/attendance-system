@@ -103,24 +103,23 @@ WSGI_APPLICATION = "config.wsgi.application"
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
+#
+# 開発・受入試験・本番とも SQLite（db.sqlite3）だけを使う（要件定義書 v1.5.7 11章）。
 
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": BASE_DIR / "db.sqlite3",
+        # SQLite は select_for_update を無視し、書き込みは DB 全体で1つずつになる。
+        # 既定の DEFERRED では「読んでから書く」処理が重なると、後続は待たずに
+        # database is locked で失敗する。IMMEDIATE で開始時に書き込みロックを取り、
+        # 後続を最大 timeout 秒待たせて順番に処理する。
+        "OPTIONS": {
+            "transaction_mode": "IMMEDIATE",
+            "timeout": 20,
+        },
     }
 }
-
-if os.getenv("DJANGO_DB_ENGINE") == "postgresql":
-    DATABASES["default"] = {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.getenv("POSTGRES_DB", "attendance_v156"),
-        "USER": os.getenv("POSTGRES_USER", "postgres"),
-        "PASSWORD": os.getenv("POSTGRES_PASSWORD", ""),
-        "HOST": os.getenv("POSTGRES_HOST", "127.0.0.1"),
-        "PORT": os.getenv("POSTGRES_PORT", "5432"),
-        "CONN_MAX_AGE": int(os.getenv("POSTGRES_CONN_MAX_AGE", "0")),
-    }
 
 NUMBERING_LEDGER_PATH = Path(
     os.getenv("NUMBERING_LEDGER_PATH", str(BASE_DIR / ".local" / "numbering-ledger.json"))
