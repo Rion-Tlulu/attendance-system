@@ -106,7 +106,7 @@ UI（ユーザーインターフェース）・UX（ユーザーエクスペリ�
 
 #### 打刻ホーム
 
-![打刻ホーム画面](docs/screenshot/defaultStaff.png)
+![打刻ホーム画面](docs/screenshot/attendanceHome.png)
 
 #### 勤怠履歴・勤怠確認
 
