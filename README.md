@@ -106,7 +106,7 @@ UI・UX・ユニバーサルデザイン（UD）・アクセシビリティ・�
 
 #### 打刻ホーム
 
-docs\screenshot\defaultStaff.png
+![打刻ホーム画面](docs/screenshot/defaultStaff.png)
 
 #### 勤怠履歴・勤怠確認
 
