@@ -79,11 +79,13 @@ def _initial_values(session):
     """現在の有効な出退勤日時を取得する。"""
 
     if session is None:
-        return {}
+        return {"clock_in_op": "keep", "clock_out_op": "keep"}
 
     return {
         "clock_in_at": _field_initial(session.clock_in_at),
         "clock_out_at": _field_initial(session.clock_out_at),
+        "clock_in_op": "keep",
+        "clock_out_op": "keep",
     }
 
 
@@ -91,7 +93,7 @@ def _initial_breaks(session):
     """現在の休憩記録を入力フォーム用に整える。"""
 
     if session is None:
-        return [{}]
+        return []
 
     breaks = BreakInterval.objects.filter(
         work_session=session,
@@ -104,15 +106,51 @@ def _initial_breaks(session):
         {
             "started_at": _field_initial(item.started_at),
             "ended_at": _field_initial(item.ended_at),
+            "op": "keep",
         }
         for item in breaks
     ]
 
-    # 追加用の空行を用意する
-    if len(rows) < 20:
-        rows.append({})
+    # 休憩の追加は「休憩を追加」ボタンで行う（空の追加行は置かない）。
 
     return rows
+
+
+def _operation(current, proposed):
+    """修正前後の値から、画面 07 の操作（変更しない／追加／変更／取消）を決める。"""
+
+    if current == proposed:
+        return "keep"
+    if proposed is None:
+        return "cancel"
+    if current is None:
+        return "add"
+    return "change"
+
+
+def _break_initial_with_operations(current_breaks, proposed_breaks):
+    """修正前の休憩と修正案の休憩を順番どおりに並べ、各行の操作を付けた初期値を作る。"""
+
+    rows = []
+    for index in range(max(len(current_breaks), len(proposed_breaks))):
+        current = current_breaks[index] if index < len(current_breaks) else None
+        proposed = proposed_breaks[index] if index < len(proposed_breaks) else None
+        source = proposed or current
+        rows.append({
+            "started_at": _field_initial(parse_datetime(source["started_at"])) if source.get("started_at") else None,
+            "ended_at": _field_initial(parse_datetime(source["ended_at"])) if source.get("ended_at") else None,
+            "op": _operation(current, proposed),
+        })
+    return rows
+
+
+def _attach_break_befores(break_formset, session):
+    """休憩の各行に「変更前」の表示用の値を付ける（画面 07）。"""
+
+    befores = _display_proposal(current_values(session))["breaks"]
+    for index, entry in enumerate(break_formset.forms):
+        entry.before = befores[index] if index < len(befores) else None
+    return break_formset
 
 
 def _display_datetime(value):
@@ -306,17 +344,28 @@ def correction_create(request, year, month, day):
             messages.error(request, str(exc))
             return redirect("corrections:create", year=year, month=month, day=day)
         proposal = payload["proposal"]
+        current = current_values(session)
         form = CorrectionValuesForm(initial={
-            "clock_in_at": _field_initial(parse_datetime(proposal["clock_in_at"])) if proposal.get("clock_in_at") else None,
-            "clock_out_at": _field_initial(parse_datetime(proposal["clock_out_at"])) if proposal.get("clock_out_at") else None,
+            "clock_in_at": (
+                _field_initial(parse_datetime(proposal["clock_in_at"])) if proposal.get("clock_in_at")
+                else _field_initial(parse_datetime(current["clock_in_at"])) if current.get("clock_in_at") else None
+            ),
+            "clock_out_at": (
+                _field_initial(parse_datetime(proposal["clock_out_at"])) if proposal.get("clock_out_at")
+                else _field_initial(parse_datetime(current["clock_out_at"])) if current.get("clock_out_at") else None
+            ),
+            "clock_in_op": _operation(current.get("clock_in_at"), proposal.get("clock_in_at")),
+            "clock_out_op": _operation(current.get("clock_out_at"), proposal.get("clock_out_at")),
             "reason": payload["reason"],
         })
-        break_formset = CorrectionBreakFormSet(initial=[{
-            "started_at": _field_initial(parse_datetime(item["started_at"])) if item.get("started_at") else None,
-            "ended_at": _field_initial(parse_datetime(item["ended_at"])) if item.get("ended_at") else None,
-        } for item in proposal.get("breaks", [])] or [{}], prefix="breaks")
+        break_formset = CorrectionBreakFormSet(
+            initial=_break_initial_with_operations(current.get("breaks", []), proposal.get("breaks", [])),
+            prefix="breaks",
+        )
+        _attach_break_befores(break_formset, session)
         return render(request, "corrections/form.html", {
             "work_day": work_day, "form": form, "break_formset": break_formset, "session": session,
+            "current_display": _display_proposal(current),
         })
 
     if request.method == "POST" and "confirm_token" in request.POST:
@@ -424,6 +473,7 @@ def correction_create(request, year, month, day):
                     make_proposal(
                         form,
                         break_formset,
+                        current_values(session),
                     ),
                     work_day,
                 )
@@ -483,6 +533,8 @@ def correction_create(request, year, month, day):
             prefix="breaks",
         )
 
+    _attach_break_befores(break_formset, session)
+
     return render(
         request,
         "corrections/form.html",
@@ -491,6 +543,7 @@ def correction_create(request, year, month, day):
             "form": form,
             "break_formset": break_formset,
             "session": session,
+            "current_display": _display_proposal(current_values(session)),
         },
     )
 

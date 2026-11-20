@@ -63,6 +63,11 @@ urlpatterns = [
         name="employee_edit",
     ),
     path(
+        "employees/<int:employee_id>/status/",
+        views.employee_status,
+        name="employee_status",
+    ),
+    path(
         "employees/<int:employee_id>/role/",
         role_views.employee_role,
         name="employee_role",

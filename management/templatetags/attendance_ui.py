@@ -117,3 +117,9 @@ def raw_break_pairs(current_breaks, proposal_breaks):
         ]
 
     return break_pairs(display(current_breaks), display(proposal_breaks))
+
+
+@register.filter
+def has_value(value):
+    """表示用の日時が実際の値か（「設定なし」「未記録」・空でないか）を返す。"""
+    return value not in (None, "", "設定なし", "未記録")

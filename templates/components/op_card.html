@@ -1,0 +1,30 @@
+{% load attendance_ui %}
+{% comment %}
+画面 07：修正する項目の表の1行（出勤・退勤）。
+target: 項目名 / field: 日時の入力欄 / op: 操作の入力欄 / before: 変更前の表示値 / day: 勤務日
+{% endcomment %}
+{% with has_before=before|has_value %}
+<tr class="op-row" data-op-card>
+    <th scope="row" class="op-row__item">{{ target }}</th>
+    <td class="op-row__before" data-label="変更前">{% if has_before %}{{ before|short_dt:day }}{% else %}<span class="muted">記録なし</span>{% endif %}</td>
+    <td class="op-row__op" data-label="操作">
+        <fieldset class="op-radios">
+            <legend class="visually-hidden">{{ target }}の操作</legend>
+            <label><input type="radio" name="{{ op.html_name }}" value="keep"{% if not op.value or op.value == 'keep' %} checked{% endif %}> 変更しない</label>
+            {% if has_before %}
+            <label><input type="radio" name="{{ op.html_name }}" value="change"{% if op.value == 'change' %} checked{% endif %}> 変更</label>
+            <label><input type="radio" name="{{ op.html_name }}" value="cancel"{% if op.value == 'cancel' %} checked{% endif %}> 取消</label>
+            {% else %}
+            <label><input type="radio" name="{{ op.html_name }}" value="add"{% if op.value == 'add' %} checked{% endif %}> 追加</label>
+            {% endif %}
+        </fieldset>
+    </td>
+    <td class="op-card__after" data-label="変更後">
+        <label class="visually-hidden" for="{{ field.id_for_label }}">{{ target }}の変更後</label>
+        {{ field }}
+        <span class="op-after-note op-after-note--keep" aria-hidden="true">—</span>
+        <span class="op-after-note op-after-note--cancel">取消（記録を消します）</span>
+        {{ field.errors }}
+    </td>
+</tr>
+{% endwith %}

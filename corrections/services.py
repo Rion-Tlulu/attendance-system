@@ -47,15 +47,29 @@ def _iso(value):
     return timezone.localtime(value).isoformat(timespec="seconds")
 
 
-def make_proposal(form, break_formset):
-    """検証済みフォームを修正案JSONへ変換する。"""
+def make_proposal(form, break_formset, current=None):
+    """検証済みフォームを修正案JSONへ変換する。
 
+    current（current_values の結果）を渡すと、操作が「変更しない」の対象は
+    入力欄の値ではなく現在の有効値をそのまま使う（画面 07）。
+    """
+
+    current = current or {}
+    current_breaks = current.get("breaks") or []
     breaks = []
 
-    for entry in break_formset.forms:
+    for index, entry in enumerate(break_formset.forms):
         data = entry.cleaned_data
 
         if not data or data.get("DELETE"):
+            continue
+
+        if (
+            current
+            and data.get("op") == "keep"
+            and index < len(current_breaks)
+        ):
+            breaks.append(dict(current_breaks[index]))
             continue
 
         start = data.get("started_at")
@@ -71,9 +85,19 @@ def make_proposal(form, break_formset):
             }
         )
 
+    values = {}
+
+    for name in ("clock_in", "clock_out"):
+        field = f"{name}_at"
+
+        if current and form.cleaned_data.get(f"{name}_op") == "keep":
+            values[field] = current.get(field)
+        else:
+            values[field] = _iso(form.cleaned_data[field])
+
     return {
-        "clock_in_at": _iso(form.cleaned_data["clock_in_at"]),
-        "clock_out_at": _iso(form.cleaned_data["clock_out_at"]),
+        "clock_in_at": values["clock_in_at"],
+        "clock_out_at": values["clock_out_at"],
         "breaks": breaks,
     }
 

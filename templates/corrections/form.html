@@ -6,8 +6,8 @@
 <div class="page">
     <header class="page-head">
         <div>
+            <a class="back-link" href="{% url 'attendance:daily' work_day.year work_day.month work_day.day %}"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> 日別詳細へ</a>
             <h1>修正申請の入力</h1>
-            <a class="btn btn--sm btn--outline btn--pill mt-16" href="{% url 'attendance:daily' work_day.year work_day.month work_day.day %}"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i> 日別詳細へ</a>
         </div>
     </header>
 

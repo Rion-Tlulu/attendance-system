@@ -824,6 +824,39 @@ def employee_edit(request, employee_id):
 
 @never_cache
 @business_admin_required
+@require_GET
+def employee_status(request, employee_id):
+    """利用停止・再有効化の確認画面（画面 19）。
+
+    保存は社員情報の更新処理（employee_edit）で行い、本人の停止禁止・有効な管理者2人以上などの
+    検証もそちらで同じトランザクション内に行う。
+    """
+
+    employee = get_object_or_404(Employee, pk=employee_id)
+    current_department = Department.objects.filter(name=employee.department).first()
+
+    return render(
+        request,
+        "management/employee_status.html",
+        {
+            "employee": employee,
+            "operation_id": str(uuid.uuid4()),
+            "edit_state": _employee_edit_state(employee),
+            "department_id": current_department.pk if current_department else "",
+            "is_self": employee.pk == request.user.pk,
+            "incomplete_count": employee.work_sessions.filter(
+                status__in=["working", "on_break"],
+            ).count(),
+            "pending_count": CorrectionRequest.objects.filter(
+                employee=employee,
+                status=CorrectionRequest.Status.PENDING,
+            ).count(),
+        },
+    )
+
+
+@never_cache
+@business_admin_required
 @require_http_methods(["GET", "POST"])
 def employee_reset_password(request, employee_id):
     """管理者による本人確認済み社員の初期パスワード再発行。"""

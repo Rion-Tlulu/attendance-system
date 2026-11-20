@@ -1,0 +1,74 @@
+{% load attendance_ui %}
+{% comment %}
+修正申請・代理申請で共通の「項目／変更前／操作／変更後」の表（画面 07・24）。
+必要な変数: form, break_formset, work_day, current_display
+{% endcomment %}
+{{ break_formset.management_form }}
+{% if break_formset.non_form_errors %}<div class="field-error" role="alert">{{ break_formset.non_form_errors }}</div>{% endif %}
+
+<div class="table-wrap op-table-wrap">
+    <table class="data-table op-table">
+        <caption class="visually-hidden">修正する対象（操作で「変更」「追加」を選ぶと変更後の日時を入力できます）</caption>
+        <thead>
+            <tr>
+                <th scope="col">対象</th>
+                <th scope="col">変更前</th>
+                <th scope="col">操作</th>
+                <th scope="col">変更後</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% include "components/op_card.html" with target="出勤" field=form.clock_in_at op=form.clock_in_op before=current_display.clock_in day=work_day %}
+            {% include "components/op_card.html" with target="退勤" field=form.clock_out_at op=form.clock_out_op before=current_display.clock_out day=work_day %}
+        </tbody>
+        <tbody id="e03-break-form-list">
+            {% for rest in break_formset %}
+            <tr class="op-row" data-op-card>
+                <th scope="row" class="op-row__item">{% if rest.before %}休憩{{ forloop.counter }}{% else %}休憩（追加）{% endif %}
+                    {% for field in rest.hidden_fields %}{% if field.name != "op" %}{{ field }}{% endif %}{% endfor %}
+                </th>
+                <td class="op-row__before" data-label="変更前">{% if rest.before %}{{ rest.before.start|short_dt:work_day }} 〜 {{ rest.before.end|short_dt:work_day }}{% else %}<span class="muted">記録なし</span>{% endif %}</td>
+                <td class="op-row__op" data-label="操作">
+                    <fieldset class="op-radios">
+                        <legend class="visually-hidden">{% if rest.before %}休憩{{ forloop.counter }}{% else %}追加する休憩{% endif %}の操作</legend>
+                        <label><input type="radio" name="{{ rest.op.html_name }}" value="keep"{% if not rest.op.value or rest.op.value == 'keep' %} checked{% endif %}> 変更しない</label>
+                        {% if rest.before %}
+                        <label><input type="radio" name="{{ rest.op.html_name }}" value="change"{% if rest.op.value == 'change' %} checked{% endif %}> 変更</label>
+                        <label><input type="radio" name="{{ rest.op.html_name }}" value="cancel"{% if rest.op.value == 'cancel' %} checked{% endif %}> 取消</label>
+                        {% else %}
+                        <label><input type="radio" name="{{ rest.op.html_name }}" value="add"{% if rest.op.value == 'add' %} checked{% endif %}> 追加</label>
+                        {% endif %}
+                    </fieldset>
+                </td>
+                <td class="op-card__after" data-label="変更後">
+                    <div class="op-pair">
+                        <label for="{{ rest.started_at.id_for_label }}">開始</label>{{ rest.started_at }}
+                        <label for="{{ rest.ended_at.id_for_label }}">終了</label>{{ rest.ended_at }}
+                    </div>
+                    <span class="op-after-note op-after-note--keep" aria-hidden="true">—</span>
+                    <span class="op-after-note op-after-note--cancel">取消（休憩を消します）</span>
+                    {{ rest.started_at.errors }}{{ rest.ended_at.errors }}
+                    {% if rest.non_field_errors %}<div class="field-error" role="alert">{{ rest.non_field_errors }}</div>{% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+<button type="button" class="btn btn--sm btn--outline op-add" data-e03-add-break><i class="fa-solid fa-plus" aria-hidden="true"></i> 休憩を追加</button>
+<template id="e03-empty-break-template">
+    <tr class="op-row is-active" data-op-card>
+        <th scope="row" class="op-row__item"><span class="op-row__title">追加した休憩</span>
+            {% for field in break_formset.empty_form.hidden_fields %}{% if field.name != "op" %}{{ field }}{% endif %}{% endfor %}
+            <input type="hidden" name="{{ break_formset.empty_form.op.html_name }}" value="add">
+        </th>
+        <td class="op-row__before" data-label="変更前"><span class="muted">記録なし</span></td>
+        <td class="op-row__op" data-label="操作"><span class="badge badge--sm badge--solid">追加</span></td>
+        <td class="op-card__after" data-label="変更後">
+            <div class="op-pair">
+                <label for="{{ break_formset.empty_form.started_at.id_for_label }}">開始</label>{{ break_formset.empty_form.started_at }}
+                <label for="{{ break_formset.empty_form.ended_at.id_for_label }}">終了</label>{{ break_formset.empty_form.ended_at }}
+            </div>
+        </td>
+    </tr>
+</template>

@@ -201,6 +201,36 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 /* ==============================================
+   画面 07・24：対象ごとの操作（変更しない／変更／追加／取消）
+   「変更」「追加」のときだけ変更後の日時を編集できるようにする。
+============================================== */
+function initOpCard(card) {
+  const radios = [...card.querySelectorAll('input[type="radio"]')];
+  const inputs = [...card.querySelectorAll('.op-card__after input:not([type="hidden"])')];
+  card.dataset.opReady = "1";
+  inputs.forEach((input) => { input.dataset.original = input.value; });
+  const apply = (focus) => {
+    const checked = radios.find((radio) => radio.checked);
+    const operation = checked ? checked.value : "add";
+    const editable = operation === "change" || operation === "add";
+    card.classList.toggle("is-active", editable);
+    card.classList.toggle("is-cancel", operation === "cancel");
+    inputs.forEach((input) => {
+      input.readOnly = !editable;
+      input.setAttribute("aria-readonly", String(!editable));
+      if (operation === "keep") input.value = input.dataset.original;
+    });
+    if (focus && editable) inputs[0]?.focus();
+  };
+  radios.forEach((radio) => radio.addEventListener("change", () => apply(true)));
+  apply(false);
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll("[data-op-card]").forEach(initOpCard);
+});
+
+/* ==============================================
    E03・代理申請：休憩の追加
 ============================================== */
 document.addEventListener("DOMContentLoaded", () => {
@@ -220,16 +250,18 @@ document.addEventListener("DOMContentLoaded", () => {
   addButton.addEventListener("click", () => {
     const current = Number.parseInt(totalForms.value, 10);
     if (!Number.isFinite(current) || current >= maximum) return;
-    const wrapper = document.createElement("div");
+    // 表の中に追加する場合は tbody で解釈しないと tr が失われる。
+    const wrapper = document.createElement(list.tagName === "TBODY" ? "tbody" : "div");
     wrapper.innerHTML = template.innerHTML.replaceAll("__prefix__", String(current)).trim();
     const newRow = wrapper.firstElementChild;
     if (!newRow) return;
-    const heading = newRow.querySelector("h3");
-    if (heading) heading.textContent = `休憩 ${current + 1}`;
+    const heading = newRow.querySelector(".op-row__title, h3");
+    if (heading) heading.textContent = `休憩（追加 ${current + 1}）`;
+    initOpCard(newRow);
     list.appendChild(newRow);
     totalForms.value = String(current + 1);
     updateButton();
-    newRow.querySelector("input:not([type='hidden']):not([type='checkbox'])")?.focus();
+    newRow.querySelector("input:not([type='hidden']):not([type='checkbox']):not([type='radio'])")?.focus();
   });
 
   updateButton();

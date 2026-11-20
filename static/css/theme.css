@@ -501,14 +501,21 @@ p {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 4px;
-  color: var(--green-800);
+  min-height: 44px;
+  margin-bottom: 10px;
+  padding: 6px 20px;
+  border: 2px solid var(--green-800);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 15px;
   font-weight: 700;
   text-decoration: none;
 }
 
 .back-link:hover {
-  text-decoration: underline;
+  background: var(--green-50);
+  color: var(--green-950);
 }
 
 .title-with-icon {
@@ -1058,7 +1065,7 @@ details.card > summary::-webkit-details-marker {
 }
 
 .stat-value small {
-  font-size: 0.55em;
+  font-size: max(12px, 0.55em);
 }
 
 .stat-grid {
@@ -1836,7 +1843,6 @@ textarea {
 }
 
 .form-row__control,
-.change-table__after,
 .field {
   min-width: 0;
 }
@@ -2124,67 +2130,168 @@ input[type="radio"] {
   margin-bottom: 18px;
 }
 
-/* 対象・変更前・変更後（画面 07） */
-.change-table {
-  overflow: hidden;
-  margin-bottom: 8px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--surface);
-}
-
-.change-table__head,
-.change-table__row {
-  display: grid;
-  grid-template-columns: minmax(110px, 18%) minmax(130px, 24%) 1fr;
-  align-items: center;
-}
-
-.change-table__head {
-  background: var(--green-100);
-  font-weight: 700;
-}
-
-.change-table__head span {
-  padding: 10px 24px;
-}
-
-.change-table__row {
-  margin: 0;
-  border-top: 1px solid var(--line);
-}
-
-.change-table__target {
-  align-self: stretch;
+/* 代理申請の対象社員（画面 24） */
+.proxy-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  padding: 10px 24px;
-  background: var(--green-50);
-  font-size: 17px;
+  gap: 8px 0;
+  margin-bottom: 16px;
+  padding: 14px 20px;
+  border-radius: var(--radius);
+  background: var(--green-100);
+}
+
+.proxy-head > * {
+  padding: 0 22px;
+}
+
+.proxy-head > *:first-child {
+  padding-left: 0;
+}
+
+.proxy-head > * + * {
+  border-left: 2px solid #c6d6ba;
+}
+
+.proxy-head__name {
+  font-size: 22px;
   font-weight: 700;
 }
 
-.change-table__before {
-  padding: 10px 24px;
-  font-size: 17px;
+.proxy-head__id {
+  margin-left: 14px;
+  font-size: 18px;
+}
+
+.proxy-head__day {
+  font-size: 22px;
   font-weight: 700;
 }
 
-.change-table__after {
-  padding: 8px 12px;
+.proxy-head__label {
+  margin-right: 12px;
+  font-size: 16px;
 }
 
-.change-table__before-label {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
+/* 修正する項目の表（画面 07・24）：項目／変更前／操作／変更後 */
+.op-table-wrap {
+  margin-bottom: 12px;
+}
+
+.op-table {
+  table-layout: fixed;
+}
+
+.op-table thead th:nth-child(1) { width: 15%; }
+.op-table thead th:nth-child(2) { width: 22%; }
+.op-table thead th:nth-child(3) { width: 33%; }
+.op-table thead th:nth-child(4) { width: 30%; }
+
+.op-table th,
+.op-table td {
+  padding: 12px 16px;
+  vertical-align: middle;
+}
+
+.op-row__item {
+  font-size: 17px;
+}
+
+.op-row__before {
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.op-radios {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.op-radios label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 16px;
   white-space: nowrap;
+  cursor: pointer;
 }
 
-.change-table__after input {
-  min-height: 41px;
+.op-radios input[type="radio"] {
+  width: 20px;
+  height: 20px;
+}
+
+.op-card__after input {
+  min-height: 44px;
+  padding: 6px 10px;
+  font-size: 16px;
+}
+
+.op-pair {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 6px 8px;
+}
+
+.op-pair label {
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* 変更する行だけを強調する */
+.op-row.is-active {
+  background: var(--green-50);
+}
+
+.op-row.is-active > th {
+  box-shadow: inset 5px 0 0 var(--green-800);
+}
+
+.op-row.is-cancel {
+  background: #fdf5f4;
+}
+
+.op-row.is-cancel > th {
+  box-shadow: inset 5px 0 0 var(--danger);
+}
+
+.op-row.is-cancel .op-row__before {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+/* 変更後：変更しない行は「—」、取消の行は文字で示し、入力欄は「変更」「追加」のときだけ表示 */
+.op-after-note {
+  display: none;
+}
+
+.op-row[data-op-ready]:not(.is-active) .op-card__after input,
+.op-row[data-op-ready]:not(.is-active) .op-pair {
+  display: none;
+}
+
+.op-row[data-op-ready]:not(.is-active):not(.is-cancel) .op-after-note--keep {
+  display: inline;
+  color: var(--muted);
+}
+
+.op-row[data-op-ready].is-cancel .op-after-note--cancel {
+  display: inline;
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.op-add {
+  margin-bottom: 18px;
 }
 
 /* ==========================================================================
@@ -3558,12 +3665,50 @@ details.card.audit-card > summary {
    ========================================================================== */
 
 @media (max-width: 1180px) {
-  .clock-layout {
-    grid-template-columns: minmax(0, 1fr) minmax(250px, 0.9fr);
+  :root {
+    --sidebar-width: 220px;
   }
 
-  :root {
-    --sidebar-width: 250px;
+  .side-link {
+    padding-left: 38px;
+    font-size: 15px;
+  }
+
+  .op-table thead th:nth-child(1) { width: 13%; }
+  .op-table thead th:nth-child(2) { width: 19%; }
+  .op-table thead th:nth-child(3) { width: 38%; }
+  .op-table thead th:nth-child(4) { width: 30%; }
+
+  .op-radios {
+    flex-wrap: nowrap;
+    gap: 12px;
+  }
+
+  .op-radios label {
+    gap: 4px;
+    font-size: 15px;
+  }
+
+  .data-table {
+    font-size: 15px;
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: 10px 12px;
+  }
+
+  .data-table td,
+  .data-table thead th {
+    white-space: nowrap;
+  }
+
+  .data-table .name-cell strong {
+    font-size: 17px;
+  }
+
+  .clock-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(250px, 0.9fr);
   }
 
   .app-content {
@@ -3964,6 +4109,22 @@ details.card.audit-card > summary {
     gap: 6px;
   }
 
+  .proxy-head {
+    justify-content: center;
+    text-align: center;
+  }
+
+  .proxy-head > * {
+    padding: 0 10px;
+  }
+
+  .proxy-head__name,
+  .proxy-head__day {
+    font-size: 18px;
+  }
+
+
+
   .diff-table__head {
     display: none;
   }
@@ -4020,37 +4181,7 @@ details.card.audit-card > summary {
     font-size: 18px;
   }
 
-  .change-table__head {
-    display: none;
-  }
 
-  .change-table__row {
-    grid-template-columns: minmax(80px, 30%) 1fr;
-  }
-
-  .change-table__target {
-    grid-row: span 2;
-    padding: 10px 12px;
-    font-size: 16px;
-  }
-
-  .change-table__before {
-    padding: 8px 12px 0;
-    font-size: 16px;
-  }
-
-  .change-table__before-label {
-    position: static !important;
-    width: auto;
-    height: auto;
-    overflow: visible;
-    clip-path: none;
-    font-size: 14px;
-  }
-
-  .change-table__after {
-    padding: 6px 12px 10px;
-  }
 
   .chip-row .kv,
   .kv-grid .kv {
@@ -4291,13 +4422,7 @@ details.card.audit-card > summary {
     font-size: 26px;
   }
 
-  .desktop-only {
-    display: none !important;
-  }
 
-  .mobile-cards {
-    display: block;
-  }
 
   .table-wrap--keep {
     display: block;
@@ -4590,15 +4715,21 @@ details.card.audit-card > summary {
   }
 
   .app-topbar .brand {
-    grid-area: brand;
+    grid-row: 1;
+    grid-column: 1 / -1;
+    justify-self: center;
+    max-width: calc(100% - 128px);
     margin: 0;
     overflow: hidden;
     font-size: 20px;
+    text-align: center;
     text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .app-menu-toggle {
     grid-area: menu;
+    justify-self: start;
     flex-direction: row;
     gap: 0;
     width: 44px;
@@ -4626,6 +4757,7 @@ details.card.audit-card > summary {
 
   .app-notification-link {
     grid-area: bell;
+    justify-self: end;
     justify-content: center;
     width: 48px;
     min-width: 48px;
@@ -4706,6 +4838,7 @@ details.card.audit-card > summary {
 
   .topbar-switch {
     grid-area: switch;
+    justify-self: end;
     flex-direction: row;
     gap: 4px;
     min-height: 30px !important;
@@ -4724,6 +4857,167 @@ details.card.audit-card > summary {
   /* 切替リンクがない社員は、氏名を右端まで使う */
   .app-topbar:not(:has(.topbar-switch)) .topbar-user {
     grid-column: 2 / 4;
+  }
+}
+
+
+/* ==========================================================================
+   スマートフォン（600px 以下）：表を1件ずつのカード・ブロックに切り替える
+   タブレット縦（601〜860px）は、メニューだけ折りたたみ、表はそのまま使う。
+   ========================================================================== */
+
+@media (max-width: 600px) {
+  .desktop-only {
+    display: none !important;
+  }
+
+  .mobile-cards {
+    display: block;
+  }
+
+  .op-table-wrap {
+    border: 0;
+    background: none;
+  }
+
+  .op-table,
+  .op-table tbody,
+  .op-table tr,
+  .op-table th,
+  .op-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .op-table thead {
+    display: none;
+  }
+
+  .op-table tr {
+    margin-bottom: 10px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+
+  .op-table th,
+  .op-table td {
+    padding: 8px 14px;
+    border-top: 0;
+  }
+
+  .op-table .op-row__item {
+    background: var(--green-100);
+    font-size: 17px;
+  }
+
+  .op-table td[data-label] {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+  }
+
+  .op-table td[data-label] > .badge {
+    justify-self: start;
+  }
+
+  .op-table td[data-label]::before {
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 700;
+    content: attr(data-label);
+  }
+
+  .op-row.is-active > th,
+  .op-row.is-cancel > th {
+    box-shadow: inset 5px 0 0 var(--green-800);
+  }
+
+  .op-row.is-cancel > th {
+    box-shadow: inset 5px 0 0 var(--danger);
+  }
+
+  .op-table td[data-label] {
+    grid-template-columns: 52px minmax(0, 1fr);
+  }
+
+  .op-radios {
+    flex-wrap: nowrap;
+    gap: 10px;
+  }
+
+  .op-radios label {
+    gap: 4px;
+    font-size: 14px;
+  }
+
+  .op-radios input[type="radio"] {
+    width: 18px;
+    height: 18px;
+  }
+
+  /* ラベルセル付きの入力行は、ラベルを上・入力欄を下に重ねる */
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .form-row > .form-row__label {
+    padding: 8px 12px;
+  }
+
+  .form-row > .form-row__control {
+    padding: 8px 10px 10px;
+  }
+
+  .form-row__static {
+    padding: 10px 12px !important;
+  }
+
+  /* 項目名と値の表は、項目名の列を広げて途中で折り返さないようにする */
+  .kv-table,
+  .kv {
+    grid-template-columns: minmax(112px, 38%) 1fr;
+  }
+
+  .kv-table > dt,
+  .kv-table > .kv__label,
+  .kv > dt {
+    font-size: 14px;
+  }
+
+  /* 数値パネル（実働合計・未完了）は1行ずつ並べ、数字が重ならないようにする */
+  .stat-panel {
+    display: block;
+    padding: 6px 16px;
+  }
+
+  .stat-panel > * {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 0;
+  }
+
+  .stat-panel > *:first-child {
+    padding-left: 0;
+  }
+
+  .stat-panel > * + * {
+    border-top: 1px solid #c6d6ba;
+    border-left: 0;
+  }
+
+  .stat-panel .stat-value {
+    font-size: 28px;
+    white-space: nowrap;
+  }
+
+  /* 代理申請の対象社員：折り返した時に区切り線がずれないようにする */
+  .proxy-head > * + * {
+    border-left: 0;
   }
 }
 

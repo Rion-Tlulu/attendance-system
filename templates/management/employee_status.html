@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}{% if employee.is_active %}利用停止{% else %}利用再開{% endif %}の確認 | 勤怠管理{% endblock %}
+
+{% block content %}
+<div class="page">
+    <header class="page-head">
+        <div>
+            <a class="back-link" href="{% url 'management:employee_edit' employee.pk %}"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> 社員詳細へ</a>
+            <h1>{% if employee.is_active %}利用を停止{% else %}利用を再開{% endif %}</h1>
+        </div>
+    </header>
+
+    <section class="card card--pad-lg" aria-label="対象社員">
+        <dl class="kv-table kv-table--strong kv-table--lg">
+            <dt>社員名</dt><dd>{{ employee.display_name }}</dd>
+            <dt>社員番号</dt><dd>{{ employee.employee_number }}</dd>
+            <dt>所属</dt><dd>{{ employee.department|default:"未設定" }}</dd>
+            <dt>利用状態</dt><dd>{% if employee.is_active %}<span class="badge badge--solid">利用中</span>{% else %}<span class="badge badge--gray">停止中</span>{% endif %}</dd>
+        </dl>
+
+        {% if is_self %}
+        <div class="notice-box notice-box--warning" role="status"><i class="fa-solid fa-circle-info" aria-hidden="true"></i><p>自分自身を利用停止にはできません。</p></div>
+        <a class="btn btn--md btn--outline btn--block" href="{% url 'management:employee_edit' employee.pk %}">社員詳細へ戻る</a>
+        {% else %}
+        <div class="notice-box notice-box--warning" role="note"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i>
+            <div>
+                {% if employee.is_active %}
+                <p>停止すると本人はログインできなくなり、ログイン中の画面も使えなくなります。</p>
+                <p>未完了 {{ incomplete_count }}件・審査中 {{ pending_count }}件はそのまま残ります。停止中の訂正は月次詳細から代理申請します。勤怠記録と申請履歴は削除されません。</p>
+                {% if employee.is_business_admin %}<p>有効な業務管理者が2人未満になる場合は停止できません。</p>{% endif %}
+                {% else %}
+                <p>再開しても、取り消された管理権限は戻りません。審査中の代理申請がある場合は、先に処理または取り下げてください。</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <form method="post" action="{% url 'management:employee_edit' employee.pk %}" autocomplete="off">
+            {% csrf_token %}
+            <input type="hidden" name="operation_id" value="{{ operation_id }}">
+            <input type="hidden" name="edit_state" value="{{ edit_state }}">
+            <input type="hidden" name="displayed_candidate" value="">
+            <input type="hidden" name="last_name" value="{{ employee.last_name }}">
+            <input type="hidden" name="first_name" value="{{ employee.first_name }}">
+            <input type="hidden" name="department_choice" value="{{ department_id }}">
+            {% if not employee.is_active %}<input type="hidden" name="is_active" value="on">{% endif %}
+            <div class="field">
+                <label for="status-reason">{% if employee.is_active %}停止{% else %}再開{% endif %}の理由 <span class="required">（必須）</span></label>
+                <textarea id="status-reason" name="change_reason" maxlength="500" rows="3" required></textarea>
+            </div>
+            <div class="btn-row btn-row--split">
+                <a class="btn btn--md btn--outline" href="{% url 'management:employee_edit' employee.pk %}">戻る</a>
+                {% if employee.is_active %}
+                <button type="submit" class="btn btn--md btn--danger"><i class="fa-solid fa-ban" aria-hidden="true"></i> 利用を停止する</button>
+                {% else %}
+                <button type="submit" class="btn btn--md"><i class="fa-solid fa-rotate-right" aria-hidden="true"></i> 利用を再開する</button>
+                {% endif %}
+            </div>
+        </form>
+        {% endif %}
+    </section>
+</div>
+{% endblock %}

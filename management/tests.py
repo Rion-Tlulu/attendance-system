@@ -2444,7 +2444,8 @@ class ProxyConfirmationTests(TestCase):
             "clock_in_at": "2024-01-02T09:00:00",
             "clock_out_at": "2024-01-02T18:00:00",
             "reason": "本人から電話で申告", "proxy_reason": "アカウント停止中",
-            "evidence": "勤務表を確認", "breaks-TOTAL_FORMS": "0",
+            "evidence_name": "勤務記録表", "evidence_date": "2024-01-03",
+            "evidence_method": "原本を照合", "breaks-TOTAL_FORMS": "0",
             "breaks-INITIAL_FORMS": "0", "breaks-MIN_NUM_FORMS": "0",
             "breaks-MAX_NUM_FORMS": "20",
         })
@@ -2454,13 +2455,31 @@ class ProxyConfirmationTests(TestCase):
         returned = self.client.post(self.url, {"return_token": token})
         self.assertEqual(returned.status_code, 200)
         self.assertEqual(returned.context["form"].initial["reason"], "本人から電話で申告")
-        self.assertEqual(returned.context["evidence_form"].initial["evidence"], "勤務表を確認")
+        self.assertEqual(returned.context["evidence_form"].initial["evidence_name"], "勤務記録表")
+        self.assertEqual(returned.context["evidence_form"].initial["evidence_date"], "2024-01-03")
+        self.assertEqual(returned.context["evidence_form"].initial["evidence_method"], "原本を照合")
         self.assertEqual(CorrectionRequest.objects.count(), 0)
         confirmed = self.client.post(self.url, {"confirm_token": token})
         self.assertEqual(confirmed.status_code, 302)
         correction = CorrectionRequest.objects.get()
         self.assertTrue(correction.is_proxy)
         self.assertIsNone(correction.work_session_id)
+        # 資料名・確認日・確認方法は1つの確認情報にまとめて保存する（画面 24）。
+        self.assertEqual(correction.evidence, "資料名：勤務記録表／確認日：2024-01-03／確認方法：原本を照合")
+
+    def test_evidence_fields_are_each_required(self):
+        response = self.client.post(self.url, {
+            "clock_in_at": "2024-01-02T09:00:00",
+            "clock_out_at": "2024-01-02T18:00:00",
+            "reason": "本人から電話で申告", "proxy_reason": "アカウント停止中",
+            "evidence_name": "勤務記録表", "evidence_date": "", "evidence_method": "",
+            "breaks-TOTAL_FORMS": "0", "breaks-INITIAL_FORMS": "0",
+            "breaks-MIN_NUM_FORMS": "0", "breaks-MAX_NUM_FORMS": "20",
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("confirm_token", response.context)
+        self.assertIn("evidence_date", response.context["evidence_form"].errors)
+        self.assertIn("evidence_method", response.context["evidence_form"].errors)
 
     def test_malformed_signed_token_does_not_crash(self):
         token = signing.dumps({"actor_id": self.manager.pk}, salt="attendance-proxy-v1")
@@ -2468,6 +2487,75 @@ class ProxyConfirmationTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "最初から入力してください")
         self.assertEqual(CorrectionRequest.objects.count(), 0)
+
+
+
+class EmployeeStatusPageTests(TestCase):
+    """画面 19：社員詳細の「利用を停止」から確認画面を経て停止・再開する。"""
+
+    def setUp(self):
+        Employee = get_user_model()
+        self.department = Department.objects.create(name="総務", code=1, is_active=True)
+        self.manager = Employee.objects.create_user(
+            employee_number="9101", password="TestPassword_2026!", is_business_admin=True,
+        )
+        Employee.objects.create_user(
+            employee_number="9102", password="TestPassword_2026!", is_business_admin=True,
+        )
+        self.employee = Employee.objects.create_user(
+            employee_number="1101", password="TestPassword_2026!", department="総務",
+            first_name="花子", last_name="山田",
+        )
+        self.client.force_login(self.manager)
+        self.status_url = reverse("management:employee_status", args=[self.employee.pk])
+
+    def _submit(self, page, reason):
+        data = {
+            "operation_id": page.context["operation_id"],
+            "edit_state": page.context["edit_state"],
+            "displayed_candidate": "",
+            "last_name": self.employee.last_name,
+            "first_name": self.employee.first_name,
+            "department_choice": str(page.context["department_id"]),
+            "change_reason": reason,
+        }
+        if not page.context["employee"].is_active:
+            data["is_active"] = "on"
+        return self.client.post(reverse("management:employee_edit", args=[self.employee.pk]), data)
+
+    def test_detail_links_to_status_page_and_stop_requires_reason(self):
+        detail = self.client.get(reverse("management:employee_edit", args=[self.employee.pk]))
+        self.assertContains(detail, self.status_url)
+        self.assertContains(detail, "利用を停止")
+
+        page = self.client.get(self.status_url)
+        self.assertEqual(page.status_code, 200)
+        self.assertContains(page, "停止の理由")
+
+        missing = self._submit(page, "")
+        self.assertEqual(missing.status_code, 200)
+        self.employee.refresh_from_db()
+        self.assertTrue(self.employee.is_active)
+
+        page = self.client.get(self.status_url)
+        stopped = self._submit(page, "退職のため")
+        self.assertEqual(stopped.status_code, 302)
+        self.employee.refresh_from_db()
+        self.assertFalse(self.employee.is_active)
+
+        page = self.client.get(self.status_url)
+        self.assertContains(page, "利用を再開する")
+        resumed = self._submit(page, "復職のため")
+        self.assertEqual(resumed.status_code, 302)
+        self.employee.refresh_from_db()
+        self.assertTrue(self.employee.is_active)
+
+    def test_self_stop_is_not_offered_and_employee_cannot_open(self):
+        own = self.client.get(reverse("management:employee_status", args=[self.manager.pk]))
+        self.assertContains(own, "自分自身を利用停止にはできません。")
+        self.assertNotContains(own, 'name="change_reason"')
+        self.client.force_login(self.employee)
+        self.assertEqual(self.client.get(self.status_url).status_code, 403)
 
 
 # 管理者権限

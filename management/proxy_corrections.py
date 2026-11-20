@@ -20,18 +20,50 @@ from corrections.services import (
     make_proposal, proposal_work_day, submit_correction, validate_proposal, withdraw_correction,
 )
 
+from corrections.views import (
+    _attach_break_befores, _break_initial_with_operations, _display_proposal, _operation,
+)
+
 from .access import business_admin_required
 
 
 class ProxyEvidenceForm(forms.Form):
+    """代理申請の追加理由と、確認した資料の名称・確認日・確認方法（画面 24）。
+
+    資料の3項目は保存時に1つの確認情報（evidence）にまとめ、各項目の合計を1000文字以内に収める。
+    """
+
     proxy_reason = forms.CharField(
         label="本人申請ができない理由", max_length=1000,
-        widget=forms.Textarea(attrs={"rows": 3}),
+        widget=forms.Textarea(attrs={"rows": 2}),
     )
-    evidence = forms.CharField(
-        label="確認資料の名称・確認日・確認方法", max_length=1000,
-        widget=forms.Textarea(attrs={"rows": 3}),
+    evidence_name = forms.CharField(label="資料名", max_length=300)
+    evidence_date = forms.DateField(
+        label="確認日",
+        widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
     )
+    evidence_method = forms.CharField(label="確認方法", max_length=300)
+
+    def clean(self):
+        cleaned = super().clean()
+        name = (cleaned.get("evidence_name") or "").strip()
+        checked_on = cleaned.get("evidence_date")
+        method = (cleaned.get("evidence_method") or "").strip()
+        if name and checked_on and method:
+            cleaned["evidence"] = (
+                f"資料名：{name}／確認日：{checked_on:%Y-%m-%d}／確認方法：{method}"
+            )
+        return cleaned
+
+    def payload(self):
+        """確認画面の署名付きトークンに入れる値（JSONに変換できる形）。"""
+        return {
+            "proxy_reason": self.cleaned_data["proxy_reason"],
+            "evidence": self.cleaned_data["evidence"],
+            "evidence_name": self.cleaned_data["evidence_name"],
+            "evidence_date": self.cleaned_data["evidence_date"].isoformat(),
+            "evidence_method": self.cleaned_data["evidence_method"],
+        }
 
 
 def _initial_values(values):
@@ -47,6 +79,31 @@ def _initial_values(values):
 
 def _initial(session):
     return _initial_values(current_values(session))
+
+
+def _initial_with_operations(session, proposal=None):
+    """画面 24：操作（変更しない／変更／追加／取消）付きの初期値を作る。"""
+    current = current_values(session)
+    proposal = proposal or current
+    shown = {
+        "clock_in_at": proposal.get("clock_in_at") or current.get("clock_in_at"),
+        "clock_out_at": proposal.get("clock_out_at") or current.get("clock_out_at"),
+        "breaks": [],
+    }
+    initial, _ = _initial_values(shown)
+    initial["clock_in_op"] = _operation(current.get("clock_in_at"), proposal.get("clock_in_at"))
+    initial["clock_out_op"] = _operation(current.get("clock_out_at"), proposal.get("clock_out_at"))
+    breaks = _break_initial_with_operations(current.get("breaks", []), proposal.get("breaks", []))
+    return initial, breaks
+
+
+def _render_form(request, employee, work_day, session, form, evidence_form, breaks):
+    _attach_break_befores(breaks, session)
+    return render(request, "management/proxy_form.html", {
+        "employee": employee, "work_day": work_day, "form": form,
+        "evidence_form": evidence_form, "break_formset": breaks,
+        "current_display": _display_proposal(current_values(session)),
+    })
 
 
 @never_cache
@@ -104,7 +161,7 @@ def proxy_correction(request, employee_id, year, month, day):
         breaks = CorrectionBreakFormSet(request.POST, prefix="breaks")
         if form.is_valid() and evidence_form.is_valid() and breaks.is_valid():
             try:
-                proposal = validate_proposal(make_proposal(form, breaks), work_day)
+                proposal = validate_proposal(make_proposal(form, breaks, current_values(session)), work_day)
                 if proposal == current_values(session):
                     raise CorrectionError("変更内容がありません。")
             except CorrectionError as exc:
@@ -115,7 +172,7 @@ def proxy_correction(request, employee_id, year, month, day):
                     "work_day": work_day.isoformat(),
                     "expected_version": session.version if session else 0,
                     "proposal": proposal, "reason": form.cleaned_data["reason"],
-                    **evidence_form.cleaned_data,
+                    **evidence_form.payload(),
                 }, salt="attendance-proxy-v1")
                 return render(request, "management/proxy_confirm.html", {
                     "employee": employee, "work_day": work_day,
@@ -124,29 +181,31 @@ def proxy_correction(request, employee_id, year, month, day):
                     "reason": form.cleaned_data["reason"],
                     "proxy_reason": evidence_form.cleaned_data["proxy_reason"],
                     "evidence": evidence_form.cleaned_data["evidence"],
+                    "evidence_name": evidence_form.cleaned_data["evidence_name"],
+                    "evidence_date": evidence_form.cleaned_data["evidence_date"],
+                    "evidence_method": evidence_form.cleaned_data["evidence_method"],
                     "confirm_token": token,
                 })
     else:
         if return_payload:
             try:
-                initial, initial_breaks = _initial_values(return_payload["proposal"])
+                initial, initial_breaks = _initial_with_operations(session, return_payload["proposal"])
                 initial["reason"] = return_payload["reason"]
-            except (KeyError, TypeError, ValueError):
+            except (KeyError, TypeError, ValueError, AttributeError):
                 messages.error(request, "確認内容が不正です。最初から入力してください。")
                 return_payload = None
-                initial, initial_breaks = _initial(session)
+                initial, initial_breaks = _initial_with_operations(session)
         else:
-            initial, initial_breaks = _initial(session)
+            initial, initial_breaks = _initial_with_operations(session)
         form = CorrectionValuesForm(initial=initial)
         evidence_form = ProxyEvidenceForm(initial={
-            "proxy_reason": return_payload["proxy_reason"],
-            "evidence": return_payload["evidence"],
+            "proxy_reason": return_payload.get("proxy_reason", ""),
+            "evidence_name": return_payload.get("evidence_name", ""),
+            "evidence_date": return_payload.get("evidence_date", ""),
+            "evidence_method": return_payload.get("evidence_method", ""),
         } if return_payload else None)
         breaks = CorrectionBreakFormSet(initial=initial_breaks, prefix="breaks")
-    return render(request, "management/proxy_form.html", {
-        "employee": employee, "work_day": work_day, "form": form,
-        "evidence_form": evidence_form, "break_formset": breaks,
-    })
+    return _render_form(request, employee, work_day, session, form, evidence_form, breaks)
 
 
 @never_cache

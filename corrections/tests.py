@@ -461,6 +461,42 @@ class CorrectionFlowTests(TestCase):
 
         self.assertEqual(response.status_code, 302)
 
+    # ---------- 画面 07：対象ごとの操作（変更しない／変更／追加／取消） ----------
+    def test_input_page_shows_operation_target_before_after(self):
+        response = self.client.get(self.url())
+        for text in ("操作", "対象", "変更前", "変更後", 'value="keep"', 'value="change"', 'value="cancel"'):
+            with self.subTest(text=text):
+                self.assertContains(response, text)
+
+    def test_keep_operation_uses_current_value_even_if_input_was_edited(self):
+        data = self.form_data()
+        data.update({
+            "clock_in_at": f"{self.day.isoformat()}T10:00:00",
+            "clock_in_op": "keep",
+            "clock_out_op": "change",
+            "breaks-0-op": "keep",
+        })
+        response = self.client.post(self.url(), data)
+        self.assertIn("confirm_token", response.context)
+        self.assertIn("09:00", response.context["proposal_display"]["clock_in"])
+        self.assertIn("18:30", response.context["proposal_display"]["clock_out"])
+
+    def test_cancel_operation_removes_break(self):
+        data = self.form_data(clock_out_minute=0)
+        data.update({"clock_in_op": "keep", "clock_out_op": "keep", "breaks-0-op": "cancel"})
+        response = self.client.post(self.url(), data)
+        self.assertIn("confirm_token", response.context)
+        self.assertEqual(response.context["proposal_display"]["breaks"], [])
+
+    def test_change_operation_requires_new_value(self):
+        data = self.form_data()
+        data.update({"clock_out_at": "", "clock_out_op": "change"})
+        response = self.client.post(self.url(), data)
+        self.assertNotIn("confirm_token", response.context)
+        self.assertContains(response, "退勤の変更後の日時を入力してください。")
+        self.assertFalse(CorrectionRequest.objects.exists())
+
+
 
 # v1.4.3 申請・移行の回帰試験
 

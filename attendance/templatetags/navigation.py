@@ -21,6 +21,7 @@ MANAGEMENT_MENU = [
         ("社員管理", "management:employees", {
             "management:employees", "management:employee_create", "management:employee_edit",
             "management:employment_edit", "management:employee_password_reset",
+            "management:employee_status",
         }),
         ("部署登録", "management:department_list", {
             "management:department_list", "management:department_create",

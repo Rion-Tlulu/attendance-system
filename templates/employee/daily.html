@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load attendance_ui %}
 
 {% block title %}日別勤怠詳細 | 勤怠管理{% endblock %}
 
@@ -43,7 +44,7 @@
                 </thead>
                 <tbody>
                     {% for row in comparison_rows %}
-                    <tr><th scope="row">{{ row.label }}</th><td>{{ row.original }}</td><td>{{ row.effective }}</td></tr>
+                    <tr><th scope="row">{{ row.label }}</th><td>{{ row.original|short_dt:work_day }}</td><td>{{ row.effective|short_dt:work_day }}</td></tr>
                     {% empty %}
                     <tr><td colspan="3" class="empty-cell">記録なし</td></tr>
                     {% endfor %}

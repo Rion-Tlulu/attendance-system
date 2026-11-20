@@ -1,31 +1,28 @@
 {% extends "base.html" %}
+{% load attendance_ui %}
 {% block title %}代理申請の確認 | 勤怠管理{% endblock %}
 
 {% block content %}
 <div class="page">
     <header class="page-head"><h1>代理申請の確認</h1></header>
     <section class="card" aria-label="代理申請の内容">
-        <div class="summary-strip">
-            <span class="summary-strip__value">{{ employee.display_name }}　{{ employee.employee_number }}</span>
-            <span class="summary-strip__value"><span class="summary-strip__label">勤務日</span>　{{ work_day|date:"Y年n月j日" }}</span>
-            {% if target_day != work_day %}<span class="summary-strip__value"><span class="summary-strip__label">移動先</span>　{{ target_day|date:"Y年n月j日" }}</span>{% endif %}
+        <div class="proxy-head">
+            <span class="proxy-head__name">{{ employee.display_name }}<span class="proxy-head__id">{{ employee.employee_number }}</span></span>
+            <span><span class="badge badge--outline">{% if employee.is_active %}利用中{% else %}停止中{% endif %}</span></span>
+            <span class="proxy-head__day"><span class="proxy-head__label">勤務日</span>{{ work_day|date:"n月j日" }}</span>
+            {% if target_day != work_day %}<span class="proxy-head__day"><span class="proxy-head__label">移動先</span>{{ target_day|date:"n月j日" }}</span>{% endif %}
         </div>
 
-        <div class="table-wrap">
-            <table class="data-table">
-                <thead><tr><th scope="col">項目</th><th scope="col">現在の有効値</th><th scope="col">修正案</th></tr></thead>
-                <tbody>
-                    <tr><th scope="row">出勤</th><td>{{ current.clock_in_at|default:"未記録" }}</td><td>{{ proposal.clock_in_at|default:"未記録" }}</td></tr>
-                    <tr><th scope="row">退勤</th><td>{{ current.clock_out_at|default:"未記録" }}</td><td>{{ proposal.clock_out_at|default:"未記録" }}</td></tr>
-                    <tr><th scope="row">休憩</th><td>—</td><td>{% for rest in proposal.breaks %}{{ rest.started_at }} 〜 {{ rest.ended_at }}<br>{% empty %}なし{% endfor %}</td></tr>
-                </tbody>
-            </table>
-        </div>
+        <h2 class="section-bar">変更内容</h2>
+        {% include "components/diff_table.html" with day=work_day before_in=current.clock_in_at|jst_datetime after_in=proposal.clock_in_at|jst_datetime before_out=current.clock_out_at|jst_datetime after_out=proposal.clock_out_at|jst_datetime break_rows=current.breaks|raw_break_pairs:proposal.breaks before_label="現在の有効値" after_label="修正案" %}
 
-        <dl class="kv-table mt-16">
+        <h2 class="section-bar">理由と確認資料</h2>
+        <dl class="kv-table">
             <dt>修正理由</dt><dd>{{ reason }}</dd>
             <dt>本人申請ができない理由</dt><dd>{{ proxy_reason }}</dd>
-            <dt>確認資料・確認方法</dt><dd>{{ evidence }}</dd>
+            <dt>資料名</dt><dd>{{ evidence_name }}</dd>
+            <dt>確認日</dt><dd>{{ evidence_date|date:"Y年n月j日" }}</dd>
+            <dt>確認方法</dt><dd>{{ evidence_method }}</dd>
         </dl>
 
         <div class="btn-row btn-row--split">

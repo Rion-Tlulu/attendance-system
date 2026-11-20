@@ -3,6 +3,14 @@ from django.forms import formset_factory
 
 DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S"
 
+# 画面 07：対象ごとの操作。未送信（空）の場合は従来どおり入力された日時をそのまま使う。
+OPERATION_CHOICES = [
+    ("keep", "変更しない"),
+    ("add", "追加"),
+    ("change", "変更"),
+    ("cancel", "取消"),
+]
+
 
 class CorrectionValuesForm(forms.Form):
     """修正後の勤務全体と理由を入力する"""
@@ -39,6 +47,20 @@ class CorrectionValuesForm(forms.Form):
         ),
     )
 
+    clock_in_op = forms.ChoiceField(
+        label="出勤の操作",
+        choices=OPERATION_CHOICES,
+        required=False,
+        widget=forms.RadioSelect,
+    )
+
+    clock_out_op = forms.ChoiceField(
+        label="退勤の操作",
+        choices=OPERATION_CHOICES,
+        required=False,
+        widget=forms.RadioSelect,
+    )
+
     reason = forms.CharField(
         label="修正申請の理由",
         max_length=500,
@@ -59,6 +81,25 @@ class CorrectionValuesForm(forms.Form):
             raise forms.ValidationError("申請理由を入力してください")
 
         return reason
+
+    def clean(self):
+        cleaned_data = super().clean()
+
+        for name, label in (("clock_in", "出勤"), ("clock_out", "退勤")):
+            operation = cleaned_data.get(f"{name}_op") or ""
+            field = f"{name}_at"
+
+            if operation == "cancel":
+                # 取消は有効値を空にする申請として扱う（07章）。
+                cleaned_data[field] = None
+            elif (
+                operation in ("add", "change")
+                and cleaned_data.get(field) is None
+                and field not in self.errors
+            ):
+                self.add_error(field, f"{label}の変更後の日時を入力してください。")
+
+        return cleaned_data
 
 
 class CorrectionBreakForm(forms.Form):
@@ -96,11 +137,27 @@ class CorrectionBreakForm(forms.Form):
         ),
     )
 
+    op = forms.ChoiceField(
+        label="休憩の操作",
+        choices=OPERATION_CHOICES,
+        required=False,
+        widget=forms.HiddenInput,
+    )
+
     def clean(self):
         cleaned_data = super().clean()
+        operation = cleaned_data.get("op") or ""
+
+        if operation == "cancel":
+            # 取消した休憩は修正案に含めない。
+            cleaned_data["DELETE"] = True
+            return cleaned_data
 
         start = cleaned_data.get("started_at")
         end = cleaned_data.get("ended_at")
+
+        if operation in ("add", "change") and not start and not end:
+            raise forms.ValidationError("休憩の開始と終了を入力してください。")
 
         if bool(start) != bool(end):
             raise forms.ValidationError("休憩の開始と終了は両方入力してください。")

@@ -9,65 +9,9 @@
         <div class="form-row__control form-row__static">{{ work_day|date:"Y年n月j日（D）" }}</div>
     </div>
 
-    <div class="change-table" role="group" aria-labelledby="change-table-title">
-        <p id="change-table-title" class="visually-hidden">出勤・退勤の変更</p>
-        <div class="change-table__head" aria-hidden="true"><span>対象</span><span>変更前</span><span>変更後</span></div>
-        <div class="change-table__row field">
-            <span class="change-table__target">出勤</span>
-            <span class="change-table__before"><span class="change-table__before-label">変更前 </span>{% if session.clock_in_at %}{{ session.clock_in_at|date:"n/j H:i" }}{% else %}未記録{% endif %}</span>
-            <div class="change-table__after">
-                <label for="{{ form.clock_in_at.id_for_label }}" class="visually-hidden">出勤の変更後</label>
-                {{ form.clock_in_at }}
-                {{ form.clock_in_at.errors }}
-            </div>
-        </div>
-        <div class="change-table__row field">
-            <span class="change-table__target">退勤</span>
-            <span class="change-table__before"><span class="change-table__before-label">変更前 </span>{% if session.clock_out_at %}{{ session.clock_out_at|date:"n/j H:i" }}{% else %}未記録{% endif %}</span>
-            <div class="change-table__after">
-                <label for="{{ form.clock_out_at.id_for_label }}" class="visually-hidden">退勤の変更後</label>
-                {{ form.clock_out_at }}
-                {{ form.clock_out_at.errors }}
-            </div>
-        </div>
-    </div>
-    <p class="field-help mb-18">追加は空欄に日時を入力、変更は日時を書き換え、取消は日時を空欄にして申請します。</p>
+    {% include "components/correction_targets.html" %}
 
-    <div class="form-row form-row--top" role="group" aria-labelledby="break-group-label">
-        <span class="form-row__label" id="break-group-label">休憩</span>
-        <div class="form-row__control">
-            {{ break_formset.management_form }}
-            {% if break_formset.non_form_errors %}<div class="field-error" role="alert">{{ break_formset.non_form_errors }}</div>{% endif %}
-            <div id="e03-break-form-list">
-                {% for rest in break_formset %}
-                <div class="break-form">
-                    <h3>休憩 {{ forloop.counter }}</h3>
-                    {% for field in rest.hidden_fields %}{{ field }}{% endfor %}
-                    <div class="form-grid-2">
-                        <div class="field">{{ rest.started_at|plain_label }}{{ rest.started_at }}{{ rest.started_at.errors }}</div>
-                        <div class="field">{{ rest.ended_at|plain_label }}{{ rest.ended_at }}{{ rest.ended_at.errors }}</div>
-                    </div>
-                    <label class="delete-check">{{ rest.DELETE }} この休憩を取消</label>
-                    {% if rest.non_field_errors %}<div class="field-error" role="alert">{{ rest.non_field_errors }}</div>{% endif %}
-                </div>
-                {% endfor %}
-            </div>
-            <button type="button" class="btn btn--sm btn--outline" data-e03-add-break><i class="fa-solid fa-plus" aria-hidden="true"></i> 休憩を追加</button>
-            <template id="e03-empty-break-template">
-                <div class="break-form">
-                    <h3>追加した休憩</h3>
-                    {% for field in break_formset.empty_form.hidden_fields %}{{ field }}{% endfor %}
-                    <div class="form-grid-2">
-                        <div class="field">{{ break_formset.empty_form.started_at|plain_label }}{{ break_formset.empty_form.started_at }}</div>
-                        <div class="field">{{ break_formset.empty_form.ended_at|plain_label }}{{ break_formset.empty_form.ended_at }}</div>
-                    </div>
-                    <label class="delete-check">{{ break_formset.empty_form.DELETE }} この休憩を取消</label>
-                </div>
-            </template>
-        </div>
-    </div>
-
-    <div class="form-row form-row--top field">
+    <div class="form-row form-row--top field mt-16">
         <label class="form-row__label" for="{{ form.reason.id_for_label }}">修正理由（必須）</label>
         <div class="form-row__control">
             {{ form.reason }}
