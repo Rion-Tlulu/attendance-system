@@ -25,3 +25,8 @@ if DATABASES["default"]["ENGINE"] == "django.db.backends.sqlite3":
 NUMBERING_LEDGER_PATH = (
     Path(tempfile.gettempdir()) / "attendance_v156_test" / "numbering-ledger.json"
 )
+
+# テストでは検証の速さを優先する（本番の PBKDF2 は重く、ユーザー作成のたびに時間がかかる）。
+# パスワードのハッシュ化そのものを検証するテストは、使用中のハッシャー名ではなく
+# 「平文で保存されていない」ことを確認しているため影響しない。
+PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
