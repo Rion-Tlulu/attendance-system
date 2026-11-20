@@ -75,13 +75,13 @@ UI・UX・ユニバーサルデザイン・アクセシビリティ・レスポ�
 
 出勤・退勤・休憩開始・休憩終了の打刻を行う画面です。現在の勤務状態や最後の打刻記録を確認できます。
 
-![打刻ホーム](docs/screenshot/attendanceHome.png)
+![打刻ホーム](docs/screenshot/employeeHome.png)
 
 #### 自分の勤怠
 
 自分の勤怠情報を日別・月別に確認する画面です。出退勤時刻、休憩時間、実働時間、申請状況などを確認できます。
 
-![自分の勤怠](docs/screenshot/employee_Month.png)
+![自分の勤怠](docs/screenshot/employee_Monthly.png)
 
 #### 日別詳細と修正申請
 
