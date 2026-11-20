@@ -123,3 +123,54 @@ def raw_break_pairs(current_breaks, proposal_breaks):
 def has_value(value):
     """表示用の日時が実際の値か（「設定なし」「未記録」・空でないか）を返す。"""
     return value not in (None, "", "設定なし", "未記録")
+
+
+def _time_range(start, end, work_day):
+    """休憩の開始・終了を「12:00 〜 13:00」の1つの表示にまとめる。"""
+    start_text = _short(start, work_day) if has_value(start) else ""
+    end_text = _short(end, work_day) if has_value(end) else ""
+    if not start_text and not end_text:
+        return "未記録"
+    return f"{start_text or '未記録'} 〜 {end_text or '未記録'}"
+
+
+@register.filter
+def grouped_comparison(rows, work_day):
+    """日別詳細の比較表：「休憩N開始」「休憩N終了」の2行を「休憩N」の1行にまとめる（画面 06）。
+
+    戻り値は [{"label", "original", "effective", "changed"}]。日時は勤務日と同じ日付なら時刻だけにする。
+    休憩が1件だけのときは「休憩」と表示する。
+    """
+    rows = list(rows or [])
+    starts = {}
+    ends = {}
+    for row in rows:
+        match = re.fullmatch(r"休憩(\d+)(開始|終了)", row.label)
+        if match:
+            (starts if match.group(2) == "開始" else ends)[match.group(1)] = row
+    break_count = len(set(starts) | set(ends))
+
+    grouped = []
+    seen = set()
+    for row in rows:
+        match = re.fullmatch(r"休憩(\d+)(開始|終了)", row.label)
+        if not match:
+            original = _short(row.original, work_day)
+            effective = _short(row.effective, work_day)
+            grouped.append({"label": row.label, "original": original, "effective": effective,
+                            "changed": original != effective})
+            continue
+        number = match.group(1)
+        if number in seen:
+            continue
+        seen.add(number)
+        start_row, end_row = starts.get(number), ends.get(number)
+        original = _time_range(getattr(start_row, "original", None), getattr(end_row, "original", None), work_day)
+        effective = _time_range(getattr(start_row, "effective", None), getattr(end_row, "effective", None), work_day)
+        grouped.append({
+            "label": "休憩" if break_count == 1 else f"休憩{number}",
+            "original": original,
+            "effective": effective,
+            "changed": original != effective,
+        })
+    return grouped

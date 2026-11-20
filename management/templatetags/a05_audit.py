@@ -232,13 +232,59 @@ AUDIT_FIELD_LABELS = {
     "retirement_date": "退職日", "target_month": "対象月", "month": "対象月",
     "output_id": "出力ID", "operation_id": "操作ID", "authenticated": "認証",
     "ip": "接続元IPアドレス", "count": "件数", "kind": "種別", "scope": "対象範囲",
+    # 修正申請・勤務記録
+    "effective_values": "有効値", "review_status": "審査結果", "correction_id": "申請番号",
+    "recorded_at": "記録日時", "work_seconds": "実働時間", "break_seconds": "休憩時間",
+    "withdraw_reason": "取下げ理由", "unlock_reason": "解除理由",
+    # 社員・在籍
+    "leave_date": "退社日", "employee_id": "社員の内部ID", "employee": "社員",
+    "department_choice": "部署", "credential_reset": "初期パスワードの再発行",
+    "desired_role": "変更後の権限", "expected_role": "変更前の権限", "change_reason": "変更理由",
+    # 月次確定・CSV
+    "checked_no_record": "別管理資料との照合を確認", "no_record_count": "記録なしの日数",
+    "integrity_check_result": "整合検査の結果", "snapshot": "確定時の記録",
+    "downloaded": "取得したCSV", "format": "CSVの種類", "manifest": "対象社員と確定版",
+    "closing_id": "確定版の番号", "actor_id": "実行者の内部ID",
+    # 部署・社員番号の保全記録
+    "legacy_migration": "旧データからの移行", "pending": "照合待ちの記録", "verified": "照合済み",
+    "numbers": "社員番号の発行記録", "departments": "部署", "registrations": "部署登録の記録",
+    "operations": "操作の記録", "department_audits": "部署の操作履歴", "ledger_path": "保全記録の保存先",
+    "schema": "記録の形式", "signature": "署名", "payload": "記録内容", "value": "値",
+}
+
+# 値が固定の語（英字の内部値）を項目ごとに日本語へ置き換える。
+AUDIT_VALUE_LABELS = {
+    "kind": {
+        "clock_in": "出勤", "clock_out": "退勤", "break_start": "休憩開始", "break_end": "休憩終了",
+    },
+    "format": {"daily": "日次明細", "monthly": "月次集計"},
+    "downloaded": {"daily": "日次明細", "monthly": "月次集計"},
+    "scope": {"all": "全社員", "department": "部署別", "employee": "社員を指定"},
+    "desired_role": {"admin": "業務管理者", "employee": "一般社員"},
+    "expected_role": {"admin": "業務管理者", "employee": "一般社員"},
 }
 
 AUDIT_STATUS_LABELS = {
     "pending": "審査中", "approved": "承認済み", "returned": "差戻し",
     "withdrawn": "取り下げ済み", "finalized": "確定済み", "reopened": "確定解除",
     "completed": "完了", "working": "勤務中", "on_break": "休憩中", "no_record": "記録なし",
+    "unlocked": "確定解除", "open": "未確定",
 }
+
+# 状態を表す項目（値を AUDIT_STATUS_LABELS で日本語にする）
+AUDIT_STATUS_KEYS = {"status", "review_status"}
+
+
+def _audit_label(key):
+    """項目名を日本語にする。登録のない内部名は、英字のまま見せずに「その他の項目」とする。"""
+    if key in AUDIT_FIELD_LABELS:
+        return AUDIT_FIELD_LABELS[key]
+    return f"その他の項目（{key}）"
+
+
+def _format_seconds(seconds):
+    hours, remainder = divmod(int(seconds), 3600)
+    return f"{hours}時間{remainder // 60:02d}分"
 
 
 def _audit_value(key, value):
@@ -248,8 +294,12 @@ def _audit_value(key, value):
         return "—"
     if isinstance(value, bool):
         return "はい" if value else "いいえ"
-    if key == "status" and isinstance(value, str):
+    if key in AUDIT_STATUS_KEYS and isinstance(value, str):
         return AUDIT_STATUS_LABELS.get(value, value)
+    if key in AUDIT_VALUE_LABELS and isinstance(value, str):
+        return AUDIT_VALUE_LABELS[key].get(value, value)
+    if key.endswith("_seconds") and isinstance(value, (int, float)):
+        return _format_seconds(value)
     if isinstance(value, str):
         parsed = parse_datetime(value) if "T" in value else None
         if parsed is not None:
@@ -265,9 +315,19 @@ def _audit_value(key, value):
         for entry in value:
             if isinstance(entry, dict) and ("started_at" in entry or "ended_at" in entry):
                 parts.append(f"{_audit_value('started_at', entry.get('started_at'))}〜{_audit_value('ended_at', entry.get('ended_at'))}")
+            elif isinstance(entry, dict):
+                parts.append("・".join(
+                    f"{_audit_label(child_key)}：{_audit_value(child_key, child_value)}"
+                    for child_key, child_value in entry.items()
+                ))
             else:
                 parts.append(_audit_value(key, entry))
         return "、".join(parts)
+    if isinstance(value, dict):
+        return "・".join(
+            f"{_audit_label(child_key)}：{_audit_value(child_key, child_value)}"
+            for child_key, child_value in value.items()
+        )
     return str(value)
 
 
@@ -284,11 +344,11 @@ def audit_rows(data):
         return []
     rows = []
     for key, value in data.items():
-        label = AUDIT_FIELD_LABELS.get(key, key)
+        label = _audit_label(key)
         if isinstance(value, dict):
+            # 入れ子の項目は「有効値の出勤」のように親の名前を前に付ける。
             for child_key, child_value in value.items():
-                child_label = AUDIT_FIELD_LABELS.get(child_key, child_key)
-                rows.append((f"{label}：{child_label}", _audit_value(child_key, child_value)))
+                rows.append((f"{label}の{_audit_label(child_key)}", _audit_value(child_key, child_value)))
         else:
             rows.append((label, _audit_value(key, value)))
     return rows

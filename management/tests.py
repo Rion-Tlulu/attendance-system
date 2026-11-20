@@ -4472,3 +4472,52 @@ class RequirementGapAcceptanceTests(_AcceptanceTestCase):
         # 一般社員は管理画面へ直接アクセスできない。
         self.client.force_login(self.employee)
         self.assertEqual(self.client.get(_reverse("management:employees")).status_code, 403)
+
+
+class AuditRowsDisplayTests(TestCase):
+    """操作履歴（A05）の変更前後に内部名（英字）を表示しない。"""
+
+    def test_reported_correction_approval_is_shown_in_japanese(self):
+        from management.templatetags.a05_audit import audit_rows
+
+        before = {
+            "status": "no_record", "version": None,
+            "effective_values": {"clock_in_at": None, "clock_out_at": None, "breaks": []},
+        }
+        after = {
+            "review_status": "approved", "status": "completed", "version": 2,
+            "effective_values": {
+                "clock_in_at": "2026-11-13T10:30:00+09:00",
+                "clock_out_at": "2026-11-13T15:30:00+09:00",
+                "breaks": [{"started_at": "2026-11-13T12:30:00+09:00", "ended_at": "2026-11-13T13:30:00+09:00"}],
+            },
+            "target_work_date": "2026-11-13",
+        }
+        before_rows = dict(audit_rows(before))
+        after_rows = dict(audit_rows(after))
+        self.assertEqual(before_rows["有効値の出勤"], "—")
+        self.assertEqual(after_rows["審査結果"], "承認済み")
+        self.assertEqual(after_rows["有効値の退勤"], "2026/11/13 15:30")
+        self.assertEqual(after_rows["有効値の休憩"], "2026/11/13 12:30〜2026/11/13 13:30")
+        for label, value in audit_rows(before) + audit_rows(after):
+            with self.subTest(label=label):
+                self.assertNotRegex(label, r"[a-z]")
+                self.assertNotIn(value, ("approved", "completed", "no_record"))
+
+    def test_fixed_values_and_seconds_are_translated(self):
+        from management.templatetags.a05_audit import audit_rows
+
+        rows = dict(audit_rows({
+            "kind": "break_start", "work_seconds": 27000, "break_seconds": 3600,
+            "checked_no_record": True, "format": "daily",
+        }))
+        self.assertEqual(rows["種別"], "休憩開始")
+        self.assertEqual(rows["実働時間"], "7時間30分")
+        self.assertEqual(rows["休憩時間"], "1時間00分")
+        self.assertEqual(rows["別管理資料との照合を確認"], "はい")
+        self.assertEqual(rows["CSVの種類"], "日次明細")
+
+    def test_unknown_key_is_not_shown_as_bare_internal_name(self):
+        from management.templatetags.a05_audit import audit_rows
+
+        self.assertEqual(audit_rows({"new_field": "x"}), [("その他の項目（new_field）", "x")])

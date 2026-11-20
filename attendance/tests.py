@@ -1013,6 +1013,27 @@ class Phase6Tests(TestCase):
         self.assertIn("09:00", rows[0].original)
         self.assertIn("09:15", rows[0].effective)
 
+    def test_daily_table_groups_break_start_and_end_into_one_row(self):
+        """日別詳細では「休憩N開始／終了」を「休憩」の1行にまとめ、時刻だけで表示する（画面 06）。"""
+        from management.templatetags.attendance_ui import grouped_comparison
+        from attendance.reporting import ComparisonRow
+
+        day = date(2026, 9, 15)
+        rows = [
+            ComparisonRow("出勤", "2026/09/15 09:00", "2026/09/15 09:00"),
+            ComparisonRow("休憩1開始", "2026/09/15 12:00", "2026/09/15 12:00"),
+            ComparisonRow("休憩1終了", "未記録", "2026/09/15 13:00"),
+            ComparisonRow("退勤", "2026/09/15 17:30", "2026/09/16 01:00"),
+        ]
+        grouped = grouped_comparison(rows, day)
+        self.assertEqual([row["label"] for row in grouped], ["出勤", "休憩", "退勤"])
+        self.assertEqual(grouped[1]["original"], "12:00 〜 未記録")
+        self.assertEqual(grouped[1]["effective"], "12:00 〜 13:00")
+        self.assertTrue(grouped[1]["changed"])
+        self.assertFalse(grouped[0]["changed"])
+        # 勤務日と別の日付になる時刻は日付も付ける。
+        self.assertEqual(grouped[2]["effective"], "9/16 01:00")
+
     def test_other_employee_is_hidden(self):
         day = date(2026, 9, 15)
 

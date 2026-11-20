@@ -2354,6 +2354,16 @@ input[type="radio"] {
   padding: 8px 20px;
 }
 
+/* 日別詳細の比較表：項目名（休憩1 など）は折り返さない */
+.daily-compare tbody th {
+  white-space: nowrap;
+}
+
+/* 日別詳細：原記録と現在の値が異なる行（修正が反映された行） */
+.data-table .is-changed-row td:last-child {
+  font-weight: 700;
+}
+
 .data-table .empty-cell {
   padding: 28px;
   color: var(--muted);

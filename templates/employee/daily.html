@@ -37,14 +37,14 @@
         </div>
 
         <div class="table-wrap">
-            <table class="data-table">
+            <table class="data-table daily-compare">
                 <caption class="visually-hidden">原記録と現在の有効値の比較</caption>
                 <thead>
                     <tr><th scope="col">項目</th><th scope="col">原記録</th><th scope="col">現在の値</th></tr>
                 </thead>
                 <tbody>
-                    {% for row in comparison_rows %}
-                    <tr><th scope="row">{{ row.label }}</th><td>{{ row.original|short_dt:work_day }}</td><td>{{ row.effective|short_dt:work_day }}</td></tr>
+                    {% for row in comparison_rows|grouped_comparison:work_day %}
+                    <tr{% if row.changed %} class="is-changed-row"{% endif %}><th scope="row">{{ row.label }}</th><td>{{ row.original }}</td><td>{{ row.effective }}{% if row.changed %} <span class="badge badge--sm">修正済み</span>{% endif %}</td></tr>
                     {% empty %}
                     <tr><td colspan="3" class="empty-cell">記録なし</td></tr>
                     {% endfor %}
