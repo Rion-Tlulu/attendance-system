@@ -537,7 +537,7 @@ WCAG 2.2 レベルAAは適合目標であり、適合認証を取得したもの
 標準フォントにはGoogle Fontsの**Noto Sans JP**を使用します。<br>
 ※リンク：https://fonts.google.com/
 
-アイコンにはFont Awesome Free（を使用し、文字ラベルと組み合わせることで、アイコンだけに依存しない操作画面を目指しています。<br>
+アイコンにはFont Awesome Freeを使用し、文字ラベルと組み合わせることで、アイコンだけに依存しない操作画面を目指しています。<br>
 ※リンク：https://fontawesome.com/
 
 グラフにはChart.jsを使用し、数値表との切り替えを可能にする設計です。
