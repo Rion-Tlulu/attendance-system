@@ -1,28 +1,45 @@
 {% extends "base.html" %}
 {% load attendance_ui %}
-{% block title %}月次CSV出力 | 勤怠管理{% endblock %}
-{% block screen_label %}管理者｜CSV出力{% endblock %}
+{% block title %}CSV出力条件（月次CSV出力） | 勤怠管理{% endblock %}
+
 {% block content %}
-<div class="v2-page">
-  <header class="v2-heading"><div><h1>月次CSV出力</h1>
-    <p>確定済みの社員と対象月を選び、日次明細と月次集計に共通の出力IDを作成します。</p>
-  </div></header>
-  <section class="v2-panel">
-    {% if summary %}
-    <p>対象 {{ summary.total_count }}人 ／ 確定済み {{ summary.finalized_count }}人 ／ 未確定 {{ summary.unfinalized_count }}人</p>
-    {% endif %}
-    <form method="post">
-      {% csrf_token %}
-      {% if form.non_field_errors %}<div class="v2-notice v2-notice--warning" role="alert">{{ form.non_field_errors }}</div>{% endif %}
-      <div class="v2-field">{{ form.month|plain_label }} {{ form.month }} {{ form.month.errors }}</div>
-      <fieldset class="v2-field"><legend>{{ form.scope.label }}</legend>{{ form.scope }} {{ form.scope.errors }}</fieldset>
-      <div class="v2-field">{{ form.department|plain_label }} {{ form.department }} {{ form.department.errors }}</div>
-      <div class="v2-field">{{ form.employee_number|plain_label }} {{ form.employee_number }} {{ form.employee_number.errors }}</div>
-      <div class="v2-actions">
-        <button class="v2-button v2-button--outline" type="submit" name="mode" value="preview">対象を確認する</button>
-        <button class="v2-button" type="submit" name="mode" value="create">出力IDを作成する</button>
-      </div>
-    </form>
-  </section>
+<div class="page">
+    <header class="page-head">
+        <h1>CSV出力</h1>
+        <p class="page-lead">確定済みの社員と対象月を選び、日次明細と月次集計に共通の出力IDを作成します。</p>
+    </header>
+    <section class="card card--pad-lg" aria-label="出力条件">
+        {% if summary %}
+        <div class="stat-grid">
+            <div><span class="stat-label">対象</span><span class="stat-value">{{ summary.total_count }}<small>人</small></span></div>
+            <div><span class="stat-label">確定済み</span><span class="stat-value">{{ summary.finalized_count }}<small>人</small></span></div>
+            <div><span class="stat-label">未確定</span><span class="stat-value{% if summary.unfinalized_count %} text-danger{% endif %}">{{ summary.unfinalized_count }}<small>人</small></span></div>
+        </div>
+        {% endif %}
+        <form method="post" novalidate>
+            {% csrf_token %}
+            {% if form.non_field_errors %}<div class="notice-box notice-box--error" role="alert"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i><div>{{ form.non_field_errors }}</div></div>{% endif %}
+            <div class="form-row field">
+                <label class="form-row__label" for="{{ form.month.id_for_label }}">{{ form.month.label }}</label>
+                <div class="form-row__control">{{ form.month }}{{ form.month.errors }}</div>
+            </div>
+            <div class="form-row" role="group" aria-labelledby="scope-label">
+                <span class="form-row__label" id="scope-label">{{ form.scope.label }}</span>
+                <div class="form-row__control"><div class="radio-row">{{ form.scope }}</div>{{ form.scope.errors }}</div>
+            </div>
+            <div class="form-row field">
+                <label class="form-row__label" for="{{ form.department.id_for_label }}">{{ form.department.label }}</label>
+                <div class="form-row__control">{{ form.department }}{{ form.department.errors }}</div>
+            </div>
+            <div class="form-row field">
+                <label class="form-row__label" for="{{ form.employee_number.id_for_label }}">{{ form.employee_number.label }}</label>
+                <div class="form-row__control">{{ form.employee_number }}{{ form.employee_number.errors }}</div>
+            </div>
+            <div class="btn-row btn-row--split">
+                <button class="btn btn--md btn--outline" type="submit" name="mode" value="preview">対象を確認する</button>
+                <button class="btn btn--md" type="submit" name="mode" value="create">出力IDを作成する</button>
+            </div>
+        </form>
+    </section>
 </div>
 {% endblock %}

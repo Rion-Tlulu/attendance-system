@@ -1,448 +1,99 @@
-
 {% extends "base.html" %}
-{% load static %}
-
-{% block title %}
-使い方ガイド | 勤怠管理
-{% endblock %}
-
-{% block screen_label %}
-使い方ガイド
-{% endblock %}
-
-{% block extra_css %}
-<link rel="stylesheet"
-      href="{% static 'css/account-pages.css' %}">
-{% endblock %}
+{% block title %}使い方ガイド | 勤怠管理{% endblock %}
 
 {% block content %}
-
-<div class="account-page guide-page">
-
-    <nav class="account-breadcrumb"
-         aria-label="パンくずリスト">
-
-        <a href="{% url 'accounts:overview' %}">
-            アカウントと使い方
-        </a>
-
-        <span aria-hidden="true">›</span>
-
-        <span aria-current="page">
-            使い方ガイド
-        </span>
-
-    </nav>
-
-
-    <header class="account-page-heading">
-        <h1>
-            <i class="fa-solid fa-book-open"
-               aria-hidden="true"></i>
-            使い方ガイド
-        </h1>
-
-        <p>
-            勤怠管理システムの操作方法を
-            項目別に確認できます。
-        </p>
+<div class="page">
+    <header class="page-head">
+        <div>
+            <a class="back-link" href="{% url 'accounts:overview' %}"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> アカウントと使い方へ</a>
+            <h1>使い方ガイド</h1>
+        </div>
+        <p class="page-lead">勤怠管理システムの操作方法を、操作ごとに確認できます。</p>
     </header>
 
-
-    <!-- 目次 -->
-    <nav class="ui-card guide-index"
-         aria-label="ガイドの目次">
-
-        <h2>確認したい項目を選択</h2>
-
-        <div class="guide-index-links">
-            <a href="#clocking">打刻の方法</a>
-            <a href="#monthly">自分の勤怠</a>
-            <a href="#correction">修正申請</a>
-            <a href="#security">パスワードと安全な利用</a>
-            <a href="#troubleshoot">困ったとき</a>
+    <nav class="card" aria-label="ガイドの目次">
+        <div class="inline-actions">
+            <a class="chev-link" href="#clocking"><span>打刻の方法</span></a>
+            <a class="chev-link" href="#monthly"><span>自分の勤怠</span></a>
+            <a class="chev-link" href="#correction"><span>修正申請</span></a>
+            <a class="chev-link" href="#security"><span>パスワードと安全な利用</span></a>
+            {% if request.user.is_business_admin %}<a class="chev-link" href="#manager"><span>管理者の使い方</span></a>{% endif %}
+            <a class="chev-link" href="#troubleshoot"><span>困ったとき</span></a>
         </div>
-
     </nav>
 
-
-    <!-- STEP 1：打刻 -->
-    <section id="clocking"
-             class="ui-card account-section guide-section"
-             aria-labelledby="clocking-title">
-
-        <h2 id="clocking-title">
-            <i class="fa-regular fa-clock"
-               aria-hidden="true"></i>
-            打刻の方法
-        </h2>
-
-        <p>
-            出勤・退勤・休憩の記録は
-            「打刻」画面から行います。
-        </p>
-
-        <ol class="guide-steps">
-
-            <li>
-                <strong>打刻画面を開く</strong>
-
-                <p>
-                    PCでは左サイドバーの「打刻」、
-                    スマートフォンでは下部メニューの
-                    「打刻」を選択します。
-                </p>
-            </li>
-
-            <li>
-                <strong>出勤時に「出勤」を押す</strong>
-
-                <p>
-                    出勤ボタンを押すと、サーバー時刻で
-                    出勤日時が記録されます。
-                </p>
-            </li>
-
-            <li>
-                <strong>休憩開始時に「休憩開始」を押す</strong>
-
-                <p>
-                    休憩を始めるタイミングで操作します。
-                </p>
-            </li>
-
-            <li>
-                <strong>休憩終了時に「休憩終了」を押す</strong>
-
-                <p>
-                    休憩を終えるタイミングで操作します。
-                    休憩は複数回記録できます。
-                </p>
-            </li>
-
-            <li>
-                <strong>勤務終了時に「退勤」を押す</strong>
-
-                <p>
-                    勤務が完了すると、実働時間と
-                    休憩時間を確認できます。
-                </p>
-            </li>
-
+    <section id="clocking" class="card" aria-labelledby="clocking-title">
+        <h2 class="section-bar" id="clocking-title">出勤・休憩・退勤を記録する</h2>
+        <ol>
+            <li><strong>仕事を始めるとき。</strong>「社員メニュー」→「打刻メニュー」→「打刻ホーム」で「出勤」を押します。</li>
+            <li><strong>休憩するとき。</strong>「休憩開始」を押し、仕事に戻ったら「休憩終了」を押します。休憩は複数回記録できます。</li>
+            <li><strong>仕事を終えるとき。</strong>「退勤」を押します。毎回、画面の完了メッセージと記録時刻を確認します。</li>
         </ol>
-
-        <p class="account-help-text">
-            端末に表示される時計は目安です。
-            実際の打刻はサーバー時刻で記録されます。
-        </p>
-
-        <a href="{% url 'attendance:home' %}"
-           class="ui-button ui-button--primary">
-            打刻画面を開く
-        </a>
-
+        <p>通信が途中で切れたときは、再送前に「最後の記録」で確認してください。前日から続く勤務は、画面に表示された勤務日を見て休憩・退勤を記録します。端末の時計は目安で、打刻はサーバー時刻で記録されます。</p>
+        <a class="btn" href="{% url 'attendance:home' %}">打刻ホームを開く</a>
     </section>
 
-
-    <!-- STEP 2：月次勤怠 -->
-    <section id="monthly"
-             class="ui-card account-section guide-section"
-             aria-labelledby="monthly-title">
-
-        <h2 id="monthly-title">
-            <i class="fa-solid fa-calendar-days"
-               aria-hidden="true"></i>
-            自分の勤怠を確認する
-        </h2>
-
-        <ol class="guide-steps">
-
-            <li>
-                <strong>「自分の勤怠」を開く</strong>
-
-                <p>
-                    PCでは左サイドバー、
-                    スマートフォンでは下部メニューから
-                    選択できます。
-                </p>
-            </li>
-
-            <li>
-                <strong>対象月を選択する</strong>
-
-                <p>
-                    確認したい年月を選択すると、
-                    月次の勤怠情報が表示されます。
-                </p>
-            </li>
-
-            <li>
-                <strong>勤務時間・勤務状態を確認する</strong>
-
-                <p>
-                    実働合計・休憩合計・未完了件数・
-                    審査中件数を確認できます。
-                </p>
-            </li>
-
-            <li>
-                <strong>日別詳細を開く</strong>
-
-                <p>
-                    日別一覧は7日分ずつ表示されます。
-                    「詳細」を選択すると原打刻や
-                    現在の有効値を確認できます。
-                </p>
-            </li>
-
+    <section id="monthly" class="card" aria-labelledby="monthly-title">
+        <h2 class="section-bar" id="monthly-title">自分の勤怠を確認する</h2>
+        <ol>
+            <li><strong>「自分の勤怠」を開く。</strong>「社員メニュー」→「勤怠メニュー」から選びます。</li>
+            <li><strong>対象月を選ぶ。</strong>実働合計と未完了の件数、日別の出勤・退勤・休憩・実働を確認できます。</li>
+            <li><strong>日別詳細を開く。</strong>日付を選ぶと、原記録と現在の値を確認できます。</li>
         </ol>
-
-        <div class="guide-information">
-            <strong>勤務時間の計算について</strong>
-
-            <p>
-                実働時間は、退勤日時から出勤日時と
-                休憩時間を差し引いて計算します。
-                月次合計は秒単位で合算してから、
-                分単位で表示します。
-            </p>
-        </div>
-
-        <div class="guide-information">
-            <strong>「未完了」「記録なし」について</strong>
-
-            <p>
-                未完了の勤務は月次実働合計に含まれません。
-                記録なしは欠勤を意味するものではありません。
-            </p>
-        </div>
-
-        <a href="{% url 'attendance:monthly' %}"
-           class="ui-button ui-button--primary">
-            自分の勤怠を開く
-        </a>
-
+        <p>実働時間は、退勤日時から出勤日時と休憩時間を差し引いて計算します。未完了の勤務は月の実働合計に含まれません。「記録なし」は欠勤を意味するものではありません。</p>
+        <a class="btn" href="{% url 'attendance:monthly' %}">自分の勤怠を開く</a>
     </section>
 
-
-    <!-- STEP 3：修正申請 -->
-    <section id="correction"
-             class="ui-card account-section guide-section"
-             aria-labelledby="correction-title">
-
-        <h2 id="correction-title">
-            <i class="fa-solid fa-file-pen"
-               aria-hidden="true"></i>
-            勤怠修正申請の方法
-        </h2>
-
-        <ol class="guide-steps">
-
-            <li>
-                <strong>修正したい日を開く</strong>
-
-                <p>
-                    「自分の勤怠」から対象日の
-                    「日別詳細」を開きます。
-                </p>
-            </li>
-
-            <li>
-                <strong>「修正を申請する」を選択する</strong>
-
-                <p>
-                    出勤・退勤・休憩の追加、変更、
-                    取消を入力できます。
-                </p>
-            </li>
-
-            <li>
-                <strong>修正理由を入力する</strong>
-
-                <p>
-                    理由は必須で、500文字以内です。
-                    修正が必要な理由を入力してください。
-                </p>
-            </li>
-
-            <li>
-                <strong>申請内容を確認する</strong>
-
-                <p>
-                    入力内容に間違いがないことを
-                    確認してから申請します。
-                </p>
-            </li>
-
-            <li>
-                <strong>申請履歴で状態を確認する</strong>
-
-                <p>
-                    審査中の申請は本人が取り下げできます。
-                    差戻し・取下げ後は、内容を確認して
-                    新しく申請できます。
-                </p>
-            </li>
-
+    <section id="correction" class="card" aria-labelledby="correction-title">
+        <h2 class="section-bar" id="correction-title">打刻忘れや時刻の間違いを直す（修正申請）</h2>
+        <ol>
+            <li><strong>日付を選ぶ。</strong>「自分の勤怠」で対象の月と日付を選び、日別詳細を開きます。</li>
+            <li><strong>正しい内容を申請する。</strong>「修正を申請」で追加・変更・取消の内容と理由（必須・500文字以内）を入力します。「入力に戻る」で直し、「申請する」で送信します。</li>
+            <li><strong>結果を確認する。</strong>右上の「通知」から結果を開きます。審査中の申請は日別詳細から取下げできます。差戻し・取下げ後は、内容を直して新しく申請できます。</li>
         </ol>
-
-        <div class="guide-information">
-            <strong>申請直後の勤務記録</strong>
-
-            <p>
-                修正申請を送信した時点では、
-                原打刻や現在の有効値は変更されません。
-                管理者が承認すると、修正内容が現在の有効値に反映されます。
-                結果は右上の「通知」で確認できます。
-            </p>
-        </div>
-
-        <div class="guide-information">
-            <strong>申請できない場合</strong>
-
-            <p>
-                同じ勤務に審査中の申請がある場合、
-                または対象月が確定済みの場合は、
-                新しい修正申請が制限されます。
-            </p>
-        </div>
-
-        <a href="{% url 'corrections:list' %}"
-           class="ui-button ui-button--primary">
-            申請履歴を開く
-        </a>
-
+        <p>申請しただけでは原記録や現在の値は変わりません。管理者が承認すると、修正内容が反映されます。同じ勤務に審査中の申請がある場合や、対象月が確定済みの場合は申請できません。</p>
+        <a class="btn" href="{% url 'corrections:list' %}">申請履歴を開く</a>
     </section>
 
-
-    <!-- STEP 4：セキュリティ -->
-    <section id="security"
-             class="ui-card account-section guide-section"
-             aria-labelledby="security-title">
-
-        <h2 id="security-title">
-            <i class="fa-solid fa-shield-halved"
-               aria-hidden="true"></i>
-            パスワードと安全な利用
-        </h2>
-
-        <p>
-            自分の社員番号とパスワードで
-            ログインしてください。
-        </p>
-
-        <p>
-            パスワードを変更する場合は
-            「パスワード変更」画面を使用します。
-        </p>
-
-        <div class="guide-information">
-            <strong>共用端末を使用する場合</strong>
-
-            <p>
-                作業を終えたらログアウトしてください。
-                パスワードを他の人に共有しないでください。
-            </p>
-        </div>
-
-        <a href="{% url 'accounts:password_change' %}"
-           class="ui-button ui-button--primary">
-            パスワードを変更する
-        </a>
-
+    <section id="security" class="card" aria-labelledby="security-title">
+        <h2 class="section-bar" id="security-title">パスワードと安全な利用</h2>
+        <p>自分の社員番号とパスワードでログインしてください。パスワードは「アカウントと使い方」の「パスワード変更」から変更できます。共用端末では作業後にログアウトし、パスワードを他の人に伝えないでください。</p>
+        <a class="btn" href="{% url 'accounts:password_change' %}">パスワードを変更する</a>
     </section>
 
-
-    <!-- STEP 5：トラブル対応 -->
-    <section id="troubleshoot"
-             class="ui-card account-section guide-section"
-             aria-labelledby="troubleshoot-title">
-
-        <h2 id="troubleshoot-title">
-            <i class="fa-solid fa-circle-question"
-               aria-hidden="true"></i>
-            困ったとき
-        </h2>
-
-        <div class="guide-faq">
-
-            <details>
-                <summary>
-                    打刻を忘れた場合は？
-                </summary>
-
-                <p>
-                    「自分の勤怠」から対象日を開き、
-                    修正申請を行ってください。
-                </p>
-            </details>
-
-            <details>
-                <summary>
-                    出勤・退勤の時刻が違う場合は？
-                </summary>
-
-                <p>
-                    日別詳細で原打刻を確認し、
-                    正しい日時を修正申請してください。
-                </p>
-            </details>
-
-            <details>
-                <summary>
-                    修正申請を取り下げたい場合は？
-                </summary>
-
-                <p>
-                    申請履歴から該当申請を開き、
-                    審査中であれば取下げできます。
-                </p>
-            </details>
-
-            <details>
-                <summary>
-                    勤怠記録が表示されない場合は？
-                </summary>
-
-                <p>
-                    対象年月とログイン中の社員番号を
-                    確認してください。
-                    解決しない場合は社内の
-                    管理担当者へ相談してください。
-                </p>
-            </details>
-
-            <details>
-                <summary>
-                    パスワードでログインできない場合は？
-                </summary>
-
-                <p>
-                    社員番号や入力内容を確認してください。
-                    ログイン失敗を繰り返すと
-                    一時的に制限される場合があります。
-                    解決しない場合は管理担当者へ
-                    相談してください。
-                </p>
-            </details>
-
-        </div>
-
-        <p class="account-help-text">
-            社員情報の修正やログインに関する相談先は、
-            所属先の管理担当者に確認してください。
-        </p>
-
+    {% if request.user.is_business_admin %}
+    <section id="manager" class="card" aria-labelledby="manager-title">
+        <h2 class="section-bar" id="manager-title">管理者の使い方</h2>
+        <h3>新入社員を登録する</h3>
+        <ol>
+            <li>「社員登録」で部署を選び、番号候補を確認します。新しい部署は先に「社員・権限管理」→「部署登録」で登録します。</li>
+            <li>完了画面で社員番号と有効期限を確認し、「表示する」または「コピー」を使います。</li>
+            <li>本人確認後、社内で承認された方法で個別に渡します。</li>
+        </ol>
+        <h3>修正申請を確認する</h3>
+        <ol>
+            <li>右上の「通知」または「申請一覧」から、対象の申請を選びます。</li>
+            <li>対象社員・日付・時刻・申請理由を見比べます。</li>
+            <li>内容が正しければ「承認する」。直してほしい箇所があれば理由を入力して「差戻し」を押します。</li>
+        </ol>
+        <h3>月次勤怠を確定して出力する</h3>
+        <ol>
+            <li>「勤怠一覧」で対象を選び、未完了の記録と審査中の申請を確認します。</li>
+            <li>翌月1日以降、表示内容を別管理資料と照合し、確認欄にチェックして「月次確定」を押します。</li>
+            <li>同じ出力IDから日次明細と月次集計のCSVを取得し、そのまま給与担当者へ渡します。</li>
+        </ol>
+        <h3>業務管理者の権限を管理する</h3>
+        <p>「業務管理者の権限管理」で対象社員と付与・取消を選び、理由を入力して実行します。有効な管理者が2人未満になる取消はできません。変更後は「操作履歴」で確認します。</p>
     </section>
+    {% endif %}
 
-
-    <a href="{% url 'accounts:overview' %}"
-       class="account-back-link">
-        <i class="fa-solid fa-arrow-left"
-           aria-hidden="true"></i>
-        アカウントと使い方へ戻る
-    </a>
-
+    <section id="troubleshoot" class="card" aria-labelledby="troubleshoot-title">
+        <h2 class="section-bar" id="troubleshoot-title">困ったとき</h2>
+        <details class="accordion"><summary>打刻を忘れた場合は？</summary><div class="accordion__body"><p>「自分の勤怠」から対象日を開き、修正申請を行ってください。</p></div></details>
+        <details class="accordion"><summary>出勤・退勤の時刻が違う場合は？</summary><div class="accordion__body"><p>日別詳細で原記録を確認し、正しい日時を修正申請してください。</p></div></details>
+        <details class="accordion"><summary>修正申請を取り下げたい場合は？</summary><div class="accordion__body"><p>日別詳細または申請履歴から該当申請を開き、審査中であれば取下げできます。</p></div></details>
+        <details class="accordion"><summary>勤怠記録が表示されない場合は？</summary><div class="accordion__body"><p>対象年月とログイン中の社員番号を確認してください。解決しない場合は社内の管理担当者へ相談してください。</p></div></details>
+        <details class="accordion"><summary>ログインできない場合は？</summary><div class="accordion__body"><p>社員番号や入力内容を確認してください。ログイン失敗を繰り返すと一時的に制限される場合があります。解決しない場合は管理担当者へ相談してください。</p></div></details>
+    </section>
 </div>
-
 {% endblock %}

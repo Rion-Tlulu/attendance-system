@@ -1,548 +1,118 @@
 {% extends "base.html" %}
-{% load attendance_ui %}
-{% load f11_charts %}
-{% load static %}
+{% load static f11_charts %}
 
-{% block title %}
-自分の勤怠 | 勤怠管理
-{% endblock %}
-
-{% block screen_label %}
-社員画面｜自分の勤怠
-{% endblock %}
-
-{% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/employee-monthly.css' %}">
-{% endblock %}
+{% block title %}自分の勤怠 | 勤怠管理{% endblock %}
 
 {% block content %}
+<div class="page e02-page">
+    <header class="page-head"><h1>自分の勤怠</h1></header>
 
-<div class="v2-page e02-page">
-
-    <!-- ====================================
-         ページタイトル
-    ===================================== -->
-    <header class="e02-heading">
-
-        <div>
-            <h1>
-                <i
-                    class="fa-solid fa-calendar-days"
-                    aria-hidden="true"
-                ></i>
-                自分の勤怠
-            </h1>
-
-            <p>
-                月次勤怠の集計と、日別の勤務記録を
-                確認できます。
-            </p>
-        </div>
-
-        <a
-            href="{% url 'attendance:home' %}"
-            class="v2-button v2-button--outline"
-        >
-            <i
-                class="fa-regular fa-clock"
-                aria-hidden="true"
-            ></i>
-            打刻へ戻る
-        </a>
-
-    </header>
-
-
-    <!-- ====================================
-         対象月の選択（左）と対象月の勤怠情報（右）
-    ===================================== -->
-    <div class="e02-overview">
-
-    <section
-        class="v2-panel e02-filter-panel"
-        aria-labelledby="e02-month-title"
-    >
-
-        <h2 id="e02-month-title">
-            対象月の選択
-        </h2>
-
-        <form
-            method="get"
-            action="/employee/monthly/"
-            class="e02-month-form"
-        >
-
-            <div class="v2-field">
-                {{ form.month|plain_label }}
-
+    <section class="card" aria-label="月次勤怠">
+        <div class="panel">
+            <form method="get" action="{% url 'attendance:monthly' %}" class="month-bar">
+                <label for="{{ form.month.id_for_label }}" class="visually-hidden">対象月</label>
                 {{ form.month }}
+                <button type="submit" class="btn btn--sm btn--outline">表示</button>
+                {% if report %}<span class="month-bar__status">月次　{% if report.is_finalized %}確定済み{% else %}未確定{% endif %}</span>{% endif %}
+            </form>
+            {% if form.month.errors or form.non_field_errors %}
+            <div class="field-error" role="alert">{{ form.month.errors }}{{ form.non_field_errors }}</div>
+            {% endif %}
 
-                {% if form.month.errors %}
-                <div
-                    class="v2-form-error"
-                    role="alert"
-                >
-                    {{ form.month.errors }}
-                </div>
-                {% endif %}
+            {% if report %}
+            <div class="stat-panel stat-panel--flat" aria-label="月次勤怠の集計">
+                <div><span class="stat-label">実働合計</span><span class="stat-value">{{ report.work_display }}</span></div>
+                <div><span class="stat-label">未完了</span><span class="stat-value">{{ report.incomplete_count }}<small>件</small></span></div>
             </div>
+            {% endif %}
+        </div>
 
-            <button
-                type="submit"
-                class="v2-button"
-            >
-                <i
-                    class="fa-solid fa-magnifying-glass"
-                    aria-hidden="true"
-                ></i>
-                表示する
-            </button>
-
-        </form>
-
-        {% if form.non_field_errors %}
-        <div class="v2-form-error" role="alert">
-            {{ form.non_field_errors }}
+        {% if report %}
+        {% if report.pending_count %}
+        <div class="notice-box notice-box--warning" role="status">
+            <i class="fa-solid fa-file-circle-question" aria-hidden="true"></i>
+            <p>審査中の修正申請が {{ report.pending_count }}件 あります。結果は右上の「通知」で確認できます。</p>
         </div>
         {% endif %}
 
-    </section>
+        {% f11_employee_chart as e02_chart %}
+        {% include "components/attendance_chart.html" with chart=e02_chart total_label="実働合計" total_value=report.work_display only %}
 
-
-    {% if report %}
-    <div class="e02-month-info">
-
-    <!-- ====================================
-         対象月・確定状態
-    ===================================== -->
-    <section class="e02-month-heading">
-
-        <h2>
-            {{ report.month|date:"Y年n月" }}
-            の勤怠
-        </h2>
-
-        {% if report.is_finalized %}
-
-        <span class="v2-state v2-state--success">
-            <i
-                class="fa-solid fa-circle-check"
-                aria-hidden="true"
-            ></i>
-            確定済み
-        </span>
-
-        {% else %}
-
-        <span class="v2-state v2-state--warning">
-            未確定
-        </span>
-
-        {% endif %}
-
-    </section>
-
-
-    <!-- ====================================
-         月次集計カード
-    ===================================== -->
-    <section
-        class="e02-kpi-grid"
-        aria-label="月次勤怠の集計"
-    >
-
-
-        <article class="e02-kpi">
-            <div class="e02-kpi__icon e02-kpi__icon--blue">
-                <i
-                    class="fa-solid fa-calendar-check"
-                    aria-hidden="true"
-                ></i>
-            </div>
-
-            <div>
-                <h3>勤務完了日数</h3>
-                <strong>
-                    {{ completed_work_days }}日
-                </strong>
-            </div>
-        </article>
-
-        <article class="e02-kpi">
-            <div class="e02-kpi__icon e02-kpi__icon--green">
-                <i
-                    class="fa-solid fa-clock"
-                    aria-hidden="true"
-                ></i>
-            </div>
-
-            <div>
-                <h3>実働合計</h3>
-                <strong>
-                    {{ report.work_display }}
-                </strong>
-            </div>
-        </article>
-
-        <article class="e02-kpi">
-            <div class="e02-kpi__icon e02-kpi__icon--orange">
-                <i
-                    class="fa-solid fa-mug-hot"
-                    aria-hidden="true"
-                ></i>
-            </div>
-
-            <div>
-                <h3>休憩合計</h3>
-                <strong>
-                    {{ report.break_display }}
-                </strong>
-            </div>
-        </article>
-
-        <article class="e02-kpi">
-            <div class="e02-kpi__icon e02-kpi__icon--red">
-                <i
-                    class="fa-solid fa-triangle-exclamation"
-                    aria-hidden="true"
-                ></i>
-            </div>
-
-            <div>
-                <h3>未完了の勤務</h3>
-                <strong>
-                    {{ report.incomplete_count }}件
-                </strong>
-            </div>
-        </article>
-
-    </section>
-
-    </div>
-    {% endif %}
-    </div>
-    {% if report %}
-
-
-    <!-- F11：対象月の日別実働時間。表を初期表示 -->
-    {% f11_employee_chart as work_chart %}
-    {% include "components/attendance_chart.html" with chart=work_chart only %}
-
-    <!-- ====================================
-         申請中の修正
-    ===================================== -->
-    {% if report.pending_count %}
-
-    <div
-        class="e02-notice e02-notice--warning"
-        role="status"
-    >
-        <i
-            class="fa-solid fa-file-circle-question"
-            aria-hidden="true"
-        ></i>
-
-        <p>
-            現在、審査中の修正申請が
-            <strong>{{ report.pending_count }}件</strong>
-            あります。
-            審査結果を確認してください。
-        </p>
-    </div>
-
-    {% endif %}
-
-
-    <!-- ====================================
-         日別勤務記録
-    ===================================== -->
-    <section
-        class="v2-panel e02-record-section" id="employee-month-records"
-        aria-labelledby="e02-record-title"
-    >
-
-        <div class="e02-section-heading">
-
-            <div>
-                <h2 id="e02-record-title">
-                    日別の勤務記録
-                </h2>
-
-                <p>
-                    1ページに7日分を表示します。
-                </p>
-            </div>
-
-            <span class="e02-page-count">
-                {{ page_obj.number }}
-                /
-                {{ page_obj.paginator.num_pages }}
-                ページ
-            </span>
-
-        </div>
-
-
-        <!-- PC・タブレット：表形式 -->
-        <div
-            class="e02-desktop-table"
-            role="region"
-            aria-label="日別勤務記録の一覧表"
-            tabindex="0"
-        >
-
-            <table class="e02-table">
-
-                <thead>
-                    <tr>
-                        <th scope="col">日付</th>
-                        <th scope="col">出勤</th>
-                        <th scope="col">退勤</th>
-                        <th scope="col">休憩</th>
-                        <th scope="col">実働</th>
-                        <th scope="col">記録状態</th>
-                        <th scope="col">修正状態</th>
-                        <th scope="col">詳細</th>
-                    </tr>
-                </thead>
-
-                <tbody>
-
-                    {% for row in page_obj %}
-
-                    <tr>
-
-                        <th scope="row">
-                            {{ row.day_label }}
-                        </th>
-
-                        <td>
-                            {{ row.clock_in|default:"—" }}
-                        </td>
-
-                        <td>
-                            {{ row.clock_out|default:"—" }}
-                        </td>
-
-                        <td>
-                            {{ row.break_display|default:"—" }}
-                        </td>
-
-                        <td>
-                            {{ row.work_display|default:"—" }}
-                        </td>
-
-                        <td>
-                            {% if row.record_label == "完了" %}
-
-                            <span class="v2-state v2-state--success">
-                                完了
-                            </span>
-
-                            {% elif row.record_label == "未完了" %}
-
-                            <span class="v2-state v2-state--danger">
-                                未完了
-                            </span>
-
+        <div id="employee-month-records" aria-label="日別の勤務記録">
+            <div class="table-wrap desktop-only e02-desktop-table" role="region" aria-label="日別勤務記録の一覧表" tabindex="0">
+                <table class="data-table data-table--center">
+                    <caption class="visually-hidden">{{ report.month|date:"Y年n月" }}の日別の勤務記録</caption>
+                    <thead>
+                        <tr>
+                            <th scope="col">勤務日</th>
+                            <th scope="col">出勤</th>
+                            <th scope="col">退勤</th>
+                            <th scope="col">休憩</th>
+                            <th scope="col">実働</th>
+                            <th scope="col">記録・申請</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in page_obj %}
+                        <tr>
+                            <th scope="row">
+                                <a class="date-link" href="{% url 'attendance:daily' row.day.year row.day.month row.day.day %}?page={{ page_obj.number }}" aria-label="{{ row.day_label }}の日別詳細"><span>{{ row.day|date:"n/j" }}</span> <i class="fa-solid fa-chevron-right" aria-hidden="true"></i></a>
+                            </th>
+                            {% if row.record_key == "no_record" %}
+                            <td colspan="4">記録なし</td>
                             {% else %}
-
-                            <span class="v2-state">
-                                {{ row.record_label }}
-                            </span>
-
+                            <td>{{ row.clock_in }}</td>
+                            <td>{{ row.clock_out }}</td>
+                            <td>{{ row.break_display }}</td>
+                            <td>{{ row.work_display }}</td>
                             {% endif %}
-                        </td>
+                            <td>
+                                {% if row.record_key == "incomplete" %}<span class="badge badge--sm badge--danger">未完了</span>{% endif %}
+                                {% if row.has_pending %}<span class="badge badge--sm badge--yellow">審査中</span>{% elif row.correction_key != "none" %}<span class="badge badge--sm badge--gray">{{ row.correction_label }}</span>{% endif %}
+                                {% if row.record_key != "incomplete" and row.correction_key == "none" %}<span class="muted">—</span>{% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="6" class="empty-cell">表示できる記録がありません。</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
 
-                        <td>
-                            <span class="e02-correction-label">
-                                {{ row.correction_label|default:"なし" }}
-                            </span>
-                        </td>
+            <div class="mobile-cards e02-mobile-list">
+                {% for row in page_obj %}
+                <article class="record-card">
+                    <h3 class="record-card__head"><a href="{% url 'attendance:daily' row.day.year row.day.month row.day.day %}?page={{ page_obj.number }}" aria-label="{{ row.day_label }}の日別詳細">{{ row.day|date:"n/j" }} <i class="fa-solid fa-chevron-right" aria-hidden="true"></i></a></h3>
+                    <dl class="record-card__grid">
+                        {% if row.record_key == "no_record" %}
+                        <div><dt>記録</dt><dd>記録なし</dd></div>
+                        <div><dt>申請</dt><dd>{{ row.correction_label|default:"なし" }}</dd></div>
+                        {% else %}
+                        <div><dt>出勤</dt><dd>{{ row.clock_in }}</dd></div>
+                        <div><dt>退勤</dt><dd>{{ row.clock_out }}</dd></div>
+                        <div><dt>休憩</dt><dd>{{ row.break_display }}</dd></div>
+                        <div><dt>実働</dt><dd>{{ row.work_display }}</dd></div>
+                        <div><dt>記録</dt><dd>{% if row.record_key == "incomplete" %}未完了{% else %}完了{% endif %}</dd></div>
+                        <div><dt>申請</dt><dd>{{ row.correction_label|default:"なし" }}</dd></div>
+                        {% endif %}
+                    </dl>
+                </article>
+                {% empty %}
+                <p>対象の勤務記録がありません。</p>
+                {% endfor %}
+            </div>
 
-                        <td>
-                            <a
-                                class="e02-detail-link"
-                                href="/employee/daily/{{ row.day.year }}/{{ row.day.month }}/{{ row.day.day }}/?page={{ page_obj.number }}"
-                                aria-label="{{ row.day_label }}の勤務詳細"
-                            >
-                                詳細
-                                <i
-                                    class="fa-solid fa-chevron-right"
-                                    aria-hidden="true"
-                                ></i>
-                            </a>
-                        </td>
-
-                    </tr>
-
-                    {% empty %}
-
-                    <tr>
-                        <td colspan="8">
-                            表示できる記録がありません。
-                        </td>
-                    </tr>
-
-                    {% endfor %}
-
-                </tbody>
-
-            </table>
-
+            <nav class="pagination" aria-label="日別勤務記録のページ切替">
+                {% if page_obj.has_previous %}<a href="?month={{ report.month|date:'Y-m' }}&amp;page={{ page_obj.previous_page_number }}"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i> 前の7日</a>{% endif %}
+                <span aria-current="page">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+                {% if page_obj.has_next %}<a href="?month={{ report.month|date:'Y-m' }}&amp;page={{ page_obj.next_page_number }}">次の7日 <i class="fa-solid fa-chevron-right" aria-hidden="true"></i></a>{% endif %}
+            </nav>
+            <p class="small muted mt-16">記録がない日を欠勤とは判定しません。月合計は秒単位で合算してから表示するため、日別表示の合計と差が出る場合があります。</p>
         </div>
-
-
-        <!-- スマートフォン：カード形式 -->
-        <div class="e02-mobile-list">
-
-            {% for row in page_obj %}
-
-            <article class="e02-day-card">
-
-                <div class="e02-day-card__heading">
-
-                    <h3>
-                        {{ row.day_label }}
-                    </h3>
-
-                    <span class="v2-state">
-                        {{ row.record_label }}
-                    </span>
-
-                </div>
-
-                <dl class="e02-day-card__data">
-
-                    <div>
-                        <dt>出勤</dt>
-                        <dd>
-                            {{ row.clock_in|default:"—" }}
-                        </dd>
-                    </div>
-
-                    <div>
-                        <dt>退勤</dt>
-                        <dd>
-                            {{ row.clock_out|default:"—" }}
-                        </dd>
-                    </div>
-
-                    <div>
-                        <dt>休憩</dt>
-                        <dd>
-                            {{ row.break_display|default:"—" }}
-                        </dd>
-                    </div>
-
-                    <div>
-                        <dt>実働</dt>
-                        <dd>
-                            {{ row.work_display|default:"—" }}
-                        </dd>
-                    </div>
-
-                    <div>
-                        <dt>修正状態</dt>
-                        <dd>
-                            {{ row.correction_label|default:"なし" }}
-                        </dd>
-                    </div>
-
-                </dl>
-
-                <a
-                    class="e02-day-card__link"
-                    href="/employee/daily/{{ row.day.year }}/{{ row.day.month }}/{{ row.day.day }}/?page={{ page_obj.number }}"
-                >
-                    日別詳細を見る
-
-                    <i
-                        class="fa-solid fa-arrow-right"
-                        aria-hidden="true"
-                    ></i>
-                </a>
-
-            </article>
-
-            {% empty %}
-
-            <p>
-                対象の勤務記録がありません。
-            </p>
-
-            {% endfor %}
-
-        </div>
-
-
-        <!-- ====================================
-             ページネーション
-        ===================================== -->
-        <nav
-            class="e02-pagination"
-            aria-label="月次勤怠のページ切替"
-        >
-
-            {% if page_obj.has_previous %}
-
-            <a
-                href="?month={{ report.month|date:'Y-m' }}&amp;page={{ page_obj.previous_page_number }}"
-            >
-                <i
-                    class="fa-solid fa-chevron-left"
-                    aria-hidden="true"
-                ></i>
-                前へ
-            </a>
-
-            {% endif %}
-
-            <span aria-current="page">
-                {{ page_obj.number }}
-                /
-                {{ page_obj.paginator.num_pages }}
-            </span>
-
-            {% if page_obj.has_next %}
-
-            <a
-                href="?month={{ report.month|date:'Y-m' }}&amp;page={{ page_obj.next_page_number }}"
-            >
-                次へ
-                <i
-                    class="fa-solid fa-chevron-right"
-                    aria-hidden="true"
-                ></i>
-            </a>
-
-            {% endif %}
-
-        </nav>
-
-        <p class="e02-footer-note">
-            記録がない日を自動的に欠勤とは判定しません。
-            打刻や申請の内容に誤りがある場合は、
-            日別詳細から確認してください。
-        </p>
-
+        {% else %}
+        <p role="status">対象月の勤怠を表示できません。月の指定を確認してください。</p>
+        {% endif %}
     </section>
-
-    {% else %}
-
-    <!-- 不正な対象月などでreportがない場合 -->
-    <section class="v2-panel">
-        <p role="status">
-            対象月の勤怠を表示できません。
-            月の指定を確認してください。
-        </p>
-    </section>
-
-    {% endif %}
-
 </div>
-
 <script src="{% static 'vendor/chartjs/chart.umd.min.js' %}" defer></script>
-
 {% endblock %}

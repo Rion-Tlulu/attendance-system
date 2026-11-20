@@ -1,24 +1,21 @@
 {% extends "base.html" %}
-{% load static %}
 {% block title %}部署登録の結果 | 勤怠管理{% endblock %}
-{% block screen_label %}管理者｜部署登録{% endblock %}
-{% block extra_css %}<link rel="stylesheet" href="{% static 'css/manager-pages.css' %}">{% endblock %}
+
 {% block content %}
-<div class="admin-page">
-  <header class="admin-heading"><h1>部署登録が完了しました</h1>
-    <p>登録時の結果を表示しています。同じ操作を再送しても履歴は増えません。</p>
-  </header>
-  <section class="ui-card admin-section admin-form-card">
-    <dl>
-      <dt>部署ID</dt><dd>{{ registration.department_id }}</dd>
-      <dt>部署名</dt><dd>{{ registration.name }}</dd>
-      <dt>採番用コード</dt><dd>{{ registration.code }}</dd>
-      <dt>登録時の状態</dt><dd>{% if registration.is_active %}有効{% else %}無効{% endif %}</dd>
-    </dl>
-    <div class="admin-actions">
-      <a class="ui-button ui-button--secondary" href="{% url 'management:department_list' %}">部署一覧へ戻る</a>
-      {% if registration.department.is_active %}<a class="ui-button ui-button--primary" href="{% url 'management:employee_create' %}">社員を登録する</a>{% endif %}
-    </div>
-  </section>
+<div class="page">
+    <h1 class="success-title"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> 部署登録が完了しました</h1>
+    <section class="card card--pad-lg" aria-label="登録結果">
+        <dl class="kv-table kv-table--strong kv-table--lg">
+            <dt>部署ID</dt><dd>{{ registration.department_id }}</dd>
+            <dt>部署名</dt><dd>{{ registration.name }}</dd>
+            <dt>採番用コード</dt><dd>{{ registration.code }}</dd>
+            <dt>登録時の状態</dt><dd>{% if registration.is_active %}有効{% else %}無効{% endif %}</dd>
+        </dl>
+        <p class="small muted">登録時の結果を表示しています。同じ操作を再送しても履歴は増えません。</p>
+        <div class="btn-row btn-row--split">
+            <a class="btn btn--md btn--outline" href="{% url 'management:department_list' %}">部署一覧へ</a>
+            {% if registration.department.is_active %}<a class="btn btn--md" href="{% url 'management:employee_create' %}">社員登録へ進む</a>{% endif %}
+        </div>
+    </section>
 </div>
 {% endblock %}

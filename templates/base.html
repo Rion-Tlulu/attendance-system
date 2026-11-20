@@ -1,40 +1,18 @@
-
-{% load static %}
-<!DOCTYPE html>
+{% load static %}<!DOCTYPE html>
 <html lang="ja">
-
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}勤怠管理システム{% endblock %}</title>
+    <link rel="icon" type="image/png" href="{% static 'img/attendance-icon.png' %}">
+    <link rel="apple-touch-icon" href="{% static 'img/attendance-icon.png' %}">
 
-    <meta name="viewport"
-          content="width=device-width, initial-scale=1">
+    <!-- Google Fonts（Noto Sans JP 400・700） -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
 
-    <title>
-        {% block title %}
-        勤怠管理システム
-        {% endblock %}
-    </title>
-
-    <link rel="icon"
-          type="image/png"
-          href="{% static 'img/attendance-icon.png' %}">
-
-    <link rel="apple-touch-icon"
-          href="{% static 'img/attendance-icon.png' %}">
-
-    <!-- Google Fonts -->
-    <link rel="preconnect"
-          href="https://fonts.googleapis.com">
-
-    <link rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossorigin>
-
-    <link
-        rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
-
-    <!-- Font Awesome Free -->
+    <!-- Font Awesome Free（版を固定） -->
     <link rel="stylesheet"
           href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.3.1/css/fontawesome.min.css"
           integrity="sha384-m8DKa0MtZAZlyNgF18TSkQRYTPDY0sEELpwK2YijfYnVFH8kxiaO6hvopM168nue"
@@ -48,222 +26,113 @@
           integrity="sha384-2RNNQHI9yrjVDjr8zReHCzBa25B4jlokRSel4Cnp9s+PCUDvwxBq8ZbIODO51CZL"
           crossorigin="anonymous">
 
-    <link rel="stylesheet" href="{% static 'css/app.css' %}">
-
-    {% block extra_css %}
-
-    {% endblock %}
-    <link rel="stylesheet" href="{% static 'css/reference-design.css' %}">
-    <link rel="stylesheet" href="{% static 'css/notifications.css' %}">
+    <link rel="stylesheet" href="{% static 'css/theme.css' %}">
+    {% block extra_css %}{% endblock %}
 </head>
 
-<body class="app-v6">
-
-<a class="skip-link" href="#main-content">
-    本文へ移動
-</a>
-
+<body>
+<a class="skip-link" href="#main-content">本文へ移動</a>
 
 {% if request.user.is_authenticated and not request.user.must_change_password %}
+<header class="app-topbar">
+    <a class="brand" href="{% url 'attendance:home' %}">勤怠管理システム</a>
+
+    <button type="button" class="app-menu-toggle" aria-controls="app-side" aria-expanded="false">
+        <i class="fa-solid fa-bars" aria-hidden="true"></i>
+        <span>メニュー</span>
+    </button>
+
+    <div class="topbar-identity">
+        <span class="topbar-identity__role">{% if request.resolver_match.namespace == "management" %}管理者画面{% else %}社員画面{% endif %}</span>
+    </div>
+
+    <div class="topbar-actions">
+        <span class="topbar-user"><i class="fa-regular fa-user" aria-hidden="true"></i> <span class="topbar-user__name">{{ request.user.display_name }}</span><span class="topbar-user__id">（{{ request.user.employee_number }}）</span></span>
+        {% if request.user.is_business_admin %}
+        {% if request.resolver_match.namespace == "management" %}
+        <a class="topbar-link topbar-switch" href="{% url 'attendance:home' %}"><i class="fa-solid fa-arrow-rotate-left" aria-hidden="true"></i> <span>社員画面へ</span></a>
+        {% else %}
+        <a class="topbar-link topbar-switch" href="{% url 'management:home' %}"><i class="fa-solid fa-arrow-right-arrow-left" aria-hidden="true"></i> <span>管理者画面へ</span></a>
+        {% endif %}
+        {% endif %}
+
+        <button type="button" id="notification-panel-open"
+                class="app-notification-link" aria-haspopup="dialog"
+                aria-controls="notification-panel" aria-expanded="false"
+                aria-label="通知 未読 {{ notification_unread_count }} 件"
+                data-panel-url="{% url 'notifications:panel' %}">
+            <i class="fa-regular fa-bell" aria-hidden="true"></i>
+            <span>通知</span>
+            <span class="app-notification-count" aria-hidden="true" {% if notification_unread_count == 0 %}hidden{% endif %}>{% if notification_unread_count > 99 %}99+{% else %}{{ notification_unread_count }}{% endif %}</span>
+        </button>
+    </div>
+</header>
 
 <div class="app-frame">
-
-    <!-- PC用左サイドバー -->
-    <aside class="app-side"
-           aria-label="アプリのメニュー">
-
-        {% include "components/sidebar.html" %}
-
+    <aside id="app-side" class="app-side" aria-label="アプリのメニュー">
+        <div class="app-side__inner">
+            <div class="app-side__top">
+                <button type="button" class="app-side__close" data-side-close><i class="fa-solid fa-xmark" aria-hidden="true"></i> 閉じる</button>
+            </div>
+            {% include "components/sidebar.html" %}
+        </div>
     </aside>
+    <div class="app-side-backdrop" data-side-close hidden></div>
 
-    <div class="app-frame__content">
-
-        <!-- 共通ブランドヘッダー -->
-        <header class="app-topbar">
-            <button type="button" class="app-menu-toggle" aria-controls="mobile-menu-panel" aria-expanded="false"><i class="fa-solid fa-bars" aria-hidden="true"></i> メニュー</button>
-            <a class="reference-brand" href="{% url 'attendance:home' %}"><img src="{% static 'img/attendance-icon.png' %}" alt="勤怠管理システムアイコン"><span>勤怠管理システム</span></a>
-
-            <div class="app-topbar__title">
-                {% block screen_label %}
-                    {% if request.resolver_match.namespace == "management" %}
-                    管理者画面
-                    {% elif request.resolver_match.view_name == "attendance:home" %}
-                    打刻
-                    {% else %}
-                    自分の勤怠
-                    {% endif %}
-                {% endblock %}
-            </div>
-
-            <div class="app-topbar__user">
-                {% if request.user.is_business_admin %}
-                <a class="reference-mode-link" href="{% if request.resolver_match.namespace == 'management' %}{% url 'attendance:home' %}{% else %}{% url 'management:home' %}{% endif %}"><i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i> {% if request.resolver_match.namespace == 'management' %}社員画面へ{% else %}管理者画面へ{% endif %}</a>
-                {% endif %}
-
-                {% if request.user.is_authenticated %}
-
-<button type="button" id="notification-panel-open"
-    class="app-notification-link" aria-haspopup="dialog"
-    aria-controls="notification-panel" aria-expanded="false"
-    aria-label="通知 未読 {{ notification_unread_count }} 件"
-    data-panel-url="{% url 'notifications:panel' %}">
-    <i
-        class="fa-solid fa-bell"
-        aria-hidden="true"
-    ></i>
-
-    <span>通知</span>
-
-    <span class="app-notification-count"
-          aria-hidden="true" {% if notification_unread_count == 0 %}hidden{% endif %}>
-        {% if notification_unread_count > 99 %}99+{% else %}{{ notification_unread_count }}{% endif %}
-    </span>
-</button>
-
-{% endif %}
-
-                <i class="fa-solid fa-user"
-                   aria-hidden="true"></i>
-
-                <span class="app-user-number">
-                    {{ request.user.employee_number }}
-                </span>
-
-                <span class="app-user-name">
-                    {{ request.user.display_name }}
-                </span>
-
-                <details class="app-account-menu">
-
-                    <summary aria-label="アカウントメニューを開く">
-                        <span>アカウント</span>
-                        <i class="fa-solid fa-chevron-down"
-                           aria-hidden="true"></i>
-                    </summary>
-
-                    <div class="app-account-panel">
-
-                        <a href="{% url 'accounts:password_change' %}">
-                            パスワード変更
-                        </a>
-
-                        {% if request.user.is_business_admin %}
-
-                        <a href="{% url 'management:home' %}">
-                            管理者画面へ
-                        </a>
-
-                        <a href="{% url 'attendance:home' %}">
-                            社員画面へ
-                        </a>
-
-                        <a href="{% url 'accounts:overview' %}">
-    アカウントと使い方
-</a>
-
-<a href="{% url 'accounts:guide' %}">
-    使い方ガイド
-</a>
-
-                        {% endif %}
-
-                        <form method="post"
-                              action="{% url 'accounts:logout' %}">
-
-                            {% csrf_token %}
-
-                            <button type="submit">
-                                ログアウト
-                            </button>
-
-                        </form>
-
-                    </div>
-
-                </details>
-
-            </div>
-
-        </header>
-
-        <main id="main-content"
-              class="app-content">
-
+    <main id="main-content" class="app-content">
 {% else %}
+<header class="app-topbar app-topbar--auth">
+    <span class="brand">勤怠管理システム</span>
+    {% if request.user.is_authenticated %}
+    <div class="topbar-identity">
+        <a class="topbar-link topbar-link--plain topbar-auth-link" href="#contact">問い合わせ先</a>
+    </div>
+    <div class="topbar-actions">
+        <form method="post" action="{% url 'accounts:logout' %}" class="topbar-logout">{% csrf_token %}
+            <button type="submit">ログアウト</button>
+        </form>
+    </div>
+    {% endif %}
+</header>
 
-<div class="auth-frame">
-
-    <header class="auth-site-header">
-
-        <span class="auth-site-brand">
-
-            <i class="fa-regular fa-calendar-days" aria-hidden="true"></i>
-            勤怠管理システム
-
-        </span>
-        <span class="reference-version">v1.5.7</span>
-
-    </header>
-
-    <main id="main-content"
-          class="auth-main">
-
+<main id="main-content" class="auth-main{% if request.user.is_authenticated %} auth-main--split{% endif %}">
+    <div class="auth-content">
 {% endif %}
 
-        {% if request.user.is_authenticated and not request.user.must_change_password %}
-        <div class="reference-mobile-identity"><i class="fa-solid fa-user" aria-hidden="true"></i><strong>{% if request.resolver_match.namespace == 'management' %}管理者画面{% else %}社員画面{% endif %}</strong><span>{{ request.user.display_name }}</span></div>
-        {% endif %}
         {% include "components/messages.html" %}
-
         {% block content %}{% endblock %}
 
-    </main>
-
-
 {% if request.user.is_authenticated and not request.user.must_change_password %}
-
-    </div>
+    </main>
 </div>
-
-{% include "components/bottom_nav.html" %}
 
 <div id="notification-backdrop" class="notification-backdrop" hidden></div>
 <aside id="notification-panel" class="notification-panel" role="dialog"
-      aria-modal="true" aria-labelledby="notification-panel-title" hidden>
+       aria-modal="true" aria-labelledby="notification-panel-title" hidden>
     <header class="notification-panel__header">
-        <div class="notification-panel__heading">
-            <h2 id="notification-panel-title" tabindex="-1"><i class="fa-solid fa-bell" aria-hidden="true"></i> 通知一覧</h2>
-            <p id="notification-panel-summary" class="notification-panel__summary"></p>
-        </div>
+        <h2 id="notification-panel-title" tabindex="-1">通知</h2>
         <button type="button" id="notification-panel-close" class="notification-panel__close"><i class="fa-solid fa-xmark" aria-hidden="true"></i> 閉じる</button>
     </header>
-    <div class="notification-panel__actions">
-        <fieldset class="notification-filter">
-            <legend>表示</legend>
-            <label><input type="radio" name="notification-filter" value="all" checked> すべて</label>
-            <label><input type="radio" name="notification-filter" value="unread"> 未読</label>
-        </fieldset>
-        <form method="post" action="{% url 'notifications:read_all' %}" id="notification-read-all-form">{% csrf_token %}
-            <button type="submit" class="notification-read-all"><i class="fa-solid fa-check" aria-hidden="true"></i> すべて既読</button>
-        </form>
+    <div class="unread-bar">
+        <p id="notification-panel-summary" class="unread-bar__count"></p>
+        <label class="side-check"><input type="checkbox" id="notification-unread-only" name="notification-filter" value="unread"> 未読のみ</label>
     </div>
-    <p id="notification-panel-status" class="notification-panel__status" role="status"></p>
+    <p id="notification-panel-status" class="notification-panel__status visually-hidden" role="status"></p>
     <div id="notification-panel-items" class="notification-panel__items"></div>
-    <a class="notification-panel__all" href="{% url 'notifications:list' %}">すべて見る <span aria-hidden="true">›</span></a>
+    <div class="notification-panel__footer">
+        <form method="post" action="{% url 'notifications:read_all' %}" id="notification-read-all-form">{% csrf_token %}
+            <button type="submit" class="link-button">すべて既読</button>
+        </form>
+        <a class="btn btn--block btn--md" href="{% url 'notifications:list' %}">すべて見る</a>
+    </div>
 </aside>
-
 {% else %}
-
-</div>
-
+    </div>
+</main>
 {% endif %}
 
-
-<script src="{% static 'js/app.js' %}"
-        defer></script>
+<script src="{% static 'js/app.js' %}" defer></script>
 <script src="{% static 'js/notifications.js' %}" defer></script>
-
 {% block extra_js %}{% endblock %}
-
 </body>
 </html>

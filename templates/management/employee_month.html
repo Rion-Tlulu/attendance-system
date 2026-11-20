@@ -1,408 +1,162 @@
 {% extends "base.html" %}
-{% load attendance_ui %}
-{% load static %}
-{% load f11_charts %}
+{% load attendance_ui static f11_charts %}
 
-{% block title %}
-月次詳細・確定 | 勤怠管理
-{% endblock %}
-
-{% block screen_label %}
-管理者｜月次詳細
-{% endblock %}
-
+{% block title %}月次詳細と出力（月次詳細・確定） | 勤怠管理{% endblock %}
 
 {% block content %}
-
-<div class="v2-page reference-month-page">
-
-    <!-- ページ見出し -->
-    <header class="v2-heading">
+<div class="page">
+    <header class="page-head">
         <div>
+            <a class="back-link" href="{% url 'management:attendance_list' %}{% if back_query %}?{{ back_query }}{% endif %}"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> 勤怠一覧へ</a>
             <h1>月次詳細と出力</h1>
-            <p>
-                社員の月次勤怠詳細を確認し、
-                対象月の確定・解除を行います。
-            </p>
         </div>
-
-        <a
-            class="v2-button v2-button--outline"
-            href="{% url 'management:attendance_list' %}{% if back_query %}?{{ back_query }}{% endif %}"
-        >
-            勤怠一覧へ戻る
-        </a>
     </header>
 
-
-    <form method="get" class="reference-month-selector reference-filter-bar">
-      <div><label for="month-employee">対象社員</label><select id="month-employee" name="employee">{% for item in month_employees %}<option value="{{ item.pk }}" {% if item.pk == employee.pk %}selected{% endif %}>{{ item.display_name }}（{{ item.employee_number }}）{% if not item.is_active %}・利用停止{% endif %}</option>{% endfor %}</select></div>
-      <div>{{ selector_form.month|plain_label }}{{ selector_form.month }}{{ selector_form.month.errors }}</div>
-      <button type="submit" class="v2-button"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i> 表示</button>
-    </form>
-    <!-- 対象社員 -->
-    <section class="v2-panel"
-             aria-labelledby="monthly-target-title">
-
-        <h2 id="monthly-target-title">
-            対象社員・対象月
-        </h2>
-
-        <dl class="reference-inline-data">
-            <div>
-                <dt>社員番号</dt>
-                <dd>{{ display_employee_number }}</dd>
+    <details class="card search-card filter-card" aria-label="対象社員・対象月の切替">
+        <summary class="chev-link"><i class="fa-solid fa-arrow-right-arrow-left" aria-hidden="true"></i> <span>対象社員・対象月を切り替える</span></summary>
+        <form method="get" class="search-grid mt-16">
+            <div class="field">
+                <label for="month-employee">対象社員</label>
+                <select id="month-employee" name="employee">
+                    {% for item in month_employees %}<option value="{{ item.pk }}" {% if item.pk == employee.pk %}selected{% endif %}>{{ item.display_name }}（{{ item.employee_number }}）{% if not item.is_active %}・停止中{% endif %}</option>{% endfor %}
+                </select>
             </div>
+            <div class="field">{{ selector_form.month|plain_label }}{{ selector_form.month }}{{ selector_form.month.errors }}</div>
+            <button type="submit" class="btn btn--cream"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i> 表示</button>
+        </form>
+    </details>
 
-            <div>
-                <dt>氏名</dt>
-                <dd>{{ display_employee_name }}</dd>
-            </div>
+    <section class="card" aria-labelledby="monthly-closing-title">
+        <h2 class="card-title" id="monthly-closing-title">月次確定</h2>
 
-            <div>
-                <dt>対象月</dt>
-                <dd>{{ report.month_label }}</dd>
-            </div>
+        <div class="summary-strip">
+            <span class="summary-strip__value"><i class="fa-regular fa-user" aria-hidden="true"></i>{{ display_employee_name }}　{{ display_employee_number }}{% if not employee.is_active %} <span class="badge badge--sm badge--gray">停止中</span>{% endif %}</span>
+            <span class="summary-strip__value"><i class="fa-regular fa-calendar" aria-hidden="true"></i>{{ report.month_label }}</span>
+            <span class="summary-strip--right">{% if report.is_finalized %}<span class="badge badge--solid">確定済み</span>{% else %}<span class="badge badge--outline">未確定</span>{% endif %}</span>
+        </div>
 
-            <div>
-                <dt>確定状態</dt>
-                <dd>
-                    {% if report.is_finalized %}
-                    <span class="v2-state v2-state--success">
-                        確定済み
-                    </span>
-                    {% else %}
-                    <span class="v2-state">
-                        未確定
-                    </span>
-                    {% endif %}
-                </dd>
-            </div>
-        </dl>
-    </section>
+        <div class="stat-grid v2-kpi-grid" aria-label="確定条件">
+            <div><span class="stat-label">未完了</span><span class="stat-value{% if report.incomplete_count %} text-danger{% endif %}">{{ report.incomplete_count }}<small>件</small></span></div>
+            <div><span class="stat-label">審査中</span><span class="stat-value{% if report.pending_count %} text-danger{% endif %}">{{ report.pending_count }}<small>件</small></span></div>
+            <div><span class="stat-label">整合検査</span><span class="stat-value{% if integrity_issues %} text-danger{% endif %}">{% if integrity_issues %}{{ integrity_issues|length }}<small>件</small>{% else %}問題なし{% endif %}</span></div>
+        </div>
 
-
-    <!-- 月次集計 -->
-    {% include "components/month_summary.html" %}
-
-
-    <!-- F11：確定状態に関係なく表示できる月次実働グラフ -->
-    {% f11_manager_chart as work_chart %}
-    {% include "components/attendance_chart.html" with chart=work_chart only %}
-
-    <!-- 確定条件 -->
-    <section class="v2-panel"
-             aria-labelledby="monthly-closing-title">
-
-        <h2 id="monthly-closing-title">
-            この社員の月次確定
-        </h2>
-
-        <p>
-            確定前に、以下の条件を確認してください。
-        </p>
-
-        <details class="reference-closing-checks" {% if integrity_issues %}open{% endif %}><summary>確定条件・記録状況を確認</summary>
-        <dl class="v2-data-list">
-
-            <div>
-                <dt>対象月</dt>
-                <dd>
-                    {% if month_is_past %}
-                    <span class="v2-state v2-state--success">
-                        終了済み
-                    </span>
-                    {% else %}
-                    <span class="v2-state v2-state--warning">
-                        月の終了前
-                    </span>
-                    {% endif %}
-                </dd>
-            </div>
-
-            <div>
-                <dt>未完了</dt>
-                <dd>
-                    {% if report.incomplete_count == 0 %}
-                    <span class="v2-state v2-state--success">
-                        0件・条件を満たしています
-                    </span>
-                    {% else %}
-                    <span class="v2-state v2-state--danger">
-                        {{ report.incomplete_count }}件あり
-                    </span>
-                    {% endif %}
-                </dd>
-            </div>
-
-            <div>
-                <dt>審査中</dt>
-                <dd>
-                    {% if report.pending_count == 0 %}
-                    <span class="v2-state v2-state--success">
-                        0件・条件を満たしています
-                    </span>
-                    {% else %}
-                    <span class="v2-state v2-state--danger">
-                        {{ report.pending_count }}件あり
-                    </span>
-                    {% endif %}
-                </dd>
-            </div>
-
-            <div>
-                <dt>記録なしの日</dt>
-                <dd>{{ no_record_count }}日</dd>
-            </div>
-            <div><dt>勤務の不整合</dt><dd>{{ integrity_issues|length }}件</dd></div>
-        </dl>
+        <div class="analysis-row">
+            <span>日別の詳細・分析</span>
+            <a class="btn btn--outline" href="#monthly-records"><i class="fa-regular fa-rectangle-list" aria-hidden="true"></i> 日別実績</a>
+            <a class="btn btn--outline" href="#f11-a04"><i class="fa-solid fa-chart-simple" aria-hidden="true"></i> グラフを表示</a>
+        </div>
 
         {% if integrity_issues %}
-        <ul>
-          {% for day, reason in integrity_issues %}<li>{{ day|date:"Y/m/d" }}: {{ reason }}</li>{% endfor %}
-        </ul>
+        <div class="notice-box notice-box--error" role="alert"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i>
+            <div><p>次の不整合が解消するまで確定とCSV出力はできません。</p>
+                <ul>{% for day, reason in integrity_issues %}<li>{{ day|date:"Y/m/d" }}: {{ reason }}</li>{% endfor %}</ul>
+            </div>
+        </div>
         {% endif %}
-        </details>
 
-        <p class="v2-notice">
-            記録がない日は、欠勤と断定しません。
-            勤務予定・休暇・休日などの別途情報と
-            照合してください。
-        </p>
-
-
-        <!-- 自分の月次確定は禁止 -->
         {% if employee.pk == request.user.pk %}
-
-        <p class="v2-notice v2-notice--warning">
-            自分自身の月次勤怠は、
-            確定・解除できません。
-        </p>
-
-
-        <!-- 確定済み -->
+        <div class="notice-box notice-box--warning" role="status"><i class="fa-solid fa-circle-info" aria-hidden="true"></i><p>自分自身の月次勤怠は、確定・解除できません。別の管理者が行います。</p></div>
         {% elif report.is_finalized %}
-
-        <p>
-            この月は確定されています。
-        </p>
-
-        <form
-            method="post"
-            action="{% url 'management:month_reopen' employee.pk report.month.year report.month.month %}"
-            class="spacing-top-20"
-        >
+        <h3 class="section-bar">月次確定の解除</h3>
+        <div class="notice-box notice-box--large"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i><p>解除すると、この確定版のCSVは取得できなくなります。</p></div>
+        <form method="post" action="{% url 'management:month_reopen' employee.pk report.month.year report.month.month %}">
             {% csrf_token %}
-
-            <div class="v2-field">
-                <label for="reopen-reason">
-                    確定解除理由（必須）
-                </label>
-
-                <textarea
-                    id="reopen-reason"
-                    name="reason"
-                    maxlength="500"
-                    rows="3"
-                    required
-                ></textarea>
-
-                <p>
-                    500文字以内で理由を入力してください。
-                </p>
+            <div class="field">
+                <label for="reopen-reason">解除理由（必須）</label>
+                <textarea id="reopen-reason" name="reason" maxlength="500" rows="3" required aria-describedby="reopen-help"></textarea>
+                <p class="field-help" id="reopen-help">500文字以内で入力してください。</p>
             </div>
-
-            <div class="v2-actions">
-                <button
-                    type="submit"
-                    class="v2-button v2-button--danger"
-                >
-                    確定を解除する
-                </button>
-            </div>
+            <button type="submit" class="btn btn--md btn--block">解除する</button>
         </form>
-
-
-        <!-- 未確定 -->
         {% else %}
-
-        <form
-            method="post"
-            action="{% url 'management:month_finalize' employee.pk report.month.year report.month.month %}"
-        >
+        <form method="post" action="{% url 'management:month_finalize' employee.pk report.month.year report.month.month %}">
             {% csrf_token %}
-
             {{ closing_form.reconciliation_token }}
-
-            <label class="v2-checkbox-line">
-                {{ closing_form.checked_no_record }}
-                <span>
-                    {{ closing_form.checked_no_record.label }}
-                </span>
-            </label>
-
+            <label class="check-line check-line--panel">{{ closing_form.checked_no_record }} <span>{{ closing_form.checked_no_record.label }}</span></label>
             {% if not can_finalize %}
-            <p class="v2-notice v2-notice--warning">
-                対象月の終了、未完了0件、
-                審査中0件の条件を確認してください。
-            </p>
+            <p class="small text-danger">対象月の終了（翌月1日以降）、未完了0件、審査中0件、不整合なしを満たすと確定できます。</p>
             {% endif %}
-
-            <div class="v2-actions spacing-top-16">
-
-                <button
-                    type="submit"
-                    class="v2-button"
-                    {% if not can_finalize %}disabled{% endif %}
-                >
-                    この月を確定する
-                </button>
-            </div>
+            <button type="submit" class="btn btn--lg btn--block" {% if not can_finalize %}disabled{% endif %}>月次確定<span class="visually-hidden">（この月を確定する）</span></button>
         </form>
-
+        <p class="small muted mt-16">記録なし {{ no_record_count }}日。記録がない日は欠勤と断定しません。勤務予定・休暇などの別管理資料と照合してください。</p>
         {% endif %}
-
     </section>
 
-
-    <!-- 日別の勤怠記録 -->
-    <section class="v2-panel reference-export-panel" aria-labelledby="month-export-title">
-      <h2 id="month-export-title"><i class="fa-solid fa-download" aria-hidden="true"></i> CSV出力</h2>
-      {% if report.is_finalized %}<p>確定した版から、日次明細・月次集計の共通出力IDを作成します。</p><form method="post" action="{% url 'management:month_csv' employee.pk report.month.year report.month.month %}">{% csrf_token %}<button class="v2-button" type="submit"><i class="fa-solid fa-file-csv" aria-hidden="true"></i> CSVの出力IDを作成</button></form>{% else %}<p class="v2-notice">月次確定後にCSVを出力できます。</p>{% endif %}
-      <p><a href="{% url 'management:bulk_export' %}">全社員・部署別のCSV出力 <span aria-hidden="true">›</span></a></p><small>解除・再確定後は以前の出力IDが失効します。</small>
+    <section class="card" aria-labelledby="month-export-title">
+        <h2 class="card-title" id="month-export-title">CSV出力</h2>
+        <dl class="kv-table kv-table--lg">
+            <dt>対象月</dt><dd>{{ report.month_label }}</dd>
+            <dt>対象社員</dt><dd>{{ display_employee_name }}（{{ display_employee_number }}）</dd>
+            <dt>確定状態</dt><dd>{% if report.is_finalized %}確定済み{% else %}未確定{% endif %}</dd>
+        </dl>
+        {% if report.is_finalized %}
+        <form method="post" action="{% url 'management:month_csv' employee.pk report.month.year report.month.month %}" class="center-narrow">
+            {% csrf_token %}
+            <button class="btn btn--md btn--block" type="submit"><i class="fa-regular fa-file" aria-hidden="true"></i> CSVの出力IDを作成</button>
+        </form>
+        <p class="small muted text-center">日次明細と月次集計は同じ出力IDで取得します。解除・再確定後は以前の出力IDが失効します。</p>
+        {% else %}
+        <p class="muted">月次確定後にCSVを出力できます。</p>
+        {% endif %}
+        <p class="text-center"><a class="text-link" href="{% url 'management:bulk_export' %}">出力条件を変更（全社員・部署別）</a></p>
     </section>
-    <details class="v2-panel reference-month-records" {% if request.GET.page %}open{% endif %}
-             aria-labelledby="monthly-records-title">
-        <summary id="monthly-records-title">
-            日別の勤怠記録
-        </summary>
 
-        <!-- PC用の一覧 -->
-        <div
-            class="v2-table-scroll v2-table-scroll--mobile-cards"
-            role="region"
-            aria-label="日別の勤怠記録"
-            tabindex="0"
-        >
-            <table class="v2-table">
+    {% f11_manager_chart as work_chart %}
+    <section class="card" aria-label="日別実働グラフ">
+        {% include "components/attendance_chart.html" with chart=work_chart total_label="実働合計" total_value=report.work_display only %}
+    </section>
+
+    <details class="card" id="monthly-records" aria-label="月次勤怠詳細（日別の勤怠記録）" {% if request.GET.page %}open{% endif %}>
+        <summary class="chev-link"><i class="fa-regular fa-rectangle-list" aria-hidden="true"></i> <span>日別実績</span></summary>
+        <dl class="kv-table mt-16">
+            <dt>勤務完了日数</dt><dd>{{ completed_day_count }}日</dd>
+            <dt>実働合計</dt><dd>{{ report.work_display }}</dd>
+            <dt>休憩合計</dt><dd>{{ report.break_display }}</dd>
+        </dl>
+        <div class="table-wrap desktop-only" role="region" aria-label="日別の勤怠記録" tabindex="0">
+            <table class="data-table data-table--center">
                 <thead>
                     <tr>
-                        <th scope="col">日付</th>
-                        <th scope="col">出勤</th>
-                        <th scope="col">退勤</th>
-                        <th scope="col">休憩</th>
-                        <th scope="col">実働</th>
-                        <th scope="col">記録状態</th>
-                        <th scope="col">修正状態</th>
+                        <th scope="col">日付</th><th scope="col">出勤</th><th scope="col">退勤</th><th scope="col">休憩</th><th scope="col">実働</th><th scope="col">記録</th><th scope="col">申請</th>
                         {% if not employee.is_active %}<th scope="col">訂正</th>{% endif %}
                     </tr>
                 </thead>
-
                 <tbody>
                     {% for row in page_obj %}
                     <tr>
-                        <th scope="row">
-                            {{ row.day_label }}
-                        </th>
-                        <td>{{ row.clock_in }}</td>
-                        <td>{{ row.clock_out }}</td>
-                        <td>{{ row.break_display }}</td>
-                        <td>{{ row.work_display }}</td>
-                        <td>{{ row.record_label }}</td>
-                        <td>{{ row.correction_label }}</td>
-                        {% if not employee.is_active %}
-                        <td><a href="{% url 'management:proxy_correction' employee.pk row.day.year row.day.month row.day.day %}">代理で修正を申請</a></td>
-                        {% endif %}
+                        <th scope="row">{{ row.day_label }}</th>
+                        <td>{{ row.clock_in }}</td><td>{{ row.clock_out }}</td><td>{{ row.break_display }}</td><td>{{ row.work_display }}</td>
+                        <td>{{ row.record_label }}</td><td>{{ row.correction_label }}</td>
+                        {% if not employee.is_active %}<td><a class="text-link" href="{% url 'management:proxy_correction' employee.pk row.day.year row.day.month row.day.day %}">代理で修正を申請</a></td>{% endif %}
                     </tr>
                     {% empty %}
-                    <tr>
-                        <td colspan="{% if employee.is_active %}7{% else %}8{% endif %}">
-                            表示できる記録がありません。
-                        </td>
-                    </tr>
+                    <tr><td colspan="{% if employee.is_active %}7{% else %}8{% endif %}" class="empty-cell">表示できる記録がありません。</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
-
-
-        <!-- スマートフォン用のカード -->
-        <div class="v2-mobile-records">
-
+        <div class="mobile-cards v2-mobile-records">
             {% for row in page_obj %}
-            <article class="v2-mobile-record">
-
-                <div class="v2-mobile-record__heading">
-                    <strong>{{ row.day_label }}</strong>
-
-                    <span class="v2-state">
-                        {{ row.record_label }}
-                    </span>
-                </div>
-
-                <dl class="v2-data-list">
-                    <div>
-                        <dt>出勤</dt>
-                        <dd>{{ row.clock_in }}</dd>
-                    </div>
-
-                    <div>
-                        <dt>退勤</dt>
-                        <dd>{{ row.clock_out }}</dd>
-                    </div>
-
-                    <div>
-                        <dt>休憩</dt>
-                        <dd>{{ row.break_display }}</dd>
-                    </div>
-
-                    <div>
-                        <dt>実働</dt>
-                        <dd>{{ row.work_display }}</dd>
-                    </div>
-
-                    <div>
-                        <dt>修正状態</dt>
-                        <dd>{{ row.correction_label }}</dd>
-                    </div>
-                    {% if not employee.is_active %}
-                    <a href="{% url 'management:proxy_correction' employee.pk row.day.year row.day.month row.day.day %}">代理で修正を申請</a>
-                    {% endif %}
+            <article class="record-card">
+                <h3 class="record-card__head">{{ row.day_label }}<span class="badge badge--sm badge--gray">{{ row.record_label }}</span></h3>
+                <dl class="record-card__grid">
+                    <div><dt>出勤</dt><dd>{{ row.clock_in }}</dd></div>
+                    <div><dt>退勤</dt><dd>{{ row.clock_out }}</dd></div>
+                    <div><dt>休憩</dt><dd>{{ row.break_display }}</dd></div>
+                    <div><dt>実働</dt><dd>{{ row.work_display }}</dd></div>
+                    <div><dt>申請</dt><dd>{{ row.correction_label }}</dd></div>
                 </dl>
-
+                {% if not employee.is_active %}<div class="record-card__actions"><a class="btn btn--sm btn--outline btn--block" href="{% url 'management:proxy_correction' employee.pk row.day.year row.day.month row.day.day %}">代理で修正を申請</a></div>{% endif %}
             </article>
             {% endfor %}
-
         </div>
-
-
-        <!-- ページ切替 -->
-        <nav
-            class="v2-pagination"
-            aria-label="日別勤怠のページ切替"
-        >
-            {% if page_obj.has_previous %}
-            <a href="?page={{ page_obj.previous_page_number }}">
-                前へ
-            </a>
-            {% endif %}
-
-            <span>
-                {{ page_obj.number }} /
-                {{ page_obj.paginator.num_pages }}
-            </span>
-
-            {% if page_obj.has_next %}
-            <a href="?page={{ page_obj.next_page_number }}">
-                次へ
-            </a>
-            {% endif %}
+        <nav class="pagination" aria-label="日別勤怠のページ切替">
+            {% if page_obj.has_previous %}<a href="?page={{ page_obj.previous_page_number }}#monthly-records">前へ</a>{% endif %}
+            <span>{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+            {% if page_obj.has_next %}<a href="?page={{ page_obj.next_page_number }}#monthly-records">次へ</a>{% endif %}
         </nav>
-
     </details>
-
 </div>
-
 <script src="{% static 'vendor/chartjs/chart.umd.min.js' %}" defer></script>
-
 {% endblock %}

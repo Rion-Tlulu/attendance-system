@@ -1,0 +1,12 @@
+<form class="clock-form" method="post" action="{% url 'attendance:clock_action' %}">
+    {% csrf_token %}
+    <input type="hidden" name="work_date" value="{{ target_date|date:'Y-m-d' }}">
+    <input type="hidden" name="session_id" value="{{ session.pk|default:'' }}">
+    <input type="hidden" name="session_version" value="{{ session.version|default:'' }}">
+    <input type="hidden" name="action" value="{{ button.kind }}">
+    <input type="hidden" name="operation_id" value="{{ button.operation_id }}">
+    <button type="submit" class="btn clock-button clock-button--{{ button.kind }}{% if secondary %} btn--cream{% endif %}">
+        <i class="{{ icon }}" aria-hidden="true"></i>
+        <span>{{ button.label }}</span>
+    </button>
+</form>

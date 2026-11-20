@@ -1,707 +1,142 @@
-
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}
-打刻ホーム | 勤怠管理
-{% endblock %}
-
-{% block screen_label %}
-社員画面｜打刻
-{% endblock %}
-
-{% block extra_css %}
-<link
-    rel="stylesheet"
-    href="{% static 'css/employee-clock.css' %}"
->
-{% endblock %}
+{% block title %}打刻ホーム | 勤怠管理{% endblock %}
 
 {% block content %}
+<div class="page">
+    <header class="page-head"><h1>打刻ホーム</h1></header>
 
-<div class="v2-page e01-page clock-dashboard">
-
-    <!-- ==================================
-         ページタイトル
-    =================================== -->
-    <header class="e01-page-heading">
-
+    {% if pending_request %}
+    <div class="notice-box notice-box--warning" role="status">
+        <i class="fa-solid fa-file-circle-question" aria-hidden="true"></i>
         <div>
-            <h1>
-                <i
-                    class="fa-regular fa-clock"
-                    aria-hidden="true"
-                ></i>
-                打刻ホーム
-            </h1>
-
-            <p>
-                今日の勤務を記録します。
-                打刻時刻はサーバーで記録されます。
-            </p>
+            <p>修正申請が審査中のため、対象勤務日の打刻はできません。</p>
+            <p><a href="{% url 'attendance:daily' target_date.year target_date.month target_date.day %}">日別詳細で申請内容を確認・取り下げる</a></p>
         </div>
-
-        <a
-            href="/employee/monthly/"
-            class="v2-button v2-button--outline"
-        >
-            <i
-                class="fa-solid fa-calendar-days"
-                aria-hidden="true"
-            ></i>
-            自分の勤怠を見る
-        </a>
-
-    </header>
-
-
-    <!-- ==================================
-         打刻操作・今日の記録
-    =================================== -->
-    <div class="e01-main-grid clock-top-grid">
-
-        <!-- 左：打刻操作 -->
-        <section
-            class="ui-card e01-panel e01-clock-panel clock-primary"
-            aria-labelledby="clock-action-title"
-        >
-
-            <div class="e01-panel-heading">
-
-                <h2 id="clock-action-title">
-                    打刻操作
-                </h2>
-
-                {% if not session %}
-                <span class="e01-status e01-status--neutral">
-                    未出勤
-                </span>
-
-                {% elif session.status == "working" %}
-                <span class="e01-status e01-status--working">
-                    <i
-                        class="fa-solid fa-circle"
-                        aria-hidden="true"
-                    ></i>
-                    勤務中
-                </span>
-
-                {% elif session.status == "on_break" %}
-                <span class="e01-status e01-status--break">
-                    休憩中
-                </span>
-
-                {% elif session.status == "completed" %}
-                <span class="e01-status e01-status--complete">
-                    勤務完了
-                </span>
-
-                {% else %}
-                <span class="e01-status e01-status--neutral">
-                    {{ session.get_status_display }}
-                </span>
-                {% endif %}
-
-            </div>
-
-
-            <!-- 日付・現在時刻 -->
-            <div class="e01-clock-display">
-
-                <p class="e01-date">
-                    {{ today|date:"Y年n月j日（D）" }}
-                    <span>日本時間</span>
-                </p>
-
-                <time
-                    id="e01-current-time"
-                    class="e01-current-time"
-                    datetime="{{ now|date:'c' }}"
-                    data-server-time="{{ now|date:'c' }}"
-                >
-                    {{ now|date:"H:i" }}
-                </time>
-
-                <p class="e01-time-note">
-                    時刻は日本時間です。
-                </p>
-
-            </div>
-
-
-            <!-- 状態メッセージ -->
-            {% if pending_request %}
-
-            <div
-                class="e01-feedback e01-feedback--warning"
-                role="status"
-            >
-                <i
-                    class="fa-solid fa-file-circle-question"
-                    aria-hidden="true"
-                ></i>
-                <span>
-                    修正申請が審査中のため、
-                    対象勤務日の打刻はできません。
-                </span>
-            </div>
-
-            {% elif is_finalized %}
-
-            <div
-                class="e01-feedback e01-feedback--info"
-                role="status"
-            >
-                <i
-                    class="fa-solid fa-lock"
-                    aria-hidden="true"
-                ></i>
-                <span>
-                    対象月の勤怠は確定済みです。
-                    打刻することはできません。
-                </span>
-            </div>
-
-            {% elif is_overnight %}
-
-            <div
-                class="e01-feedback e01-feedback--warning"
-                role="status"
-            >
-                <i
-                    class="fa-solid fa-moon"
-                    aria-hidden="true"
-                ></i>
-                <span>
-                    前日以前から続く勤務を表示しています。
-                    現在の勤務状態を確認してください。
-                </span>
-            </div>
-
-            {% elif last_event %}
-
-            <div
-                class="e01-feedback e01-feedback--success"
-                role="status"
-            >
-                <i
-                    class="fa-solid fa-circle-check"
-                    aria-hidden="true"
-                ></i>
-                <span>
-                    最後の記録：
-                    {{ last_event.get_kind_display }}
-                    {{ last_event.recorded_at|date:"H:i" }}
-                </span>
-            </div>
-
-            {% endif %}
-
-
-            <!-- ==================================
-                 出勤・退勤・休憩開始・休憩終了
-            =================================== -->
-            <div
-                class="e01-actions clock-buttons"
-                aria-label="打刻操作"
-            >
-
-                <!-- 出勤 -->
-                {% with button=action_buttons.clock_in %}
-
-                {% if button %}
-
-                <form
-                    class="clock-form"
-                    method="post"
-                    action="/employee/clock/"
-                >
-                    {% csrf_token %}
-                    <input type="hidden" name="work_date" value="{{ target_date|date:'Y-m-d' }}">
-                    <input type="hidden" name="session_id" value="{{ session.pk|default:'' }}">
-                    <input type="hidden" name="session_version" value="{{ session.version|default:'' }}">
-
-                    <input
-                        type="hidden"
-                        name="action"
-                        value="{{ button.kind }}"
-                    >
-
-                    <input
-                        type="hidden"
-                        name="operation_id"
-                        value="{{ button.operation_id }}"
-                    >
-
-                    <button
-                        type="submit"
-                        class="clock-button clock-button--clock_in e01-action-button"
-                    >
-                        <i
-                            class="fa-solid fa-right-to-bracket"
-                            aria-hidden="true"
-                        ></i>
-                        <span>出勤</span>
-                    </button>
-
-                </form>
-
-                {% else %}
-
-                <button
-                    type="button"
-                    class="clock-button e01-action-button"
-                    disabled
-                >
-                    <i
-                        class="fa-solid fa-right-to-bracket"
-                        aria-hidden="true"
-                    ></i>
-                    <span>出勤</span>
-                    <small>操作できません</small>
-                </button>
-
-                {% endif %}
-                {% endwith %}
-
-
-                <!-- 退勤 -->
-                {% with button=action_buttons.clock_out %}
-
-                {% if button %}
-
-                <form
-                    class="clock-form"
-                    method="post"
-                    action="/employee/clock/"
-                >
-                    {% csrf_token %}
-                    <input type="hidden" name="work_date" value="{{ target_date|date:'Y-m-d' }}">
-                    <input type="hidden" name="session_id" value="{{ session.pk|default:'' }}">
-                    <input type="hidden" name="session_version" value="{{ session.version|default:'' }}">
-
-                    <input
-                        type="hidden"
-                        name="action"
-                        value="{{ button.kind }}"
-                    >
-
-                    <input
-                        type="hidden"
-                        name="operation_id"
-                        value="{{ button.operation_id }}"
-                    >
-
-                    <button
-                        type="submit"
-                        class="clock-button clock-button--clock_out e01-action-button"
-                    >
-                        <i
-                            class="fa-solid fa-right-from-bracket"
-                            aria-hidden="true"
-                        ></i>
-                        <span>退勤</span>
-                    </button>
-
-                </form>
-
-                {% else %}
-
-                <button
-                    type="button"
-                    class="clock-button e01-action-button"
-                    disabled
-                >
-                    <i
-                        class="fa-solid fa-right-from-bracket"
-                        aria-hidden="true"
-                    ></i>
-                    <span>退勤</span>
-                    <small>操作できません</small>
-                </button>
-
-                {% endif %}
-                {% endwith %}
-
-
-                <!-- 休憩開始 -->
-                {% with button=action_buttons.break_start %}
-
-                {% if button %}
-
-                <form
-                    class="clock-form"
-                    method="post"
-                    action="/employee/clock/"
-                >
-                    {% csrf_token %}
-                    <input type="hidden" name="work_date" value="{{ target_date|date:'Y-m-d' }}">
-                    <input type="hidden" name="session_id" value="{{ session.pk|default:'' }}">
-                    <input type="hidden" name="session_version" value="{{ session.version|default:'' }}">
-
-                    <input
-                        type="hidden"
-                        name="action"
-                        value="{{ button.kind }}"
-                    >
-
-                    <input
-                        type="hidden"
-                        name="operation_id"
-                        value="{{ button.operation_id }}"
-                    >
-
-                    <button
-                        type="submit"
-                        class="clock-button clock-button--break_start e01-action-button"
-                    >
-                        <i
-                            class="fa-solid fa-mug-hot"
-                            aria-hidden="true"
-                        ></i>
-                        <span>休憩開始</span>
-                    </button>
-
-                </form>
-
-                {% else %}
-
-                <button
-                    type="button"
-                    class="clock-button e01-action-button"
-                    disabled
-                >
-                    <i
-                        class="fa-solid fa-mug-hot"
-                        aria-hidden="true"
-                    ></i>
-                    <span>休憩開始</span>
-                    <small>操作できません</small>
-                </button>
-
-                {% endif %}
-                {% endwith %}
-
-
-                <!-- 休憩終了 -->
-                {% with button=action_buttons.break_end %}
-
-                {% if button %}
-
-                <form
-                    class="clock-form"
-                    method="post"
-                    action="/employee/clock/"
-                >
-                    {% csrf_token %}
-                    <input type="hidden" name="work_date" value="{{ target_date|date:'Y-m-d' }}">
-                    <input type="hidden" name="session_id" value="{{ session.pk|default:'' }}">
-                    <input type="hidden" name="session_version" value="{{ session.version|default:'' }}">
-
-                    <input
-                        type="hidden"
-                        name="action"
-                        value="{{ button.kind }}"
-                    >
-
-                    <input
-                        type="hidden"
-                        name="operation_id"
-                        value="{{ button.operation_id }}"
-                    >
-
-                    <button
-                        type="submit"
-                        class="clock-button clock-button--break_end e01-action-button"
-                    >
-                        <i
-                            class="fa-solid fa-mug-saucer"
-                            aria-hidden="true"
-                        ></i>
-                        <span>休憩終了</span>
-                    </button>
-
-                </form>
-
-                {% else %}
-
-                <button
-                    type="button"
-                    class="clock-button e01-action-button"
-                    disabled
-                >
-                    <i
-                        class="fa-solid fa-mug-saucer"
-                        aria-hidden="true"
-                    ></i>
-                    <span>休憩終了</span>
-                    <small>操作できません</small>
-                </button>
-
-                {% endif %}
-                {% endwith %}
-
-            </div>
-
-            <a class="reference-clock-link" href="{% url 'attendance:monthly' %}"><i class="fa-regular fa-file-lines" aria-hidden="true"></i> 自分の勤怠を確認 <i class="fa-solid fa-chevron-right" aria-hidden="true"></i></a>
-            <p class="e01-security-note">
-                <i
-                    class="fa-solid fa-circle-info"
-                    aria-hidden="true"
-                ></i>
-                同じボタンを連続で押さず、
-                保存結果を確認してください。
-            </p>
-
-        </section>
-
-
-        <!-- 右：今日の記録 -->
-        <section
-            class="ui-card e01-panel e01-history-panel"
-            aria-labelledby="today-records-title"
-        >
-
-            <div class="e01-panel-heading">
-
-                <h2 id="today-records-title">
-                    本日の打刻タイムライン
-                </h2>
-
-                <span class="e01-panel-subtitle">
-                    {% if session %}
-                    {{ session.work_date|date:"n月j日" }}
-                    {% else %}
-                    {{ today|date:"n月j日" }}
-                    {% endif %}
-                </span>
-
-            </div>
-
-            {% if session %}
-
-            <details class="reference-clock-summary"><summary>勤務時間・休憩の集計を見る</summary>
-            <dl class="e01-today-summary">
-
-                <div>
-                    <dt>出勤</dt>
-                    <dd>
-                        {% if session.clock_in_at %}
-                        {{ session.clock_in_at|date:"H:i:s" }}
-                        {% else %}
-                        未記録
-                        {% endif %}
-                    </dd>
-                </div>
-
-                <div>
-                    <dt>退勤</dt>
-                    <dd>
-                        {% if session.clock_out_at %}
-                        {{ session.clock_out_at|date:"H:i:s" }}
-                        {% else %}
-                        未記録
-                        {% endif %}
-                    </dd>
-                </div>
-
-                <div>
-                    <dt>休憩合計</dt>
-                    <dd>
-                        {{ break_duration|default:"勤務完了後に確定" }}
-                    </dd>
-                </div>
-
-                <div>
-                    <dt>実働合計</dt>
-                    <dd>
-                        {{ work_duration|default:"勤務完了後に確定" }}
-                    </dd>
-                </div>
-
-            </dl>
-            </details>
-
-
-            <h3 class="e01-history-title">
-                打刻履歴
-            </h3>
-
-            {% if clock_events %}
-
-            <ol class="e01-event-list">
-
-                {% for event in clock_events %}
-
-                <li>
-
-                    <time datetime="{{ event.recorded_at|date:'c' }}">
-                        {{ event.recorded_at|date:"H:i" }}
-                    </time>
-
-                    <span>
-                        {{ event.get_kind_display }}
-                    </span>
-
-                </li>
-
-                {% endfor %}
-
-            </ol>
-
-            {% else %}
-
-            <p class="e01-empty">
-                打刻履歴はありません。
-            </p>
-
-            {% endif %}
-
-
-            {% if breaks %}
-
-            <h3 class="e01-history-title">
-                休憩の記録
-            </h3>
-
-            <ol class="e01-break-list">
-
-                {% for rest in breaks %}
-
-                <li>
-
-                    <span>
-                        {{ rest.started_at|date:"H:i" }}
-                        〜
-                        {% if rest.ended_at %}
-                        {{ rest.ended_at|date:"H:i" }}
-                        {% else %}
-                        休憩中
-                        {% endif %}
-                    </span>
-
-                </li>
-
-                {% endfor %}
-
-            </ol>
-
-            {% endif %}
-
-
-            <div class="e01-history-actions">
-
-                <a
-                    href="/employee/daily/{{ session.work_date.year }}/{{ session.work_date.month }}/{{ session.work_date.day }}/"
-                    class="v2-button v2-button--outline"
-                >
-                    <i
-                        class="fa-solid fa-file-lines"
-                        aria-hidden="true"
-                    ></i>
-                    勤怠詳細を見る
-                </a>
-
-            </div>
-
-            {% else %}
-
-            <div class="e01-empty-state">
-
-                <i
-                    class="fa-regular fa-calendar"
-                    aria-hidden="true"
-                ></i>
-
-                <p>
-                    まだ勤務記録はありません。
-                </p>
-
-                <p>
-                    出勤すると、ここに記録が表示されます。
-                </p>
-
-            </div>
-
-            {% endif %}
-
-        </section>
-
     </div>
-
-
-    <!-- ==================================
-         確認が必要な状態
-    =================================== -->
-    {% if is_overnight %}
-
-    <section
-        class="e01-attention"
-        aria-label="前日以前から続く勤務"
-    >
-        <i
-            class="fa-solid fa-triangle-exclamation"
-            aria-hidden="true"
-        ></i>
-
-        <div>
-            <h2>前日以前から続く勤務があります</h2>
-
-            <p>
-                勤務日：
-                {{ session.work_date|date:"Y年n月j日" }}
-            </p>
-
-            <p>
-                記録を確認し、
-                必要に応じて修正申請してください。
-            </p>
-        </div>
-
-        <a
-            class="v2-button v2-button--outline"
-            href="/employee/daily/{{ session.work_date.year }}/{{ session.work_date.month }}/{{ session.work_date.day }}/"
-        >
-            記録を確認する
-        </a>
-
-    </section>
-
+    {% elif is_finalized %}
+    <div class="notice-box" role="status">
+        <i class="fa-solid fa-lock" aria-hidden="true"></i>
+        <p>対象月の勤怠は確定済みのため、打刻できません。訂正が必要な場合は管理者に確定解除を相談してください。</p>
+    </div>
     {% endif %}
 
+    {% if is_overnight %}
+    <div class="notice-box notice-box--warning" role="status" aria-label="前日以前から続く勤務">
+        <i class="fa-solid fa-moon" aria-hidden="true"></i>
+        <div>
+            <p>前日以前から続く勤務があります（勤務日 {{ session.work_date|date:"Y年n月j日" }}・出勤 {{ session.clock_in_at|date:"H:i" }}）。</p>
+            <p>休憩・退勤はこの勤務日で記録されます。記録に誤りがある場合は <a href="{% url 'corrections:create' session.work_date.year session.work_date.month session.work_date.day %}">修正を申請</a> してください。</p>
+        </div>
+    </div>
+    {% endif %}
 
-    <!-- 補助リンク -->
-    <nav
-        class="e01-quick-links"
-        aria-label="勤怠関連のメニュー"
-    >
+    <section class="card clock-layout e01-main-grid" aria-label="打刻">
+        <div class="clock-layout__main">
+            <div class="clock-hero clock-hero--stack e01-clock-panel">
+                <p class="clock-hero__date">{{ today|date:"Y年n月j日（D）" }}</p>
+                <time id="e01-current-time" class="clock-hero__time" datetime="{{ now|date:'c' }}" data-server-time="{{ now|date:'c' }}">{{ now|date:"H:i" }}</time>
+                <p class="clock-hero__status">
+                    <span class="clock-hero__status-icon" aria-hidden="true">
+                        {% if not session %}<i class="fa-solid fa-house"></i>
+                        {% elif session.status == "working" %}<i class="fa-solid fa-briefcase"></i>
+                        {% elif session.status == "on_break" %}<i class="fa-solid fa-mug-saucer"></i>
+                        {% else %}<i class="fa-solid fa-check"></i>{% endif %}
+                    </span>
+                    <span>
+                        {% if not session %}未出勤
+                        {% elif session.status == "working" %}勤務中
+                        {% elif session.status == "on_break" %}休憩中
+                        {% elif session.status == "completed" %}退勤済み
+                        {% else %}{{ session.get_status_display }}{% endif %}
+                    </span>
+                </p>
+                <img class="clock-hero__art" src="{% static 'img/desk-illustration.png' %}" alt="" width="240" height="160">
+            </div>
 
-        <a href="/employee/monthly/">
-            <i
-                class="fa-solid fa-calendar-days"
-                aria-hidden="true"
-            ></i>
-            自分の勤怠
-        </a>
+            <dl class="clock-stats" aria-label="今日の勤務の概要">
+                <div>
+                    <dt><i class="fa-solid fa-right-to-bracket" aria-hidden="true"></i> 出勤</dt>
+                    <dd>{% if session.clock_in_at %}{{ session.clock_in_at|date:"H:i" }}{% else %}—{% endif %}</dd>
+                </div>
+                <div>
+                    <dt><i class="fa-solid fa-mug-hot" aria-hidden="true"></i> 休憩</dt>
+                    <dd>{% if break_duration %}{{ break_duration }}{% elif breaks %}{{ breaks|length }}<small>回</small>{% else %}—{% endif %}</dd>
+                </div>
+                <div>
+                    <dt><i class="fa-regular fa-clock" aria-hidden="true"></i> {% if work_duration %}実働{% else %}退勤{% endif %}</dt>
+                    <dd>{% if work_duration %}{{ work_duration }}{% elif session.clock_out_at %}{{ session.clock_out_at|date:"H:i" }}{% else %}—{% endif %}</dd>
+                </div>
+            </dl>
 
-        <a href="/employee/corrections/">
-            <i
-                class="fa-solid fa-file-pen"
-                aria-hidden="true"
-            ></i>
-            修正申請
-        </a>
+            <p class="clock-guide">
+                {% if action_buttons.clock_in %}仕事を始めるときは「出勤」を押します。
+                {% elif action_buttons.break_start %}休憩に入るときは「休憩開始」を押します。
+                {% elif action_buttons.break_end %}仕事に戻るときは「休憩終了」を押します。
+                {% elif session.status == "completed" %}本日の勤務は記録済みです。
+                {% else %}現在、打刻できる操作はありません。
+                {% endif %}
+            </p>
 
-        <a href="{% url 'accounts:guide' %}">
-            <i
-                class="fa-solid fa-circle-question"
-                aria-hidden="true"
-            ></i>
-            使い方ガイド
-        </a>
+            <div class="clock-actions" role="group" aria-label="打刻操作">
+                {% if action_buttons.clock_in %}{% include "components/clock_button.html" with button=action_buttons.clock_in icon="fa-solid fa-right-to-bracket" %}{% endif %}
+                {% if action_buttons.break_start %}{% include "components/clock_button.html" with button=action_buttons.break_start icon="fa-solid fa-mug-hot" %}{% endif %}
+                {% if action_buttons.break_end %}{% include "components/clock_button.html" with button=action_buttons.break_end icon="fa-solid fa-mug-saucer" %}{% endif %}
+                {% if action_buttons.clock_out %}{% if action_buttons.break_start %}{% include "components/clock_button.html" with button=action_buttons.clock_out icon="fa-regular fa-clock" secondary=True %}{% else %}{% include "components/clock_button.html" with button=action_buttons.clock_out icon="fa-regular fa-clock" %}{% endif %}{% endif %}
+            </div>
 
-    </nav>
+            <p class="clock-note"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> 打刻時刻はサーバーで記録されます。通信が切れたときは、もう一度押す前に「今日の記録」で確認してください。</p>
+        </div>
 
+        <aside class="clock-layout__side e01-history-panel" aria-labelledby="today-records-title">
+            <h2 class="section-bar record-flow-title" id="today-records-title">今日の記録{% if session %}<small>勤務日 {{ session.work_date|date:"n月j日" }}</small>{% endif %}</h2>
+
+            <ol class="record-flow" aria-label="打刻の流れ">
+                {% for event in clock_events %}
+                <li class="record-flow__step{% if last_event and event.pk == last_event.pk %} record-flow__step--last{% endif %}">
+                    <span class="record-flow__icon" aria-hidden="true">
+                        {% if event.kind == "clock_in" %}<i class="fa-solid fa-right-to-bracket"></i>
+                        {% elif event.kind == "break_start" %}<i class="fa-solid fa-mug-hot"></i>
+                        {% elif event.kind == "break_end" %}<i class="fa-solid fa-mug-saucer"></i>
+                        {% else %}<i class="fa-regular fa-clock"></i>{% endif %}
+                    </span>
+                    <div class="record-flow__body">
+                        <time class="record-flow__time" datetime="{{ event.recorded_at|date:'c' }}">{{ event.recorded_at|date:"H:i" }}</time>
+                        <span class="record-flow__label">{{ event.get_kind_display }}</span>
+                        {% if event.recorded_at|date:"Y-m-d" != today|date:"Y-m-d" %}<span class="small muted">{{ event.recorded_at|date:"n月j日" }}</span>{% endif %}
+                        {% if last_event and event.pk == last_event.pk %}<span class="badge badge--sm badge--solid record-flow__badge">最後の記録</span>{% endif %}
+                    </div>
+                </li>
+                {% endfor %}
+                {% if buttons %}
+                <li class="record-flow__step record-flow__step--next">
+                    <span class="record-flow__icon" aria-hidden="true"><i class="fa-solid fa-ellipsis"></i></span>
+                    <div class="record-flow__body">
+                        <span class="record-flow__label">次の操作：{% for item in buttons %}「{{ item.label }}」{% if not forloop.last %}または{% endif %}{% endfor %}</span>
+                    </div>
+                </li>
+                {% elif not clock_events %}
+                <li class="record-flow__step record-flow__step--next">
+                    <span class="record-flow__icon" aria-hidden="true"><i class="fa-solid fa-ellipsis"></i></span>
+                    <div class="record-flow__body"><span class="record-flow__label">記録はありません</span></div>
+                </li>
+                {% endif %}
+            </ol>
+
+            {% if not clock_events %}
+            <dl class="last-record last-record--compact mt-16">
+                <dt>最後の記録</dt>
+                <dd>{% if last_event %}<span>{{ last_event.recorded_at|date:"n月j日 H:i" }}</span><span>{{ last_event.get_kind_display }}</span>{% else %}<span>記録はありません</span>{% endif %}</dd>
+            </dl>
+            {% endif %}
+
+            {% if session %}
+            <p class="mt-16"><a class="chev-link" href="{% url 'attendance:daily' session.work_date.year session.work_date.month session.work_date.day %}"><span>日別詳細を見る</span> <i class="fa-solid fa-chevron-right" aria-hidden="true"></i></a></p>
+            {% else %}
+            <p class="small muted mt-16">出勤すると、ここに打刻の流れが表示されます。</p>
+            {% endif %}
+        </aside>
+    </section>
 </div>
-
 {% endblock %}

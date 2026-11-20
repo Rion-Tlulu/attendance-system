@@ -103,6 +103,35 @@ def notification_open(request, pk):
 @never_cache
 @login_required
 @require_POST
+def mark_read(request, pk):
+    """本人が現在閲覧できる通知1件だけを既読にする（14章 個別既読）。"""
+
+    wants_json = "application/json" in request.headers.get("Accept", "")
+    notification = get_object_or_404(
+        visible_notifications(request.user),
+        pk=pk,
+        recipient=request.user,
+    )
+    try:
+        # 既読済みの日時は更新しない。
+        Notification.objects.filter(pk=notification.pk, read_at__isnull=True).update(read_at=timezone.now())
+    except SAVE_FAILURE_ERRORS:
+        log_save_failure("notification_mark_read", employee_id=request.user.pk)
+        if wants_json:
+            return JsonResponse({"ok": False, "error": UNCONFIRMED_SAVE_MESSAGE}, status=503)
+        messages.error(request, UNCONFIRMED_SAVE_MESSAGE)
+
+    if wants_json:
+        return JsonResponse({"ok": True})
+    url = reverse("notifications:list")
+    if request.POST.get("status") == "unread":
+        url += "?status=unread"
+    return HttpResponseRedirect(url)
+
+
+@never_cache
+@login_required
+@require_POST
 def mark_all_read(request):
     """本人の未読通知だけを既読にする"""
 
@@ -148,5 +177,7 @@ def notification_panel(request):
             "workflow_key": item.workflow_key,
             "workflow_label": item.workflow_label,
             "open_url": reverse("notifications:open", args=[item.pk]),
+            "read_url": reverse("notifications:read", args=[item.pk]),
+            "target_label": item.target_label,
         } for item in items],
     })

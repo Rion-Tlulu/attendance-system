@@ -1,20 +1,27 @@
 {% extends "base.html" %}
-{% block title %}CSV出力ID | 勤怠管理{% endblock %}
-{% block screen_label %}管理者｜CSV出力{% endblock %}
+{% block title %}CSV出力 | 勤怠管理{% endblock %}
+
 {% block content %}
-<div class="v2-page">
-  <header class="v2-heading"><div><h1>確定版CSV出力</h1>
-    <p>対象月 {{ batch.target_month|date:"Y年n月" }}　出力ID {{ batch.output_id }}</p></div></header>
-  {% if error %}<div class="v2-notice v2-notice--warning" role="alert">{{ error }}</div>{% endif %}
-  <section class="v2-panel">
-    <p>日次明細と月次集計は同じ出力IDの組で受け渡してください。</p>
-    <form method="post" action="{% url 'management:batch_download' batch.output_id 'daily' %}">
-      {% csrf_token %}<button class="v2-button" type="submit">日次明細CSVを取得</button>
-    </form>
-    <form method="post" action="{% url 'management:batch_download' batch.output_id 'monthly' %}">
-      {% csrf_token %}<button class="v2-button" type="submit">月次集計CSVを取得</button>
-    </form>
-    <a class="v2-button v2-button--outline" href="{% url 'management:bulk_export' %}">新しい出力IDを作る</a>
-  </section>
+<div class="page">
+    <header class="page-head"><h1>CSV出力</h1></header>
+    {% if error %}<div class="notice-box notice-box--error" role="alert"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i><p>{{ error }}</p></div>{% endif %}
+    <section class="card card--pad-lg" aria-label="確定版CSV出力">
+        <dl class="kv-table kv-table--lg">
+            <dt>対象月</dt><dd>{{ batch.target_month|date:"Y年n月" }}</dd>
+            <dt>対象社員</dt><dd>{{ batch.manifest|length }}人</dd>
+            <dt>確定状態</dt><dd>確定済み</dd>
+            <dt>出力ID</dt><dd>{{ batch.output_id }}</dd>
+        </dl>
+        <div class="btn-stack center-narrow">
+            <form method="post" action="{% url 'management:batch_download' batch.output_id 'daily' %}">{% csrf_token %}
+                <button class="btn btn--md btn--block" type="submit"><i class="fa-regular fa-file" aria-hidden="true"></i> 日次明細CSVを取得</button>
+            </form>
+            <form method="post" action="{% url 'management:batch_download' batch.output_id 'monthly' %}">{% csrf_token %}
+                <button class="btn btn--md btn--block" type="submit"><i class="fa-regular fa-file" aria-hidden="true"></i> 月次集計CSVを取得</button>
+            </form>
+        </div>
+        <p class="small muted text-center mt-16">日次明細と月次集計は同じ出力IDの組で給与担当者へ渡してください。</p>
+        <p class="text-center"><a class="text-link" href="{% url 'management:bulk_export' %}">出力条件を変更</a></p>
+    </section>
 </div>
 {% endblock %}

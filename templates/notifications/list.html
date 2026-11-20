@@ -1,135 +1,64 @@
 {% extends "base.html" %}
-
-{% block title %}
-通知一覧 | 勤怠管理
-{% endblock %}
-
-{% block screen_label %}
-通知一覧
-{% endblock %}
+{% block title %}通知一覧 | 勤怠管理{% endblock %}
 
 {% block content %}
-
-<div class="v2-page notice-page">
-
-    <header class="v2-heading">
-        <div>
-            <h1><i class="fa-solid fa-bell" aria-hidden="true"></i> 通知一覧</h1>
-            <p>
-                自分宛の通知を新しい順に確認できます。通知から対象画面を開くと、その通知が既読になります。
-            </p>
-        </div>
-
-        <span class="notice-count{% if unread_count %} notice-count--unread{% endif %}">
-            {% if unread_count %}未読 {{ unread_count }}件{% else %}未読はありません{% endif %}
-        </span>
+<div class="page">
+    <header class="page-head">
+        <h1>通知一覧</h1>
+        <p class="page-head__meta">{% if unread_count %}未読 {{ unread_count }}件{% else %}未読はありません{% endif %}</p>
     </header>
 
-    <section class="v2-panel">
-
-        <div class="notice-toolbar">
-
-            <nav class="notice-tabs" aria-label="表示する通知">
-                <a href="{% url 'notifications:list' %}"
-                   {% if status_filter != 'unread' %}aria-current="page"{% endif %}>すべて</a>
-                <a href="{% url 'notifications:list' %}?status=unread"
-                   {% if status_filter == 'unread' %}aria-current="page"{% endif %}>未読</a>
-            </nav>
-
-            <form method="post" action="{% url 'notifications:read_all' %}">
-                {% csrf_token %}
-                <button type="submit" class="notification-read-all"
-                        {% if unread_count == 0 %}disabled{% endif %}>
-                    <i class="fa-solid fa-check" aria-hidden="true"></i> すべて既読
-                </button>
-            </form>
-
-        </div>
-
-        <div class="notice-list">
-
-            {% for item in page_obj %}
-
-            <article class="notice notice--{{ item.workflow_key }}{% if not item.is_read %} notice--unread{% endif %}">
-
-                <span class="notice__icon">
-                    {% if item.workflow_key == "action" %}
-                    <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
-                    {% elif item.workflow_key == "done" %}
-                    <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
-                    {% elif item.workflow_key == "result" %}
-                    <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
-                    {% else %}
-                    <i class="fa-solid fa-bell" aria-hidden="true"></i>
-                    {% endif %}
-                </span>
-
-                <div class="notice__main">
-
-                    <div class="notice__head">
-                        <h2 class="notice__title">{{ item.title }}</h2>
-                        <p class="notice__states">
-                            {% if item.is_read %}
-                            <span class="notice-badge notice-badge--read">既読</span>
-                            {% else %}
-                            <span class="notice-badge notice-badge--unread">未読</span>
-                            {% endif %}
-                            <span class="notice-badge notice-badge--{{ item.workflow_key }}">{{ item.workflow_label }}</span>
-                        </p>
-                    </div>
-
-                    <p class="notice__meta">
-                        <span class="notice__kind">{{ item.kind_label }}</span>
-                        <time class="notice__time" datetime="{{ item.created_at|date:'c' }}">{{ item.created_at|date:"Y/m/d H:i" }}</time>
-                    </p>
-
-                    <p class="notice__body">{{ item.body }}</p>
-
-                    <form class="notice__open-form" method="post" action="{% url 'notifications:open' item.pk %}">
-                        {% csrf_token %}
-                        <button type="submit" class="notice__open" aria-label="対象画面を開く：{{ item.title }}">
-                            <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i> 対象画面を開く
-                        </button>
-                    </form>
-
-                </div>
-
-            </article>
-
-            {% empty %}
-
-            <p class="notification-panel__empty">
-                <i class="fa-solid fa-inbox" aria-hidden="true"></i>
-                {% if status_filter == 'unread' %}未読の通知はありません。{% else %}通知はありません。{% endif %}
-            </p>
-
-            {% endfor %}
-
-        </div>
-
-        <nav class="v2-pagination" aria-label="通知のページ切替">
-
-            {% if page_obj.has_previous %}
-            <a href="?status={{ status_filter }}&amp;page={{ page_obj.previous_page_number }}">
-                前へ
-            </a>
+    <div class="notice-toolbar">
+        <nav aria-label="表示する通知">
+            {% if status_filter == 'unread' %}
+            <a class="check-link" href="{% url 'notifications:list' %}" aria-current="page"><span class="check-link__box" aria-hidden="true"><i class="fa-solid fa-check"></i></span>未読のみ</a>
+            {% else %}
+            <a class="check-link" href="{% url 'notifications:list' %}?status=unread"><span class="check-link__box" aria-hidden="true"></span>未読のみ</a>
             {% endif %}
-
-            <span>
-                {{ page_obj.number }} /
-                {{ page_obj.paginator.num_pages }}
-            </span>
-
-            {% if page_obj.has_next %}
-            <a href="?status={{ status_filter }}&amp;page={{ page_obj.next_page_number }}">
-                次へ
-            </a>
-            {% endif %}
-
         </nav>
+        <form method="post" action="{% url 'notifications:read_all' %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn--sm btn--outline" {% if unread_count == 0 %}disabled{% endif %}>すべて既読</button>
+        </form>
+    </div>
 
-    </section>
+    {% for item in page_obj %}
+    <article class="notice-list-item">
+        <div class="notice-list-item__state">
+            {% if item.is_read %}
+            <span class="badge badge--gray notice-badge--read">既読</span>
+            {% else %}
+            <span class="badge notice-badge--unread">未読</span>
+            {% endif %}
+            {% if item.workflow_key == "action" or item.workflow_key == "done" %}<span class="small">{{ item.workflow_label }}</span>{% endif %}
+        </div>
+        <div>
+            <time class="notice-list-item__time" datetime="{{ item.created_at|date:'c' }}">{{ item.created_at|date:"n月j日 H:i" }}<span class="visually-hidden">・{{ item.kind_label }}</span></time>
+            <h2 class="notice-list-item__title">{{ item.title }}</h2>
+            <p class="notice-list-item__body"><span class="small">{{ item.kind_label }}</span>　{{ item.body }}</p>
+        </div>
+        <div class="notice-list-item__actions">
+            <form method="post" action="{% url 'notifications:open' item.pk %}">
+                {% csrf_token %}
+                <button type="submit" class="notice-open" aria-label="{{ item.target_label }}：{{ item.title }}">{{ item.target_label }} <i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
+            </form>
+            {% if not item.is_read %}
+            <form method="post" action="{% url 'notifications:read' item.pk %}">
+                {% csrf_token %}
+                <input type="hidden" name="status" value="{{ status_filter }}">
+                <button type="submit" class="link-button" aria-label="既読にする：{{ item.title }}">既読にする</button>
+            </form>
+            {% endif %}
+        </div>
+    </article>
+    {% empty %}
+    <p class="card text-center muted">{% if status_filter == 'unread' %}未読の通知はありません。{% else %}通知はありません。{% endif %}</p>
+    {% endfor %}
 
+    <nav class="pagination" aria-label="通知のページ切替">
+        {% if page_obj.has_previous %}<a href="?status={{ status_filter }}&amp;page={{ page_obj.previous_page_number }}">前へ</a>{% endif %}
+        <span>{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}<a href="?status={{ status_filter }}&amp;page={{ page_obj.next_page_number }}">次へ</a>{% endif %}
+    </nav>
 </div>
-
 {% endblock %}

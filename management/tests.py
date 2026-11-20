@@ -145,7 +145,7 @@ class CommonLayoutTests(TestCase):
         )
 
     def test_mobile_navigation_in_html(self):
-        """スマートフォン用ナビがHTMLに存在する。"""
+        """スマートフォンではヘッダーの「メニュー」で同じ階層メニューを開ける（21章）。"""
 
         self.client.force_login(self.manager)
 
@@ -153,7 +153,7 @@ class CommonLayoutTests(TestCase):
 
         self.assertContains(
             response,
-            'aria-label="スマートフォン用メニュー"',
+            'class="app-menu-toggle" aria-controls="app-side"',
         )
 
     def test_forced_password_change_hides_shell(self):
@@ -1597,7 +1597,7 @@ class A03EmployeeDirectoryTests(TestCase):
 
         self.assertContains(
             response,
-            "a03-summary-grid",
+            reverse("management:employee_create"),
         )
 
     def test_02_search_employee_number(self):
@@ -1712,22 +1712,20 @@ class A03EmployeeDirectoryTests(TestCase):
         )
 
     def test_08_edit_links_exist(self):
-        """既存の編集画面への導線がある。"""
+        """一覧から社員詳細へ、社員詳細から所属・在籍日の変更へ進める（画面 16・19）。"""
 
         response = self.client.get(self.url)
 
         self.assertEqual(response.status_code, 200)
 
-        self.assertContains(
-            response,
-            reverse(
-                "management:employee_edit",
-                args=[self.employee.pk],
-            ),
+        edit_url = reverse(
+            "management:employee_edit",
+            args=[self.employee.pk],
         )
+        self.assertContains(response, edit_url)
 
         self.assertContains(
-            response,
+            self.client.get(edit_url),
             reverse(
                 "management:employment_edit",
                 args=[self.employee.pk],
@@ -1985,9 +1983,10 @@ class ManagementUiV2Tests(TestCase):
             "修正案",
         )
 
+        # 勤務日と同じ日付の時刻は「HH:MM」だけで比較表に表示する。
         self.assertContains(
             response,
-            "2026/09/15 18:30",
+            "18:30",
         )
 
     def test_invalid_review_preserves_reason_and_field_error(self):
@@ -2539,8 +2538,11 @@ class BusinessAdminRoleTests(TestCase):
         self.assertContains(detail, '?q=91002&amp;role=employee')
 
     def test_sole_manager_can_grant_second_manager_with_audit(self):
+        # 社員一覧 → 社員詳細 → 業務管理者権限の変更（画面 16・19）
         directory = self.client.get(reverse("management:employees"))
-        self.assertContains(directory, self.url())
+        detail_url = reverse("management:employee_edit", args=[self.employee.pk])
+        self.assertContains(directory, detail_url)
+        self.assertContains(self.client.get(detail_url), self.url())
 
         edit = self.client.get(
             reverse(
@@ -4170,8 +4172,8 @@ class RequirementV157ConformanceTests(_TestCase):
     def test_login_page_has_design_links_and_toggle_label(self):
         response = self.client.get(_reverse("accounts:login"))
         self.assertContains(response, "勤怠管理システムにログインしてください。")
-        self.assertContains(response, 'href="#login-trouble"')
         self.assertContains(response, 'href="#login-contact"')
+        self.assertContains(response, 'id="login-trouble"')
         self.assertContains(response, "ログインできない場合")
         self.assertContains(response, "社内問い合わせ窓口")
         self.assertContains(response, "表示する")

@@ -1,40 +1,67 @@
 {% extends "base.html" %}
-{% load static %}
 {% block title %}アカウントと使い方 | 勤怠管理{% endblock %}
-{% block screen_label %}アカウントと使い方{% endblock %}
-{% block extra_css %}<link rel="stylesheet" href="{% static 'css/account-pages.css' %}">{% endblock %}
+
 {% block content %}
-<div class="account-page">
-  <header class="account-page-heading"><h1>アカウントと使い方</h1></header>
-  <div class="reference-columns">
-    <section class="reference-form-card" aria-label="アカウントの設定">
-      <div class="reference-tabs" role="tablist" aria-label="アカウントメニュー">
-        <button type="button" role="tab" id="account-password-tab" aria-controls="account-password" aria-selected="true" data-reference-tab><i class="fa-solid fa-lock" aria-hidden="true"></i> パスワード変更</button>
-        <button type="button" role="tab" id="account-guide-tab" aria-controls="account-guide" aria-selected="false" tabindex="-1" data-reference-tab><i class="fa-solid fa-book-open" aria-hidden="true"></i> 使い方</button>
-      </div>
-      <div id="account-password" role="tabpanel" aria-labelledby="account-password-tab">
-        <form method="post" action="{% url 'accounts:password_change' %}" id="account-password-form">
-          {% csrf_token %}
-          {% include "components/password_fields.html" %}
-          <p class="v2-notice"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> パスワードは12文字以上で設定してください。</p>
-        </form>
-        <div class="reference-account-actions">
-          <button class="v2-button" type="submit" form="account-password-form"><i class="fa-regular fa-floppy-disk" aria-hidden="true"></i> 変更内容を保存</button>
-          <form method="post" action="{% url 'accounts:logout' %}" class="reference-logout-form">{% csrf_token %}<button type="submit" class="v2-button v2-button--outline"><i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i> ログアウト</button></form>
-        </div>
-      </div>
-      <div id="account-guide" role="tabpanel" aria-labelledby="account-guide-tab" hidden>
-        <h2>使い方ガイド</h2>
-        <p>出勤・休憩・退勤を記録し、自分の勤怠から日別の記録を確認します。訂正が必要な場合は修正申請を行ってください。</p>
-        <a class="v2-button v2-button--outline" href="{% url 'accounts:guide' %}">使い方ガイドを開く</a>
-        <h2 class="spacing-top-20">アカウント情報</h2>
-        <dl class="v2-data-list"><div><dt>社員番号</dt><dd>{{ employee_number }}</dd></div><div><dt>氏名</dt><dd>{{ display_name }}</dd></div><div><dt>部署</dt><dd>{{ department_label }}</dd></div><div><dt>権限</dt><dd>{{ account_role }}</dd></div></dl>
-      </div>
+<div class="page">
+    <header class="page-head"><h1>アカウントと使い方</h1></header>
+
+    <div class="card">
+        <section aria-labelledby="usage-title">
+            <h2 class="section-bar" id="usage-title">使い方</h2>
+            <details class="accordion" open>
+                <summary>打刻のしかた</summary>
+                <div class="accordion__body">
+                    <p>仕事を始めるときは「出勤」を押します。休憩に入るときは「休憩開始」、戻ったら「休憩終了」、仕事を終えるときは「退勤」を押します。</p>
+                    <a class="chev-link" href="{% url 'accounts:guide' %}#clocking"><span>詳しい手順を見る</span> <i class="fa-solid fa-chevron-right" aria-hidden="true"></i></a>
+                </div>
+            </details>
+            <details class="accordion">
+                <summary>打刻を修正する</summary>
+                <div class="accordion__body">
+                    <p>「自分の勤怠」で対象の日付を選び、日別詳細の「修正を申請」から正しい時刻と理由を入力します。結果は右上の「通知」で確認できます。</p>
+                    <a class="chev-link" href="{% url 'accounts:guide' %}#correction"><span>詳しい手順を見る</span> <i class="fa-solid fa-chevron-right" aria-hidden="true"></i></a>
+                </div>
+            </details>
+            <details class="accordion">
+                <summary>自分の勤怠を確認する</summary>
+                <div class="accordion__body">
+                    <p>「自分の勤怠」で月を選ぶと、日別の出勤・退勤・休憩・実働時間と月の合計を確認できます。</p>
+                    <a class="chev-link" href="{% url 'accounts:guide' %}#monthly"><span>詳しい手順を見る</span> <i class="fa-solid fa-chevron-right" aria-hidden="true"></i></a>
+                </div>
+            </details>
+            {% if is_business_admin %}
+            <details class="accordion">
+                <summary>管理者の操作</summary>
+                <div class="accordion__body">
+                    <p>管理画面では社員・部署登録、申請の確認、月次確定とCSV出力、業務管理者の権限管理を行います。自分の打刻は社員画面から行います。</p>
+                    <a class="chev-link" href="{% url 'accounts:guide' %}#manager"><span>詳しい手順を見る</span> <i class="fa-solid fa-chevron-right" aria-hidden="true"></i></a>
+                </div>
+            </details>
+            {% endif %}
+            <p class="mt-16"><a class="chev-link" href="{% url 'accounts:guide' %}"><span>使い方ガイドをすべて見る</span> <i class="fa-solid fa-chevron-right" aria-hidden="true"></i></a></p>
+        </section>
+
+        <section class="mt-24" aria-labelledby="account-title">
+            <h2 class="section-bar" id="account-title">アカウント</h2>
+            <dl class="kv-table kv-table--strong">
+                <dt>社員番号</dt><dd>{{ employee_number }}</dd>
+                <dt>氏名</dt><dd>{{ display_name }}</dd>
+                <dt>部署</dt><dd>{{ department_label }}</dd>
+                <dt>権限</dt><dd>{{ account_role }}</dd>
+            </dl>
+            <div class="btn-stack btn-stack--inset">
+                <a class="btn btn--md" href="{% url 'accounts:password_change' %}">パスワード変更</a>
+                <a class="btn btn--md btn--outline" href="#account-contact">問い合わせ先</a>
+                <form method="post" action="{% url 'accounts:logout' %}">{% csrf_token %}
+                    <button type="submit" class="btn btn--md btn--outline btn--block">ログアウト</button>
+                </form>
+            </div>
+        </section>
+    </div>
+
+    <section class="card" id="account-contact" tabindex="-1" aria-labelledby="account-contact-title">
+        <h2 class="card-title" id="account-contact-title">問い合わせ先</h2>
+        <p>勤怠管理システムの操作や不明点、ログインできない場合は、社内の管理担当者（社内問い合わせ窓口）にお問い合わせください。</p>
     </section>
-    <aside>
-      <section class="reference-note"><h2><i class="fa-solid fa-headset" aria-hidden="true"></i> 社内問い合わせ窓口</h2><p>勤怠管理システムの操作や不明点については、社内の管理担当者にお問い合わせください。</p></section>
-      <section class="reference-note"><h2><i class="fa-solid fa-book-open" aria-hidden="true"></i> 使い方ガイド</h2><nav class="reference-guide-links" aria-label="使い方ガイド"><a href="{% url 'accounts:guide' %}#clocking">出勤・休憩・退勤 <span aria-hidden="true">›</span></a><a href="{% url 'accounts:guide' %}#monthly">勤怠の確認 <span aria-hidden="true">›</span></a><a href="{% url 'accounts:guide' %}#correction">修正申請 <span aria-hidden="true">›</span></a></nav></section>
-    </aside>
-  </div>
 </div>
 {% endblock %}

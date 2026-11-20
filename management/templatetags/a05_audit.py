@@ -166,6 +166,9 @@ def a05_audit(context):
                 "target_number": (getattr(target, "employee_number", "") or "—"),
                 "target_name": getattr(target, "display_name", "") or (log.after_data or {}).get("name", "") or log.target_model,
                 "reason": (getattr(log, "reason", "") or ""),
+                "before_data": log.before_data,
+                "after_data": log.after_data,
+                "full_detail_url": reverse("management:audit_detail", args=[log.pk]),
                 "detail_url": "?" + urlencode({**filters, "page": page_obj.number, "selected": log.pk}) + "#audit-selected",
             }
         )

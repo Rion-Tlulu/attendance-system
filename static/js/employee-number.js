@@ -10,11 +10,13 @@ document.addEventListener("DOMContentLoaded", () => {
     currentRequest?.abort();
     if (candidate) candidate.value = "";
     if (!select.value) {
+      output.classList.add("is-message");
       output.textContent = "部署を選択すると候補を表示します。";
       return;
     }
     const controller = new AbortController();
     currentRequest = controller;
+    output.classList.add("is-message");
     output.textContent = "候補を取得中です。";
     const url = new URL(form.dataset.numberCandidateUrl, window.location.href);
     url.searchParams.set("department", select.value);
@@ -24,11 +26,13 @@ document.addEventListener("DOMContentLoaded", () => {
       const result = await response.json();
       if (controller !== currentRequest) return;
       if (response.ok && candidate) candidate.value = result.number;
+      output.classList.toggle("is-message", !response.ok);
       output.textContent = response.ok
-        ? `社員番号候補: ${result.number}`
+        ? result.number
         : `${result.error || "候補を取得できませんでした。"} 再度部署を選択してください。`;
     } catch (error) {
       if (error.name !== "AbortError" && controller === currentRequest) {
+        output.classList.add("is-message");
         output.textContent = "候補を取得できませんでした。再度部署を選択してください。";
       }
     }

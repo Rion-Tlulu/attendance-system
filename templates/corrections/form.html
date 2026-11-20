@@ -1,79 +1,18 @@
-
 {% extends "base.html" %}
-{% load static %}
 
-{% block title %}
-修正を申請 | 勤怠管理
-{% endblock %}
-
-{% block screen_label %}
-社員画面｜修正申請
-{% endblock %}
-
-{% block extra_css %}
-<link rel="stylesheet"
-      href="{% static 'css/daily-record-correction.css' %}">
-{% endblock %}
+{% block title %}修正申請の入力（勤怠修正申請） | 勤怠管理{% endblock %}
 
 {% block content %}
-
-<div class="v2-page e03-page reference-correction-input">
-
-    <header class="e03-heading">
+<div class="page">
+    <header class="page-head">
         <div>
-            <h1>勤怠修正申請</h1>
-<p class="e03-date">
-    {{ work_day|date:"Y年n月j日（D）" }}
-</p>
-<p>
-    修正を申請する日時と理由を入力してください。
-</p>
+            <h1>修正申請の入力</h1>
+            <a class="btn btn--sm btn--outline btn--pill mt-16" href="{% url 'attendance:daily' work_day.year work_day.month work_day.day %}"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i> 日別詳細へ</a>
         </div>
     </header>
 
-    <!-- ステップ -->
-    <ol class="e03-steps"
-        aria-label="修正申請の進行状況">
-        <li aria-current="step">1. 入力</li>
-        <li>2. 内容確認</li>
-        <li>3. 提出完了</li>
-    </ol>
-
-    <section class="e03-card reference-original-records" aria-labelledby="e03-input-original-title"><h2 id="e03-input-original-title">原記録</h2><ol class="e03-event-list">{% for event in session.clock_events.all %}<li>{{ event.get_kind_display }}：{{ event.recorded_at|date:"Y/m/d H:i" }}</li>{% empty %}<li>原打刻の記録はありません。</li>{% endfor %}</ol></section>
-    <!-- 現在の記録 -->
-    <section class="e03-card"
-             aria-labelledby="e03-current-title">
-        <h2 id="e03-current-title">
-            現在の有効値
-        </h2>
-
-        <dl class="e03-data-list">
-            <div>
-                <dt>出勤</dt>
-                <dd>
-                    {% if session.clock_in_at %}
-                        {{ session.clock_in_at|date:"Y/m/d H:i" }}
-                    {% else %}
-                        未記録
-                    {% endif %}
-                </dd>
-            </div>
-            <div>
-                <dt>退勤</dt>
-                <dd>
-                    {% if session.clock_out_at %}
-                        {{ session.clock_out_at|date:"Y/m/d H:i" }}
-                    {% else %}
-                        未記録
-                    {% endif %}
-                </dd>
-            </div>
-        </dl>
+    <section class="card" aria-label="修正を申請">
+        {% include "components/correction_values_form.html" %}
     </section>
-
-    <!-- 修正申請フォーム -->
-    {% include "components/correction_values_form.html" %}
-
 </div>
-
 {% endblock %}

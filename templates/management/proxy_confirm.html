@@ -1,28 +1,43 @@
 {% extends "base.html" %}
 {% block title %}代理申請の確認 | 勤怠管理{% endblock %}
-{% block screen_label %}管理者｜代理申請{% endblock %}
+
 {% block content %}
-<div class="v2-page">
-  <header class="v2-heading"><div><h1>代理申請の確認</h1></div></header>
-  <section class="v2-panel">
-    <p>対象: {{ employee.display_name }}（{{ employee.employee_number }}） 勤務日: {{ work_day|date:"Y/m/d" }}</p>
-    {% if target_day != work_day %}<p>移動先: {{ target_day|date:"Y/m/d" }}</p>{% endif %}
-    <h2>現在の有効値</h2>
-    <p>出勤 {{ current.clock_in_at|default:"未記録" }} ／ 退勤 {{ current.clock_out_at|default:"未記録" }}</p>
-    <h2>修正案</h2>
-    <p>出勤 {{ proposal.clock_in_at|default:"未記録" }} ／ 退勤 {{ proposal.clock_out_at|default:"未記録" }}</p>
-    <h3>休憩</h3>
-    {% for rest in proposal.breaks %}<p>{{ rest.started_at }} 〜 {{ rest.ended_at }}</p>{% empty %}<p>なし</p>{% endfor %}
-    <h3>理由と確認資料</h3>
-    <p>{{ reason }}</p><p>{{ proxy_reason }}</p><p>{{ evidence }}</p>
-    <form method="post">{% csrf_token %}
-      <input type="hidden" name="confirm_token" value="{{ confirm_token }}">
-      <button class="v2-button" type="submit">申請する</button>
-    </form>
-    <form method="post">{% csrf_token %}
-      <input type="hidden" name="return_token" value="{{ confirm_token }}">
-      <button class="v2-button v2-button--outline" type="submit">入力に戻る</button>
-    </form>
-  </section>
+<div class="page">
+    <header class="page-head"><h1>代理申請の確認</h1></header>
+    <section class="card" aria-label="代理申請の内容">
+        <div class="summary-strip">
+            <span class="summary-strip__value">{{ employee.display_name }}　{{ employee.employee_number }}</span>
+            <span class="summary-strip__value"><span class="summary-strip__label">勤務日</span>　{{ work_day|date:"Y年n月j日" }}</span>
+            {% if target_day != work_day %}<span class="summary-strip__value"><span class="summary-strip__label">移動先</span>　{{ target_day|date:"Y年n月j日" }}</span>{% endif %}
+        </div>
+
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead><tr><th scope="col">項目</th><th scope="col">現在の有効値</th><th scope="col">修正案</th></tr></thead>
+                <tbody>
+                    <tr><th scope="row">出勤</th><td>{{ current.clock_in_at|default:"未記録" }}</td><td>{{ proposal.clock_in_at|default:"未記録" }}</td></tr>
+                    <tr><th scope="row">退勤</th><td>{{ current.clock_out_at|default:"未記録" }}</td><td>{{ proposal.clock_out_at|default:"未記録" }}</td></tr>
+                    <tr><th scope="row">休憩</th><td>—</td><td>{% for rest in proposal.breaks %}{{ rest.started_at }} 〜 {{ rest.ended_at }}<br>{% empty %}なし{% endfor %}</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <dl class="kv-table mt-16">
+            <dt>修正理由</dt><dd>{{ reason }}</dd>
+            <dt>本人申請ができない理由</dt><dd>{{ proxy_reason }}</dd>
+            <dt>確認資料・確認方法</dt><dd>{{ evidence }}</dd>
+        </dl>
+
+        <div class="btn-row btn-row--split">
+            <form method="post">{% csrf_token %}
+                <input type="hidden" name="return_token" value="{{ confirm_token }}">
+                <button class="btn btn--md btn--outline btn--block" type="submit">入力に戻る</button>
+            </form>
+            <form method="post">{% csrf_token %}
+                <input type="hidden" name="confirm_token" value="{{ confirm_token }}">
+                <button class="btn btn--md btn--block" type="submit">申請する</button>
+            </form>
+        </div>
+    </section>
 </div>
 {% endblock %}

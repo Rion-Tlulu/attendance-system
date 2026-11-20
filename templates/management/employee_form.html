@@ -1,135 +1,180 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}
-{% if creating %}社員の新規登録{% else %}社員情報の編集{% endif %} | 勤怠管理
-{% endblock %}
-
-{% block screen_label %}管理者｜社員管理{% endblock %}
-
-{% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/manager-pages.css' %}">
-{% endblock %}
+{% block title %}{% if creating %}社員登録{% else %}社員詳細{% endif %} | 勤怠管理{% endblock %}
 
 {% block content %}
-<div class="admin-page">
-    <header class="admin-heading">
-        <h1 id="employee-form-title">
-            {% if creating %}社員の新規登録{% else %}社員情報の編集{% endif %}
-        </h1>
-        <p>
-            {% if creating %}
-                社員情報を登録すると、初回ログイン用パスワードが自動発行されます。
-                新しい部署は先に部署登録で登録してください。
-            {% else %}
-                社員の基本情報とアカウントの有効状態を管理します。
-            {% endif %}
-        </p>
+<div class="page">
+{% if creating %}
+    <header class="page-head">
+        <div>
+            <h1 id="employee-form-title">社員登録</h1>
+            <a class="btn btn--sm btn--outline btn--pill mt-16" href="{% url 'management:employees' %}{% if request.session.a03_return_query %}?{{ request.session.a03_return_query }}{% endif %}"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> 社員管理へ</a>
+        </div>
     </header>
 
-    {% include "components/employee_tabs.html" %}
-    {% if creating %}
-    <a href="{% url 'management:department_create' %}">部署を新規登録する</a>
-    {% endif %}
-
-    {% if not creating and employee.is_active %}
-    <div class="admin-warning" role="note">
-      利用停止後も未完了 {{ incomplete_count }}件、審査中 {{ pending_count }}件を保持します。
-      停止中の訂正は月次詳細から代理申請してください。
-    </div>
-    {% endif %}
-
-    <section class="ui-card admin-section admin-form-card"
-             aria-labelledby="employee-form-title">
-        <form method="post" autocomplete="off"
-              data-number-candidate-url="{% url 'management:employee_number_candidate' %}"
-              {% if not creating %}data-employee-id="{{ employee.pk }}"{% endif %}>
+    <section class="card card--pad-lg" aria-labelledby="employee-form-title">
+        <form method="post" autocomplete="off" novalidate data-number-candidate-url="{% url 'management:employee_number_candidate' %}">
             {% csrf_token %}
             <input type="hidden" name="operation_id" value="{{ operation_id }}">
-            {% if not creating %}<input type="hidden" name="edit_state" value="{{ edit_state }}">{% endif %}
             <input type="hidden" name="displayed_candidate" value="">
+            {% if form.non_field_errors %}<div class="notice-box notice-box--error" role="alert"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i><div>{{ form.non_field_errors }}</div></div>{% endif %}
 
-            {% if form.non_field_errors %}
-            <div class="admin-warning" role="alert">
-                {{ form.non_field_errors }}
-            </div>
-            {% endif %}
-
-            {% for field in form %}
-            <div class="admin-field reference-employee-field">
-                <label for="{{ field.id_for_label }}">{{ field.label }} {% if field.field.required %}<span class="reference-required">必須</span>{% endif %}</label>
-                {{ field }}
-                {% if field.help_text %}
-                <p class="admin-field-help">{{ field.help_text }}</p>
-                {% endif %}
-                {% if field.errors %}
-                <div class="admin-warning" role="alert">
-                    {{ field.errors }}
+            <div class="form-row form-row--plain" role="group" aria-labelledby="name-label">
+                <span class="form-row__label" id="name-label">氏名（必須）</span>
+                <div class="form-row__control">
+                    <div class="name-pair">
+                        <div class="field"><label for="{{ form.last_name.id_for_label }}" class="field-label small-label">{{ form.last_name.label }}</label>{{ form.last_name }}{{ form.last_name.errors }}</div>
+                        <div class="field"><label for="{{ form.first_name.id_for_label }}" class="field-label small-label">{{ form.first_name.label }}</label>{{ form.first_name }}{{ form.first_name.errors }}</div>
+                    </div>
                 </div>
-                {% endif %}
-            </div>
-            {% endfor %}
-
-            <div class="admin-field">
-                <label for="employee-number-candidate">社員番号候補</label>
-                <output id="employee-number-candidate" aria-live="polite">
-                    {% if creating %}部署を選択すると候補を表示します。{% else %}{{ employee.employee_number }}{% endif %}
-                </output>
-                <p class="admin-field-help">候補は予約されません。保存時に番号を確定します。</p>
             </div>
 
-            {% if creating %}
-            <div class="admin-warning" role="note">
-                <p>新しい社員は一般社員として登録されます。</p>
-                <p>
-                    初期パスワードはシステムが20文字で自動生成します。
-                    発行から72時間有効で、初回ログイン時に本人による変更が必要です。
-                </p>
-                <p>
-                    登録完了画面で一度だけ確認できます。
-                    本人確認後、社内で承認された方法で個別に伝えてください。
-                </p>
+            <div class="form-row form-row--plain field">
+                <label class="form-row__label" for="{{ form.department_choice.id_for_label }}">部署（必須）</label>
+                <div class="form-row__control">
+                    {{ form.department_choice }}
+                    {{ form.department_choice.errors }}
+                    <p class="field-help">新しい部署は先に <a href="{% url 'management:department_create' %}">部署登録</a> で登録してください。</p>
+                </div>
             </div>
-            {% endif %}
 
-            <div class="admin-actions">
-                <a href="{% url 'management:employees' %}{% if request.session.a03_return_query %}?{{ request.session.a03_return_query }}{% endif %}"
-                   class="ui-button ui-button--secondary">
-                    戻る
-                </a>
-                <button type="submit" {% if creating %}name="preview" value="1"{% endif %}
-                        class="ui-button ui-button--primary">
-                    {% if creating %}登録内容を確認{% else %}変更を保存する{% endif %}
-                </button>
+            <div class="candidate-strip">
+                <span class="candidate-strip__label" id="candidate-label">社員番号候補</span>
+                <output id="employee-number-candidate" class="is-message" aria-live="polite" aria-labelledby="candidate-label">部署を選択すると候補を表示します。</output>
+                <span class="candidate-strip__note">保存時に確定します。</span>
+            </div>
+
+            <div class="form-row form-row--plain field">
+                <label class="form-row__label" for="{{ form.hire_date.id_for_label }}">入社日（必須）</label>
+                <div class="form-row__control">{{ form.hire_date }}{{ form.hire_date.errors }}</div>
+            </div>
+
+            <p class="small muted">新しい社員は一般社員として登録されます。初期パスワード（20文字）はシステムが自動で発行し、登録完了画面で一度だけ確認できます。発行から72時間有効です。</p>
+
+            <div class="center-narrow">
+                <button type="submit" name="preview" value="1" class="btn btn--lg btn--block">登録する</button>
             </div>
         </form>
     </section>
+{% else %}
+    <header class="page-head">
+        <div>
+            <a class="back-link" href="{% url 'management:employees' %}{% if request.session.a03_return_query %}?{{ request.session.a03_return_query }}{% endif %}"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> 社員管理へ</a>
+            <h1 id="employee-form-title">社員詳細</h1>
+        </div>
+    </header>
 
-    {% if not creating and employee.pk and not employee.is_staff and not employee.is_superuser %}
-    <section class="ui-card admin-section" aria-labelledby="employee-role-title">
-        <h2 id="employee-role-title">業務管理者権限</h2>
-        <p>現在: {% if employee.is_business_admin %}業務管理者{% else %}一般社員{% endif %}</p>
-        <p>権限を付与・取り消す場合は、対象社員と変更理由を確認して操作してください。</p>
-        <a class="ui-button ui-button--secondary"
-           href="{% url 'management:employee_role' employee.pk %}">業務管理者権限を変更</a>
-    </section>
+    {% if form.errors %}
+    <div class="notice-box notice-box--error" role="alert"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i>
+        <div>
+            {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+            {% for error in form.is_active.errors %}<p>{{ error }}</p>{% endfor %}
+            {% if form.change_reason.errors %}<p>変更理由を入力してください。</p>{% endif %}
+            {% if not form.non_field_errors and not form.is_active.errors and not form.change_reason.errors %}<p>入力内容を確認してください。</p>{% endif %}
+        </div>
+    </div>
     {% endif %}
 
-    {% if not creating and employee.pk and employee.is_active and not employee.is_business_admin and not employee.is_staff and not employee.is_superuser %}
-    <section class="ui-card admin-section"
-             aria-labelledby="reset-password-title">
-        <h2 id="reset-password-title">初期パスワードの再発行</h2>
-        <p>
-            パスワードを忘れた社員には、本人確認を行ったうえで
-            初期パスワードを再発行できます。
-            再発行すると、以前のパスワードは利用できなくなります。
-        </p>
-        <a class="ui-button ui-button--secondary"
-           href="{% url 'management:employee_password_reset' employee.pk %}">
-            初期パスワードを再発行
-        </a>
+    <section class="card" aria-labelledby="employee-form-title">
+        <div class="hero-card">
+            <dl class="hero-dl">
+                <dt>社員名</dt><dd>{{ employee.display_name }}</dd>
+                <dt>社員番号</dt><dd>{{ employee.employee_number }}</dd>
+                <dt>所属</dt><dd>{{ employee.department|default:"未設定" }}</dd>
+                <dt>利用状態</dt><dd>{% if employee.is_active %}<span class="badge badge--solid">利用中</span>{% else %}<span class="badge badge--gray">停止中</span>{% endif %}{% if employee.is_business_admin %} <span class="badge badge--outline">業務管理者</span>{% endif %}</dd>
+            </dl>
+        </div>
+
+        <dl class="kv-table">
+            <dt>未完了勤務</dt><dd>{{ incomplete_count|default:0 }}件</dd>
+            <dt>審査中の申請</dt><dd>{{ pending_count|default:0 }}件</dd>
+        </dl>
+
+        <div class="action-list">
+            <span class="action-list__label">管理</span>
+            <ul>
+                <li><a href="#department-change"><i class="fa-solid fa-people-arrows" aria-hidden="true"></i><span>氏名・部署異動を変更</span><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></a></li>
+                <li><a href="{% url 'management:employment_edit' employee.pk %}"><i class="fa-regular fa-calendar" aria-hidden="true"></i><span>所属・在籍日を変更</span><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></a></li>
+                {% if not employee.is_staff and not employee.is_superuser %}
+                <li><a href="{% url 'management:employee_role' employee.pk %}"><i class="fa-solid fa-user-shield" aria-hidden="true"></i><span>業務管理者権限を変更</span><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></a></li>
+                {% endif %}
+                {% if employee.is_active and not employee.is_business_admin and not employee.is_staff and not employee.is_superuser %}
+                <li><a href="{% url 'management:employee_password_reset' employee.pk %}"><i class="fa-solid fa-key" aria-hidden="true"></i><span>初期パスワードを再発行</span><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></a></li>
+                {% endif %}
+            </ul>
+        </div>
+
+        {% if employee.pk != request.user.pk %}
+        <details class="accordion" {% if form.is_active.errors %}open{% endif %}>
+            <summary>{% if employee.is_active %}<span><i class="fa-solid fa-ban" aria-hidden="true"></i> 利用を停止</span>{% else %}<span><i class="fa-solid fa-rotate-right" aria-hidden="true"></i> 利用を再開</span>{% endif %}</summary>
+            <div class="accordion__body">
+                {% if employee.is_active %}
+                <p>停止すると本人はログインできなくなり、既存のログインも無効になります。未完了 {{ incomplete_count|default:0 }}件・審査中 {{ pending_count|default:0 }}件は保持され、停止中の訂正は月次詳細から代理申請します。勤怠記録と申請履歴は削除されません。</p>
+                {% else %}
+                <p>再開しても、取り消された管理権限は復活しません。審査中の代理申請がある場合は先に処理してください。</p>
+                {% endif %}
+                <form method="post" autocomplete="off">
+                    {% csrf_token %}
+                    <input type="hidden" name="operation_id" value="{{ operation_id }}">
+                    <input type="hidden" name="edit_state" value="{{ edit_state }}">
+                    <input type="hidden" name="displayed_candidate" value="">
+                    <input type="hidden" name="last_name" value="{{ employee.last_name }}">
+                    <input type="hidden" name="first_name" value="{{ employee.first_name }}">
+                    <input type="hidden" name="department_choice" value="{{ form.department_choice.initial|default_if_none:'' }}">
+                    {% if not employee.is_active %}<input type="hidden" name="is_active" value="on">{% endif %}
+                    <div class="field">
+                        <label for="status-reason">{% if employee.is_active %}停止{% else %}再開{% endif %}の理由（必須）</label>
+                        <textarea id="status-reason" name="change_reason" maxlength="500" rows="2" required></textarea>
+                    </div>
+                    {% if employee.is_active %}
+                    <button type="submit" class="btn btn--md btn--danger btn--block"><i class="fa-solid fa-ban" aria-hidden="true"></i> 利用を停止</button>
+                    {% else %}
+                    <button type="submit" class="btn btn--md btn--block"><i class="fa-solid fa-rotate-right" aria-hidden="true"></i> 利用を再開</button>
+                    {% endif %}
+                </form>
+            </div>
+        </details>
+        {% endif %}
     </section>
-    {% endif %}
+
+    <section class="card" id="department-change" tabindex="-1" aria-labelledby="department-change-title">
+        <h2 class="section-bar" id="department-change-title">氏名の変更・部署異動</h2>
+        <form method="post" autocomplete="off" novalidate data-number-candidate-url="{% url 'management:employee_number_candidate' %}" data-employee-id="{{ employee.pk }}">
+            {% csrf_token %}
+            <input type="hidden" name="operation_id" value="{{ operation_id }}">
+            <input type="hidden" name="edit_state" value="{{ edit_state }}">
+            <input type="hidden" name="displayed_candidate" value="">
+            {% if employee.is_active %}<input type="hidden" name="is_active" value="on">{% endif %}
+
+            <dl class="kv-table kv-table--lg">
+                <dt>現在の部署</dt><dd>{{ employee.department|default:"未設定" }}</dd>
+                <dt>現在の社員番号</dt><dd>{{ employee.employee_number }}</dd>
+            </dl>
+
+            <div class="form-row field">
+                <label class="form-row__label" for="{{ form.department_choice.id_for_label }}">異動先</label>
+                <div class="form-row__control">{{ form.department_choice }}{{ form.department_choice.errors }}</div>
+            </div>
+            <div class="candidate-strip">
+                <span class="candidate-strip__label" id="candidate-label">新しい社員番号候補</span>
+                <output id="employee-number-candidate" aria-live="polite" aria-labelledby="candidate-label">{{ employee.employee_number }}</output>
+            </div>
+            <p class="text-center">異動すると、次回は新しい社員番号でログインします。パスワードは引き継がれます。</p>
+
+            <div class="form-grid-2">
+                <div class="field"><label for="{{ form.last_name.id_for_label }}">{{ form.last_name.label }}</label>{{ form.last_name }}{{ form.last_name.errors }}</div>
+                <div class="field"><label for="{{ form.first_name.id_for_label }}">{{ form.first_name.label }}</label>{{ form.first_name }}{{ form.first_name.errors }}</div>
+            </div>
+            <div class="field">
+                <label for="{{ form.change_reason.id_for_label }}">変更理由（変更時は必須）</label>
+                {{ form.change_reason }}
+                {{ form.change_reason.errors }}
+            </div>
+            <button type="submit" class="btn btn--lg btn--block">変更内容を保存</button>
+        </form>
+    </section>
+{% endif %}
 </div>
 <script src="{% static 'js/employee-number.js' %}" defer></script>
 {% endblock %}

@@ -19,6 +19,12 @@ urlpatterns = [
         views.notification_open,
         name="open",
     ),
+    # 通知を1件だけ既読にする
+    path(
+        "<int:pk>/read/",
+        views.mark_read,
+        name="read",
+    ),
     # 通知をすべて既読にする
     path(
         "read-all/",

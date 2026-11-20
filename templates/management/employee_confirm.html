@@ -1,34 +1,32 @@
 {% extends "base.html" %}
-{% load static %}
 {% block title %}社員登録内容の確認 | 勤怠管理{% endblock %}
-{% block screen_label %}管理者｜社員管理{% endblock %}
-{% block extra_css %}<link rel="stylesheet" href="{% static 'css/manager-pages.css' %}">{% endblock %}
+
 {% block content %}
-<div class="admin-page">
-  <header class="admin-heading"><h1>社員登録内容の確認</h1>
-    <p>内容を確認してから社員を登録してください。</p>
-  </header>
-  <section class="ui-card admin-section admin-form-card">
-    <dl>
-      <dt>氏名</dt><dd>{{ employee_data.last_name }} {{ employee_data.first_name }}</dd>
-      <dt>所属部署</dt><dd>{{ employee_data.department_choice.name }}</dd>
-      <dt>入社日</dt><dd>{{ employee_data.hire_date|date:"Y/m/d" }}</dd>
-      <dt>社員番号候補</dt><dd>{{ candidate }}</dd>
-    </dl>
-    <p class="admin-field-help">社員番号候補は予約されません。保存時に確定します。初期パスワードは登録後の画面で一度だけ表示します。</p>
-    <form method="post">
-      {% csrf_token %}
-      <input type="hidden" name="operation_id" value="{{ operation_id }}">
-      <input type="hidden" name="first_name" value="{{ employee_data.first_name }}">
-      <input type="hidden" name="last_name" value="{{ employee_data.last_name }}">
-      <input type="hidden" name="department_choice" value="{{ employee_data.department_choice.pk }}">
-      <input type="hidden" name="hire_date" value="{{ employee_data.hire_date|date:'Y-m-d' }}">
-      <input type="hidden" name="displayed_candidate" value="{{ candidate }}">
-      <div class="admin-actions">
-        <button class="ui-button ui-button--secondary" type="submit" name="back" value="1">入力に戻る</button>
-        <button class="ui-button ui-button--primary" type="submit">社員を登録する</button>
-      </div>
-    </form>
-  </section>
+<div class="page">
+    <header class="page-head"><h1>社員登録内容の確認</h1><p class="page-lead">内容を確認してから社員を登録してください。</p></header>
+    <section class="card card--pad-lg" aria-label="登録内容">
+        <dl class="kv-table kv-table--strong kv-table--lg">
+            <dt>氏名</dt><dd>{{ employee_data.last_name }} {{ employee_data.first_name }}</dd>
+            <dt>部署</dt><dd>{{ employee_data.department_choice.name }}</dd>
+            <dt>入社日</dt><dd>{{ employee_data.hire_date|date:"Y年n月j日" }}</dd>
+        </dl>
+        <div class="candidate-strip">
+            <span class="candidate-strip__label">社員番号候補</span>
+            <span class="candidate-strip__value">{{ candidate }}</span>
+            <span class="candidate-strip__note">保存時に確定します。</span>
+        </div>
+        <p class="small muted">社員番号候補は予約されません。初期パスワードは登録後の画面で一度だけ表示します。</p>
+        <form method="post" class="btn-row btn-row--split">
+            {% csrf_token %}
+            <input type="hidden" name="operation_id" value="{{ operation_id }}">
+            <input type="hidden" name="first_name" value="{{ employee_data.first_name }}">
+            <input type="hidden" name="last_name" value="{{ employee_data.last_name }}">
+            <input type="hidden" name="department_choice" value="{{ employee_data.department_choice.pk }}">
+            <input type="hidden" name="hire_date" value="{{ employee_data.hire_date|date:'Y-m-d' }}">
+            <input type="hidden" name="displayed_candidate" value="{{ candidate }}">
+            <button class="btn btn--md btn--outline" type="submit" name="back" value="1">入力に戻る</button>
+            <button class="btn btn--md" type="submit">社員を登録する</button>
+        </form>
+    </section>
 </div>
 {% endblock %}

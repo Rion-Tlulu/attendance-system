@@ -152,7 +152,7 @@ class NotificationTests(TestCase):
         self.assertContains(response, "お知らせ")
         self.assertContains(response, "未読 1件")
         unread = self.client.get(reverse("notifications:list"), {"status": "unread"})
-        self.assertContains(unread, 'aria-current="page">未読</a>', html=False)
+        self.assertContains(unread, 'aria-current="page"><span class="check-link__box"', html=False)
 
     def test_stopped_employee_result_opens_application_detail_for_manager(self):
         self.employee.is_active = False
@@ -271,6 +271,40 @@ class NotificationTests(TestCase):
 
         self.assertIsNotNone(own.read_at)
         self.assertIsNone(other.read_at)
+
+    def test_07b_mark_read_changes_only_one_own_notification(self):
+        """個別既読（14章）は本人宛の1件だけを既読にし、他人宛は404で変更しない。"""
+        first = self.make_user_notification()
+        second = self.make_user_notification()
+        other = create_notification(
+            recipient=self.manager,
+            kind=Notification.Kind.GENERAL,
+            title="管理者向け",
+            body="管理者向けの通知です。",
+        )
+        self.client.force_login(self.employee)
+
+        response = self.client.post(
+            reverse("notifications:read", args=[first.pk]),
+            HTTP_ACCEPT="application/json",
+        )
+        self.assertEqual(response.json(), {"ok": True})
+        self.assertEqual(
+            self.client.post(reverse("notifications:read", args=[other.pk])).status_code, 404,
+        )
+        self.assertEqual(self.client.get(reverse("notifications:read", args=[second.pk])).status_code, 405)
+
+        for item in (first, second, other):
+            item.refresh_from_db()
+        self.assertIsNotNone(first.read_at)
+        self.assertIsNone(second.read_at)
+        self.assertIsNone(other.read_at)
+
+        # 既読済みの日時は更新しない。
+        read_at = first.read_at
+        self.client.post(reverse("notifications:read", args=[first.pk]))
+        first.refresh_from_db()
+        self.assertEqual(first.read_at, read_at)
 
     def test_08_read_all_keeps_later_notification_unread(self):
         later = self.make_user_notification()

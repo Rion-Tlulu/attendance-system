@@ -2,7 +2,7 @@
 
 /*
  * C03 通知パネル（13・14章）
- * - 新しい順に最大20件。見出し・種別・日時・未読／既読・対応状況を文字で示す。
+ * - 新しい順に最大20件。見出し・日時・未読／既読・対応状況を文字で示す。
  * - 読み込み中／通知なし／未読なし／取得失敗と再試行を区別する。
  * - 名称付きモーダル: 見出しへフォーカス、背景は操作対象外、Tab を閉じ込め、Esc で閉じて起点へ戻す。
  */
@@ -16,24 +16,16 @@ document.addEventListener("DOMContentLoaded", () => {
   const list = document.getElementById("notification-panel-items");
   const status = document.getElementById("notification-panel-status");
   const summary = document.getElementById("notification-panel-summary");
-  const filters = [...panel.querySelectorAll('input[name="notification-filter"]')];
+  const unreadFilter = document.getElementById("notification-unread-only");
   const readAllForm = document.getElementById("notification-read-all-form");
   const readAllButton = readAllForm?.querySelector("button");
   const badge = openButton.querySelector(".app-notification-count");
-  const background = [...document.querySelectorAll(".app-frame, .mobile-nav, .skip-link")];
+  const background = [...document.querySelectorAll(".app-frame, .app-topbar, .skip-link")];
   let items = [];
   let requestVersion = 0;
   let backgroundState = [];
 
-  // 対応状況ごとのアイコン（色だけに頼らず、文字のバッジも併記する）。
-  const ICONS = {
-    action: "fa-triangle-exclamation",
-    done: "fa-circle-check",
-    result: "fa-circle-info",
-    info: "fa-bell",
-  };
-
-  const unreadOnly = () => filters.some((input) => input.checked && input.value === "unread");
+  const unreadOnly = () => Boolean(unreadFilter?.checked);
 
   function csrfToken() {
     return readAllForm?.querySelector('input[name="csrfmiddlewaretoken"]')?.value || "";
@@ -46,10 +38,19 @@ document.addEventListener("DOMContentLoaded", () => {
     return node;
   }
 
-  function icon(name) {
-    const node = element("i", `fa-solid ${name}`);
-    node.setAttribute("aria-hidden", "true");
-    return node;
+  function postForm(action, className, label, ariaLabel) {
+    const form = element("form", "inline-form");
+    form.method = "post";
+    form.action = action;
+    const csrf = element("input");
+    csrf.type = "hidden";
+    csrf.name = "csrfmiddlewaretoken";
+    csrf.value = csrfToken();
+    const button = element("button", className, label);
+    button.type = "submit";
+    if (ariaLabel) button.setAttribute("aria-label", ariaLabel);
+    form.append(csrf, button);
+    return form;
   }
 
   function updateCount(count) {
@@ -58,45 +59,36 @@ document.addEventListener("DOMContentLoaded", () => {
       badge.textContent = count > 99 ? "99+" : String(count);
       badge.hidden = count === 0;
     }
-    summary.textContent = count > 0 ? `未読 ${count > 99 ? "99+" : count} 件` : "未読はありません";
+    summary.textContent = count > 0 ? `未読 ${count > 99 ? "99+" : count}件` : "未読はありません";
     if (readAllButton) readAllButton.disabled = count === 0;
   }
 
   function renderItem(item) {
-    const key = ICONS[item.workflow_key] ? item.workflow_key : "info";
-    const article = element("article", `notice notice--${key}${item.read ? "" : " notice--unread"}`);
+    const article = element("article", `notice-card${item.read ? "" : " notice-card--unread"}`);
 
-    const mark = element("span", "notice__icon");
-    mark.append(icon(ICONS[key]));
+    const title = element("h3", "notice-card__title");
+    const dot = element("span", `notice-card__dot${item.read ? " notice-card__dot--read" : ""}`);
+    dot.setAttribute("aria-hidden", "true");
+    title.append(dot, element("span", "", item.title));
 
-    const main = element("div", "notice__main");
-    const head = element("div", "notice__head");
-    const title = element("h3", "notice__title", item.title);
-    const states = element("p", "notice__states");
-    states.append(
-      element("span", item.read ? "notice-badge notice-badge--read" : "notice-badge notice-badge--unread", item.read ? "既読" : "未読"),
-      element("span", `notice-badge notice-badge--${key}`, item.workflow_label),
-    );
-    head.append(title, states);
+    const meta = element("div", "notice-card__meta");
+    meta.append(element("span", "", item.created_at));
+    const badges = element("span", "notice-card__badges");
+    badges.append(element("span", `badge badge--sm${item.read ? " badge--gray" : ""}`, item.read ? "既読" : "未読"));
+    if (item.workflow_label) {
+      badges.append(element("span", "badge badge--sm badge--outline", item.workflow_label));
+    }
+    meta.append(badges);
 
-    const meta = element("p", "notice__meta");
-    meta.append(element("span", "notice__kind", item.kind_label || "お知らせ"), element("span", "notice__time", item.created_at));
+    const actions = element("div", "notice-card__actions");
+    actions.append(postForm(item.open_url, "link-button", item.target_label || "対象画面を開く", `${item.target_label || "対象画面を開く"}：${item.title}`));
+    if (!item.read && item.read_url) {
+      const readForm = postForm(item.read_url, "link-button", "既読にする", `既読にする：${item.title}`);
+      readForm.addEventListener("submit", (event) => markRead(event, readForm));
+      actions.append(readForm);
+    }
 
-    const form = element("form", "notice__open-form");
-    form.method = "post";
-    form.action = item.open_url;
-    const csrf = element("input");
-    csrf.type = "hidden";
-    csrf.name = "csrfmiddlewaretoken";
-    csrf.value = csrfToken();
-    const button = element("button", "notice__open");
-    button.type = "submit";
-    button.append(icon("fa-arrow-up-right-from-square"), document.createTextNode(" 対象画面を開く"));
-    button.setAttribute("aria-label", `対象画面を開く：${item.title}`);
-    form.append(csrf, button);
-
-    main.append(head, meta, form);
-    article.append(mark, main);
+    article.append(title, meta, actions);
     return article;
   }
 
@@ -104,10 +96,9 @@ document.addEventListener("DOMContentLoaded", () => {
     list.replaceChildren();
     const visible = items.filter((item) => !unreadOnly() || !item.read);
     if (!visible.length) {
-      const empty = element("p", "notification-panel__empty");
-      empty.append(icon("fa-inbox"), document.createTextNode(unreadOnly() ? " 未読の通知はありません。" : " 通知はありません。"));
-      list.append(empty);
-      status.textContent = unreadOnly() ? "未読の通知はありません。" : "通知はありません。";
+      const text = unreadOnly() ? "未読の通知はありません。" : "通知はありません。";
+      list.append(element("p", "notification-panel__empty", text));
+      status.textContent = text;
       return;
     }
     list.append(...visible.map(renderItem));
@@ -118,7 +109,7 @@ document.addEventListener("DOMContentLoaded", () => {
     list.replaceChildren();
     const box = element("div", "notification-panel__error");
     box.append(element("p", "", message));
-    const retry = element("button", "notification-panel__retry", "再試行する");
+    const retry = element("button", "btn btn--outline btn--sm", "再試行する");
     retry.type = "button";
     retry.addEventListener("click", load);
     box.append(retry);
@@ -147,17 +138,35 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  async function postJson(url) {
+    const response = await fetch(url, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { Accept: "application/json", "X-CSRFToken": csrfToken() },
+    });
+    if (!response.ok) throw new Error("failed");
+  }
+
+  async function markRead(event, form) {
+    event.preventDefault();
+    const button = form.querySelector("button");
+    button.disabled = true;
+    try {
+      await postJson(form.action);
+      await load();
+      status.textContent = "通知を既読にしました。";
+    } catch (_error) {
+      button.disabled = false;
+      status.textContent = "既読にできませんでした。時間をおいて再試行してください。";
+    }
+  }
+
   async function markAllRead(event) {
     event.preventDefault();
     if (!readAllButton || readAllButton.disabled) return;
     readAllButton.disabled = true;
     try {
-      const response = await fetch(readAllForm.action, {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { Accept: "application/json", "X-CSRFToken": csrfToken() },
-      });
-      if (!response.ok) throw new Error("failed");
+      await postJson(readAllForm.action);
       await load();
       status.textContent = "表示中の未読通知を既読にしました。";
     } catch (_error) {
@@ -172,15 +181,14 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function show() {
-    const mobileMenu = document.querySelector(".mobile-more");
-    if (mobileMenu?.open) mobileMenu.open = false;
+    document.dispatchEvent(new CustomEvent("app:close-menu"));
     panel.hidden = false;
     backdrop.hidden = false;
     openButton.setAttribute("aria-expanded", "true");
-    heading.focus();
     backgroundState = background.map((node) => node.inert);
     background.forEach((node) => { node.inert = true; });
     document.body.classList.add("notification-is-open");
+    heading.focus();
     load();
   }
 
@@ -197,7 +205,7 @@ document.addEventListener("DOMContentLoaded", () => {
   openButton.addEventListener("click", show);
   closeButton.addEventListener("click", hide);
   backdrop.addEventListener("click", hide);
-  filters.forEach((input) => input.addEventListener("change", load));
+  unreadFilter?.addEventListener("change", load);
   readAllForm?.addEventListener("submit", markAllRead);
   panel.addEventListener("keydown", (event) => {
     if (event.key === "Escape") { hide(); return; }

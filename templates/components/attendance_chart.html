@@ -1,112 +1,74 @@
-
 {% if chart %}
-<section
-    id="{{ chart.dom_id }}"
-    class="f11-chart"
-    data-f11-chart
-    data-f11-default="{% if chart.kind == 'incomplete_count' or chart.dom_id == 'f11-a04' %}graph{% else %}table{% endif %}"
-    {% if chart.dom_id == 'f11-e02' %}data-f11-linked-table="employee-month-records"{% endif %}
-    aria-labelledby="{{ chart.dom_id }}-heading"
->
-    <div class="f11-chart__header">
-        <div class="f11-chart__heading">
-            <h2 id="{{ chart.dom_id }}-heading">
-                {{ chart.title }}
-            </h2>
-            <p>
-                {{ chart.month }}・単位：{{ chart.unit }}
-            </p>
-        </div>
+<section id="{{ chart.dom_id }}" class="f11-chart" data-f11-chart
+         data-f11-default="{% if chart.kind == 'incomplete_count' or chart.dom_id == 'f11-a04' %}graph{% else %}table{% endif %}"
+         {% if chart.dom_id == 'f11-e02' %}data-f11-linked-table="employee-month-records"{% endif %}
+         aria-label="{{ chart.month }}の{{ chart.title }}">
+    {{ chart|json_script:chart.data_id }}
 
-        <button
-            type="button"
-            class="f11-chart__toggle"
-            data-f11-toggle
-            aria-controls="{{ chart.dom_id }}-panel"
-            aria-expanded="false"
-        >
-            グラフを表示
+    <div class="center-narrow">
+        <button type="button" class="btn btn--md btn--block f11-chart__toggle" data-f11-show aria-controls="{{ chart.dom_id }}-panel" aria-expanded="false">
+            <i class="fa-solid fa-chart-simple" aria-hidden="true"></i> グラフを表示
         </button>
     </div>
 
-    <p class="f11-chart__help">
-        数値表とグラフを切り替えられます。
-        グラフは勤務状況の確認を補助するものです。
-    </p>
-
-    {{ chart|json_script:chart.data_id }}
-
-    <div
-        class="f11-chart__table-wrap"
-        data-f11-table
-        role="region"
-        aria-label="{{ chart.month }}の{{ chart.title }}の数値表"
-        tabindex="0"
-    >
+    {% if chart.dom_id != 'f11-e02' %}
+    <div class="f11-chart__table-wrap mt-16" data-f11-table role="region" aria-label="{{ chart.month }}の{{ chart.title }}の数値表" tabindex="0">
         <table class="f11-chart__table">
-            <caption>
-                {{ chart.month }} {{ chart.title }}
-            </caption>
-
+            <caption>{{ chart.month }} {{ chart.title }}（単位：{{ chart.unit }}）</caption>
             <thead>
                 <tr>
                     <th scope="col">日付</th>
-                    <th scope="col">
-                        {{ chart.value_header }}
-                    </th>
-
-                    {% if chart.kind == "work_hours" %}
-                    <th scope="col">勤務状態</th>
-                    {% endif %}
+                    <th scope="col">{{ chart.value_header }}</th>
+                    {% if chart.kind == "work_hours" %}<th scope="col">勤務状態</th>{% endif %}
                 </tr>
             </thead>
-
             <tbody>
                 {% for row in chart.rows %}
                 <tr>
-                    <th scope="row">
-                        {{ row.label }}
-                    </th>
-                    <td>
-                        {{ row.display }}
-                    </td>
-
-                    {% if chart.kind == "work_hours" %}
-                    <td>{{ row.status }}</td>
-                    {% endif %}
+                    <th scope="row">{{ row.label }}</th>
+                    <td>{{ row.display }}</td>
+                    {% if chart.kind == "work_hours" %}<td>{{ row.status }}</td>{% endif %}
                 </tr>
                 {% empty %}
-                <tr>
-                    <td colspan="3">
-                        対象データはありません。
-                    </td>
-                </tr>
+                <tr><td colspan="3">対象データはありません。</td></tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
+    {% else %}
+    <div data-f11-table hidden></div>
+    {% endif %}
 
-    <div
-        id="{{ chart.dom_id }}-panel"
-        class="f11-chart__panel"
-        data-f11-panel
-        hidden
-    >
+    <div id="{{ chart.dom_id }}-panel" class="f11-chart__panel mt-16" data-f11-panel hidden>
+        <h2 class="section-bar" id="{{ chart.dom_id }}-heading" tabindex="-1">
+            {% if chart.kind == "work_hours" %}日別実働グラフ{% else %}{{ chart.title }}{% endif %}
+            <small>単位　{{ chart.unit }}</small>
+        </h2>
         <div class="f11-chart__canvas-wrap">
-            <canvas
-                data-f11-canvas
-                role="img"
-                aria-label="{{ chart.month }}の{{ chart.title }}を示す棒グラフ。数値は表でも確認できます。"
-            ></canvas>
+            <canvas data-f11-canvas role="img" aria-label="{{ chart.month }}の{{ chart.title }}を示す棒グラフ。数値は表でも確認できます。"></canvas>
         </div>
+        <p class="f11-chart__note">
+            {% if chart.kind == "work_hours" %}記録なし・未完了の日は、棒を表示しません。{% else %}現在も未完了の勤務を勤務日ごとに数えています。{% endif %}
+        </p>
+        <div class="f11-chart__foot">
+            {% if total_label %}<p class="f11-chart__total">{{ total_label }}<span>{{ total_value }}</span></p>{% else %}<span></span>{% endif %}
+            <button type="button" class="btn btn--outline f11-chart__toggle" data-f11-hide aria-controls="{{ chart.dom_id }}-panel">表を表示</button>
+        </div>
+        {% if chart.kind == "work_hours" %}
+        <div class="table-wrap">
+            <table class="data-table data-table--compact">
+                <caption class="visually-hidden">{{ chart.month }}の記録がある日の実働時間</caption>
+                <thead><tr><th scope="col">勤務日</th><th scope="col">実働時間</th></tr></thead>
+                <tbody>
+                    {% for row in chart.rows %}{% if row.value is not None %}
+                    <tr><th scope="row">{{ row.label }}</th><td>{{ row.display }}</td></tr>
+                    {% endif %}{% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
     </div>
 
-    <p
-        class="f11-chart__message"
-        data-f11-message
-        role="status"
-        aria-live="polite"
-        hidden
-    ></p>
+    <p class="f11-chart__message" data-f11-message role="status" aria-live="polite" hidden></p>
 </section>
 {% endif %}

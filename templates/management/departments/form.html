@@ -1,37 +1,44 @@
 {% extends "base.html" %}
-{% load static %}
 {% block title %}{{ page_title }} | 勤怠管理{% endblock %}
-{% block screen_label %}管理者｜部署登録{% endblock %}
-{% block extra_css %}<link rel="stylesheet" href="{% static 'css/manager-pages.css' %}">{% endblock %}
+
 {% block content %}
-<div class="admin-page">
-  <header class="admin-heading"><h1>{{ page_title }}</h1>
-    <p>部署名と割当可能な採番用コードを確認してください。</p>
-  </header>
-  <div class="reference-columns">
-  <section class="ui-card admin-section admin-form-card">
-    <form method="post">
-      {% csrf_token %}
-      {% if operation_id %}<input type="hidden" name="operation_id" value="{{ operation_id }}">{% endif %}
-      {% if form.non_field_errors %}<div class="admin-warning" role="alert">{{ form.non_field_errors }}</div>{% endif %}
-      {% if no_codes %}<div class="admin-warning" role="alert">割当可能な部署コードがありません。</div>{% endif %}
-      {% if stop_reason %}<div class="admin-warning" role="alert">{{ stop_reason }}</div>{% endif %}
-      {% for field in form.hidden_fields %}{{ field }}{% endfor %}
-      {% for field in form.visible_fields %}
-        <div class="admin-field">
-          <label for="{{ field.id_for_label }}">{{ field.label }} {% if field.field.required %}<span class="reference-required">必須</span>{% endif %}</label> {{ field }}
-          {% if field.help_text %}<p class="admin-field-help">{{ field.help_text }}</p>{% endif %}
-          {% if field.errors %}<div class="admin-warning" role="alert">{{ field.errors }}</div>{% endif %}
-        </div>
-      {% endfor %}
-      <p class="admin-field-help">使用済みのコードと社員番号は再利用できません。</p>
-      <div class="admin-actions">
-        <a class="ui-button ui-button--secondary" href="{% url 'management:department_list' %}">一覧へ戻る</a>
-        <button class="ui-button ui-button--primary" type="submit" {% if not department %}name="preview" value="1"{% endif %} {% if no_codes or stop_reason %}disabled{% endif %}>{% if department %}変更を保存する{% else %}登録内容を確認{% endif %}</button>
-      </div>
-    </form>
-  </section>
-  <aside class="reference-note"><h2><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i> 重要な注意事項</h2><p class="reference-important">部署登録では社員番号を発行しません。</p><p>社員番号は、社員登録でこの部署を選択した後、保存時に確定します。</p><p>使用中・過去に使われた採番用コードは再利用できません。</p><a href="{% url 'management:employee_create' %}">社員登録へ <span aria-hidden="true">›</span></a></aside>
-  </div>
+<div class="page">
+    <header class="page-head"><h1>{% if department %}{{ page_title }}{% else %}部署登録{% endif %}</h1></header>
+
+    <section class="card card--pad-lg" aria-label="{{ page_title }}">
+        <form method="post" novalidate>
+            {% csrf_token %}
+            {% if operation_id %}<input type="hidden" name="operation_id" value="{{ operation_id }}">{% endif %}
+            {% if form.non_field_errors %}<div class="notice-box notice-box--error" role="alert"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i><div>{{ form.non_field_errors }}</div></div>{% endif %}
+            {% if no_codes %}<div class="notice-box notice-box--error" role="alert"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i><p>割当可能な部署コードがありません。</p></div>{% endif %}
+            {% if stop_reason %}<div class="notice-box notice-box--error" role="alert"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i><p>{{ stop_reason }}</p></div>{% endif %}
+            {% for field in form.hidden_fields %}{{ field }}{% endfor %}
+
+            <div class="field field--green">
+                <label for="{{ form.name.id_for_label }}">{{ form.name.label }}（必須）</label>
+                {{ form.name }}
+                {% if form.name.help_text %}<p class="field-help">{{ form.name.help_text }}</p>{% endif %}
+                {{ form.name.errors }}
+            </div>
+            <div class="field field--green">
+                <label for="{{ form.code.id_for_label }}">{{ form.code.label }}（必須）</label>
+                {{ form.code }}
+                {% if form.code.help_text %}<p class="field-help">{{ form.code.help_text }}</p>{% endif %}
+                {{ form.code.errors }}
+            </div>
+            <div class="candidate-strip" data-code-example-for="{{ form.code.id_for_label }}">
+                <span class="candidate-strip__label" id="code-example-label">最初の社員番号の例</span>
+                <output class="candidate-strip__value" aria-labelledby="code-example-label" aria-live="polite">{% if form.code.value %}{{ form.code.value }}0001{% else %}—{% endif %}</output>
+            </div>
+            {% if form.is_active %}
+            <label class="check-line check-line--panel">{{ form.is_active }} {{ form.is_active.label }}</label>
+            {{ form.is_active.errors }}
+            {% endif %}
+            <p class="small muted">部署登録では社員番号を発行しません。社員番号は社員登録でこの部署を選び、保存した時に確定します。使用済みのコードと社員番号は再利用できません。</p>
+
+            <button class="btn btn--lg btn--block" type="submit" {% if not department %}name="preview" value="1"{% endif %} {% if no_codes or stop_reason %}disabled{% endif %}>{% if department %}変更を保存する{% else %}部署を登録{% endif %}</button>
+        </form>
+        <p class="mt-16"><a class="chev-link" href="{% url 'management:employees' %}"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> <span>社員管理へ</span></a>　<a class="chev-link" href="{% url 'management:department_list' %}"><span>登録済みの部署一覧</span></a></p>
+    </section>
 </div>
 {% endblock %}

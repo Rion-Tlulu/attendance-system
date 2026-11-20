@@ -1,5 +1,0 @@
-<nav class="reference-tabs" aria-label="社員管理メニュー">
-  <a href="{% url 'management:employee_create' %}" {% if creating %}aria-current="page"{% endif %}>社員登録</a>
-  <a href="{% url 'management:employees' %}" {% if request.resolver_match.view_name == 'management:employees' %}aria-current="page"{% endif %}>社員一覧</a>
-  {% if employee %}<a href="{% url 'management:employee_edit' employee.pk %}" {% if not creating %}aria-current="page"{% endif %}>社員詳細</a>{% else %}<span aria-disabled="true">社員詳細</span>{% endif %}
-</nav>

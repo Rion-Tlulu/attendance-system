@@ -1,54 +1,54 @@
 {% extends "base.html" %}
-{% load attendance_ui %}
-{% load static %}
-{% block title %}業務管理者権限の変更 | 勤怠管理{% endblock %}
-{% block screen_label %}管理者｜業務管理者の権限管理{% endblock %}
-{% block extra_css %}<link rel="stylesheet" href="{% static 'css/manager-pages.css' %}">{% endblock %}
+{% block title %}業務管理者の権限管理（業務管理者権限の変更） | 勤怠管理{% endblock %}
+
 {% block content %}
-<div class="admin-page">
-  <header class="admin-heading">
-    <h1 id="role-title">業務管理者の権限管理</h1>
-    <p>対象: {{ employee.display_name }}（{{ employee.employee_number }}）</p>
-    <p>現在: {% if employee.is_business_admin %}業務管理者{% else %}一般社員{% endif %}
-      ／ 利用状態: {% if employee.is_active %}有効{% else %}停止中{% endif %}</p>
-  </header>
-  <p class="reference-section-bar"><i class="fa-solid fa-users" aria-hidden="true"></i> 有効な業務管理者 {{ active_manager_count }}人</p>
-  <div class="reference-role-grid">
-  <section class="ui-card admin-section admin-form-card" aria-labelledby="role-title">
-    <p>業務管理者は社員情報・勤怠・修正申請を扱えます。付与先と理由を確認してください。</p>
-    <p>停止中の社員には付与できません。有効な業務管理者が2人未満になる取消は拒否します。</p>
-    <form method="post" autocomplete="off" id="reference-role-form">
-      {% csrf_token %}
-      {{ form.expected_role }}
-      {% if form.expected_role.errors %}<div class="admin-warning" role="alert">{{ form.expected_role.errors }}画面を再読み込みしてください。</div>{% endif %}
-      {% if form.non_field_errors %}<div class="admin-warning" role="alert">{{ form.non_field_errors }}</div>{% endif %}
-      <div class="admin-field">
-        <fieldset>
-          <legend>{{ form.desired_role.label }}</legend>
-          {{ form.desired_role }}
-        </fieldset>
-        {% if form.desired_role.errors %}<div class="admin-warning" role="alert">{{ form.desired_role.errors }}</div>{% endif %}
-      </div>
-      <div class="admin-field">
-        {{ form.change_reason|plain_label }}
-        {{ form.change_reason }}
-        {% if form.change_reason.errors %}<div class="admin-warning" role="alert">{{ form.change_reason.errors }}</div>{% endif %}
-      </div>
-      <div class="admin-actions">
-        <a class="ui-button ui-button--secondary" href="{% url 'management:role_list' %}{% if request.session.a06_return_query %}?{{ request.session.a06_return_query }}{% endif %}">権限一覧に戻る</a>
-        <button class="ui-button ui-button--primary" type="button" data-role-preview><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i> 変更内容を確認</button>
-        <noscript><button class="ui-button ui-button--primary" type="submit">権限を変更する</button></noscript>
-      </div>
-    </form>
-  </section>
-  <aside class="reference-role-preview">
-    <h2>確認（変更内容）</h2>
-    <dl class="v2-data-list"><div><dt>対象社員</dt><dd>{{ employee.display_name }}（{{ employee.employee_number }}）</dd></div><div><dt>利用状態</dt><dd>{% if employee.is_active %}利用中{% else %}利用停止{% endif %}</dd></div><div><dt>管理権限</dt><dd data-role-result>変更内容を確認してください</dd></div></dl>
-    <p data-role-preview-status role="status"></p>
-    <button class="v2-button" type="submit" form="reference-role-form" data-role-submit hidden>権限を変更する</button>
-    <p><a href="{% url 'management:audit_history' %}"><i class="fa-regular fa-clock" aria-hidden="true"></i> 操作履歴で確認</a></p>
-    <p class="v2-notice v2-notice--warning">有効な管理者が2人未満になる取消はできません。取り消した管理権限は、再有効化しても復活しません。</p>
-  </aside>
-  </div>
+<div class="page">
+    <header class="page-head">
+        <div>
+            <a class="back-link" href="{% url 'management:role_list' %}{% if request.session.a06_return_query %}?{{ request.session.a06_return_query }}{% endif %}"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> 権限一覧へ</a>
+            <h1 id="role-title">業務管理者の権限管理</h1>
+        </div>
+    </header>
+
+    <section class="card card--pad-lg" aria-labelledby="role-title">
+        <dl class="kv-table">
+            <dt>対象社員</dt><dd>{{ employee.display_name }}（{{ employee.employee_number }}）</dd>
+            <dt>利用状態</dt><dd>{% if employee.is_active %}利用中{% else %}停止中{% endif %}</dd>
+            <dt>現在の権限</dt><dd>{% if employee.is_business_admin %}業務管理者{% else %}一般社員{% endif %}</dd>
+        </dl>
+
+        <form method="post" autocomplete="off" id="reference-role-form" novalidate>
+            {% csrf_token %}
+            {{ form.expected_role }}
+            {% if form.expected_role.errors %}<div class="notice-box notice-box--error" role="alert"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i><p>{{ form.expected_role.errors }}画面を再読み込みしてください。</p></div>{% endif %}
+            {% if form.non_field_errors %}<div class="notice-box notice-box--error" role="alert"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i><div>{{ form.non_field_errors }}</div></div>{% endif %}
+
+            <div class="kv-table">
+                <span class="kv__label" id="desired-role-label">業務管理者権限</span>
+                <div class="kv__value" role="radiogroup" aria-labelledby="desired-role-label">
+                    <div class="radio-row">{{ form.desired_role }}</div>
+                    {{ form.desired_role.errors }}
+                </div>
+                <span class="kv__label">変更後の権限（プレビュー）</span>
+                <div class="kv__value" data-role-result data-current="{% if employee.is_business_admin %}業務管理者{% else %}一般社員{% endif %}">変更内容を確認してください</div>
+            </div>
+
+            <div class="field">
+                <label for="{{ form.change_reason.id_for_label }}">変更理由 <span class="required">（必須）</span></label>
+                {{ form.change_reason }}
+                {{ form.change_reason.errors }}
+            </div>
+
+            <p class="small muted">有効な業務管理者は現在 {{ active_manager_count }}人です。有効な管理者が2人未満になる取消はできません。停止中の社員には付与できませんが、付与済みの権限は取り消せます。取り消した管理権限は、再有効化しても復活しません。</p>
+            <p data-role-preview-status role="status" class="small"></p>
+
+            <div class="center-narrow">
+                <button class="btn btn--md btn--block" type="button" data-role-preview>内容を確認</button>
+                <button class="btn btn--md btn--block" type="submit" data-role-submit hidden>権限を変更する</button>
+                <noscript><button class="btn btn--md btn--block" type="submit">権限を変更する</button></noscript>
+            </div>
+        </form>
+        <p class="text-center mt-16"><a class="text-link" href="{% url 'management:audit_history' %}">操作履歴で確認</a></p>
+    </section>
 </div>
 {% endblock %}

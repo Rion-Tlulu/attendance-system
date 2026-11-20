@@ -1,1109 +1,145 @@
 {% extends "base.html" %}
-
 {% load static a01_dashboard %}
 
-{% block title %}
-
-管理者｜勤怠一覧 | 勤怠管理
-
-{% endblock %}
-
-{% block screen_label %}
-
-管理者｜勤怠一覧
-
-{% endblock %}
-
-{% block extra_css %}
-
-<link
-
-    rel="stylesheet"
-
-    href="{% static 'css/manager-attendance-list.css' %}"
-
->
-
-{% endblock %}
+{% block title %}管理者｜勤怠一覧 | 勤怠管理{% endblock %}
 
 {% block content %}
-
 {% a01_snapshot as a01 %}
-
 {% if a01.allowed %}
+<div class="page">
+    <header class="page-head"><h1>勤怠一覧</h1></header>
 
-<div class="a01-page">
-
-    <!-- =====================================
-
-         ページ見出し
-
-    ====================================== -->
-
-    <header class="a01-heading">
-
-        <div>
-
-            <p class="a01-eyebrow">
-
-                MANAGEMENT / ATTENDANCE
-
-            </p>
-
-            <h1>
-
-                <i
-
-                    class="fa-solid fa-calendar-check"
-
-                    aria-hidden="true"
-
-                ></i>
-
-                勤怠一覧
-
-            </h1>
-
-            <p>
-
-                社員の月次勤怠と、確認が必要な記録を
-
-                一覧で確認できます。
-
-            </p>
-
-        </div>
-
-        <div class="a01-heading-actions">
-
-            <a
-
-                href="/management/corrections/"
-
-                class="a01-button a01-button--outline"
-
-            >
-
-                <i
-
-                    class="fa-solid fa-file-circle-check"
-
-                    aria-hidden="true"
-
-                ></i>
-
-                修正申請を確認
-
-            </a>
-
-            <a
-
-                href="{% url 'management:bulk_export' %}"
-
-                class="a01-button a01-button--primary"
-
-            >
-
-                <i
-
-                    class="fa-solid fa-file-csv"
-
-                    aria-hidden="true"
-
-                ></i>
-
-                月次CSV出力
-
-            </a>
-
-        </div>
-
-    </header>
-
-    <!-- =====================================
-
-         対象月・集計
-
-    ====================================== -->
-
-    <section
-
-        class="a01-summary-section"
-
-        aria-labelledby="a01-summary-title"
-
-    >
-
-        <div class="a01-section-heading">
-
+    <section class="card" aria-label="{{ a01.target_month|date:'Y年n月' }}の勤怠一覧">
+        <div class="summary-strip">
             <div>
-
-                <h2 id="a01-summary-title">
-
-                    {{ a01.target_month|date:"Y年n月" }}
-
-                    の確認状況
-
-                </h2>
-
-                <p>
-
-                    以下の件数は現在の検索条件を
-
-                    反映しています。
-
-                </p>
-
+                <span class="summary-strip__label">申請待ち</span>
+                <span class="summary-strip__big">{{ a01.pending_count }}<small>件</small></span>
+                <a class="btn btn--sm" href="{% url 'management:corrections' %}?status=pending">申請一覧へ</a>
             </div>
-
-        </div>
-
-        <div class="a01-summary-grid">
-
-            <!-- 対象社員 -->
-
-            <article class="a01-summary-card">
-
-                <span class="a01-summary-icon a01-summary-icon--blue">
-
-                    <i
-
-                        class="fa-solid fa-users"
-
-                        aria-hidden="true"
-
-                    ></i>
-
-                </span>
-
-                <div>
-
-                    <h3>対象社員</h3>
-
-                    <p>
-
-                        <strong>{{ a01.employee_count }}</strong>
-
-                        <span>人</span>
-
-                    </p>
-
-                </div>
-
-            </article>
-
-            <!-- 未完了 -->
-
-            <article class="a01-summary-card">
-
-                <span class="a01-summary-icon a01-summary-icon--orange">
-
-                    <i
-
-                        class="fa-solid fa-triangle-exclamation"
-
-                        aria-hidden="true"
-
-                    ></i>
-
-                </span>
-
-                <div>
-
-                    <h3>未完了の勤務</h3>
-
-                    <p>
-
-                        <strong>{{ a01.incomplete_count }}</strong>
-
-                        <span>件</span>
-
-                    </p>
-
-                </div>
-
-            </article>
-
-            <!-- 審査待ち -->
-
-            <article class="a01-summary-card">
-
-                <span class="a01-summary-icon a01-summary-icon--red">
-
-                    <i
-
-                        class="fa-solid fa-file-circle-question"
-
-                        aria-hidden="true"
-
-                    ></i>
-
-                </span>
-
-                <div>
-
-                    <h3>修正申請の審査待ち</h3>
-
-                    <p>
-
-                        <strong>{{ a01.pending_count }}</strong>
-
-                        <span>件</span>
-
-                    </p>
-
-                </div>
-
-            </article>
-
-            <!-- 確定済み -->
-
-            <article class="a01-summary-card">
-
-                <span class="a01-summary-icon a01-summary-icon--green">
-
-                    <i
-
-                        class="fa-solid fa-circle-check"
-
-                        aria-hidden="true"
-
-                    ></i>
-
-                </span>
-
-                <div>
-
-                    <h3>月次確定済み</h3>
-
-                    <p>
-
-                        <strong>{{ a01.finalized_count }}</strong>
-
-                        <span>人</span>
-
-                    </p>
-
-                </div>
-
-            </article>
-
-        </div>
-
-    </section>
-
-    <!-- =====================================
-
-         検索
-
-    ====================================== -->
-
-    <section
-
-        class="a01-panel"
-
-        aria-labelledby="a01-search-title"
-
-    >
-
-        <div class="a01-section-heading">
-
-            <h2 id="a01-search-title">
-
-                <i
-
-                    class="fa-solid fa-filter"
-
-                    aria-hidden="true"
-
-                ></i>
-
-                検索・絞り込み
-
-            </h2>
-
+            <div>
+                <span class="summary-strip__label">未完了勤務</span>
+                <span class="summary-strip__big">{{ a01.incomplete_count }}<small>件</small></span>
+                <a class="btn btn--sm" href="?month={{ a01.filters.month }}&amp;status=incomplete">対象者を確認</a>
+            </div>
         </div>
 
         {% if a01.month_error %}
-
-        <div class="a01-error" role="alert">
-
-            {{ a01.month_error }}
-
-        </div>
-
+        <div class="notice-box notice-box--error" role="alert"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i><p>{{ a01.month_error }}</p></div>
         {% endif %}
 
-        <form
-
-            method="get"
-
-            action="/management/attendance/"
-
-            class="a01-filter-form"
-
-            role="search"
-
-        >
-
-            <!-- 対象月 -->
-
-            <div class="a01-field">
-
-                <label for="a01-month">
-
-                    対象月
-
-                </label>
-
-                <input
-
-                    type="month"
-
-                    id="a01-month"
-
-                    name="month"
-
-                    value="{{ a01.filters.month }}"
-
-                    required
-
-                >
-
+        <form method="get" action="{% url 'management:attendance_list' %}" class="filter-form" role="search" aria-label="勤怠一覧の検索">
+            <div class="toolbar">
+                <div class="inline-actions">
+                    <label for="a01-month" class="visually-hidden">対象月</label>
+                    <input type="month" id="a01-month" name="month" value="{{ a01.filters.month }}" required class="month-field">
+                    <button type="submit" class="btn btn--sm btn--outline">表示</button>
+                </div>
+                <details class="filter-details" {% if a01.filters.q or a01.filters.department or a01.filters.status != 'all' and a01.filters.status or a01.filters.active != 'all' %}open{% endif %}>
+                    <summary class="btn btn--outline"><i class="fa-solid fa-filter" aria-hidden="true"></i> 絞り込み条件</summary>
+                    <div class="filter-panel">
+                        <div class="search-grid">
+                            <div class="field">
+                                <label for="a01-query">氏名・社員番号</label>
+                                <input type="search" id="a01-query" name="q" value="{{ a01.filters.q }}" maxlength="100" autocomplete="off">
+                            </div>
+                            <div class="field">
+                                <label for="a01-department">部署</label>
+                                <select id="a01-department" name="department">
+                                    <option value="">すべて</option>
+                                    {% for department in a01.departments %}<option value="{{ department }}" {% if a01.filters.department == department %}selected{% endif %}>{{ department }}</option>{% endfor %}
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="a01-status">勤怠状態</label>
+                                <select id="a01-status" name="status">
+                                    {% for value, label in a01.status_options %}<option value="{{ value }}" {% if a01.filters.status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="a01-active">利用状態</label>
+                                <select id="a01-active" name="active">
+                                    <option value="all" {% if a01.filters.active == 'all' %}selected{% endif %}>すべて</option>
+                                    <option value="active" {% if a01.filters.active == 'active' %}selected{% endif %}>利用中</option>
+                                    <option value="inactive" {% if a01.filters.active == 'inactive' %}selected{% endif %}>停止中</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="btn-row mt-16">
+                            <button type="submit" class="btn btn--cream"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i> 検索</button>
+                            <a href="{% url 'management:attendance_list' %}" class="btn btn--outline">条件をクリア</a>
+                        </div>
+                    </div>
+                </details>
             </div>
-
-            <!-- 社員検索 -->
-
-            <div class="a01-field">
-
-                <label for="a01-query">
-
-                    社員番号・氏名
-
-                </label>
-
-                <input
-
-                    type="search"
-
-                    id="a01-query"
-
-                    name="q"
-
-                    value="{{ a01.filters.q }}"
-
-                    placeholder="例：社員番号・氏名"
-
-                    maxlength="100"
-
-                    autocomplete="off"
-
-                >
-
-            </div>
-
-            <!-- 部署 -->
-
-            <div class="a01-field">
-
-                <label for="a01-department">
-
-                    部署
-
-                </label>
-
-                <select
-
-                    id="a01-department"
-
-                    name="department"
-
-                >
-
-                    <option value="">
-
-                        すべての部署
-
-                    </option>
-
-                    {% for department in a01.departments %}
-
-                    <option
-
-                        value="{{ department }}"
-
-                        {% if a01.filters.department == department %}
-
-                        selected
-
-                        {% endif %}
-
-                    >
-
-                        {{ department }}
-
-                    </option>
-
-                    {% endfor %}
-
-                </select>
-
-            </div>
-
-            <!-- 状態 -->
-
-            <div class="a01-field">
-
-                <label for="a01-status">
-
-                    勤怠状態
-
-                </label>
-
-                <select
-
-                    id="a01-status"
-
-                    name="status"
-
-                >
-
-                    {% for value, label in a01.status_options %}
-
-                    <option
-
-                        value="{{ value }}"
-
-                        {% if a01.filters.status == value %}
-
-                        selected
-
-                        {% endif %}
-
-                    >
-
-                        {{ label }}
-
-                    </option>
-
-                    {% endfor %}
-
-                </select>
-
-            </div>
-
-            <div class="a01-field">
-                <label for="a01-active">利用状態</label>
-                <select id="a01-active" name="active">
-                    <option value="all" {% if a01.filters.active == 'all' %}selected{% endif %}>すべて</option>
-                    <option value="active" {% if a01.filters.active == 'active' %}selected{% endif %}>利用中</option>
-                    <option value="inactive" {% if a01.filters.active == 'inactive' %}selected{% endif %}>停止中</option>
-                </select>
-            </div>
-
-            <div class="a01-filter-actions">
-
-                <button
-
-                    type="submit"
-
-                    class="a01-button a01-button--primary"
-
-                >
-
-                    <i
-
-                        class="fa-solid fa-magnifying-glass"
-
-                        aria-hidden="true"
-
-                    ></i>
-
-                    検索する
-
-                </button>
-
-                <a
-
-                    href="/management/attendance/"
-
-                    class="a01-button a01-button--outline"
-
-                >
-
-                    条件をクリア
-
-                </a>
-
-            </div>
-
         </form>
 
-    </section>
-
-        <!-- F11: 絞り込み結果の日別未完了件数 -->
-    {% include "components/attendance_chart.html" with chart=a01.incomplete_chart only %}
-
-<!-- =====================================
-
-         社員別一覧
-
-    ====================================== -->
-
-    <section
-
-        class="a01-panel a01-list-panel"
-
-        aria-labelledby="a01-list-title"
-
-    >
-
-        <div class="a01-section-heading">
-
-            <div>
-
-                <h2 id="a01-list-title">
-
-                    社員別の勤怠状況
-
-                </h2>
-
-                <p>
-
-                    該当 {{ a01.employee_count }} 人 /
-
-                    1ページ最大25人
-
-                </p>
-
-            </div>
-
-            <span class="a01-page-number">
-
-                {{ a01.page_obj.number }}
-
-                /
-
-                {{ a01.page_obj.paginator.num_pages }}
-
-                ページ
-
-            </span>
-
-        </div>
-
-        <!-- PC用テーブル -->
-
-        <div
-
-            class="a01-table-scroll"
-
-            role="region"
-
-            aria-label="社員別勤怠一覧表"
-
-            tabindex="0"
-
-        >
-
-            <table class="a01-table">
-
+        <div class="table-wrap desktop-only" role="region" aria-label="社員別の勤怠状況" tabindex="0">
+            <table class="data-table">
+                <caption class="visually-hidden">社員別の勤怠状況（該当 {{ a01.employee_count }} 人）</caption>
                 <thead>
-
                     <tr>
-
-                        <th scope="col">社員情報</th>
-
+                        <th scope="col">氏名・社員番号</th>
                         <th scope="col">部署</th>
-
-                        <th scope="col">完了した勤務</th>
-
+                        <th scope="col">利用状態</th>
                         <th scope="col">未完了</th>
-
-                        <th scope="col">審査待ち</th>
-
-                        <th scope="col">勤怠状態</th>
-
-                        <th scope="col">月次確定</th>
-
-                        <th scope="col">操作</th>
-
+                        <th scope="col">申請待ち</th>
+                        <th scope="col">月次</th>
+                        <th scope="col">詳細</th>
                     </tr>
-
                 </thead>
-
                 <tbody>
-
                     {% for row in a01.page_obj %}
-
                     <tr>
-
-                        <th scope="row">
-
-                            <div class="a01-employee-cell">
-
-                                <strong>
-
-                                    {{ row.employee.display_name|default:"氏名未設定" }}
-
-                                </strong>
-
-                                <span>
-
-                                    {{ row.employee.employee_number }}
-
-                                </span>
-
-                                {% if not row.employee.is_active %}
-
-                                <small class="a01-inactive-label">
-
-                                    アカウント無効
-
-                                </small>
-
-                                {% endif %}
-
-                            </div>
-
-                        </th>
-
-                        <td>
-
-                            {{ row.department }}
-
-                        </td>
-
-                        <td class="a01-number">
-
-                            {{ row.completed }}日
-
-                        </td>
-
-                        <td class="a01-number">
-
-                            {% if row.incomplete %}
-
-                            <strong class="a01-text-danger">
-
-                                {{ row.incomplete }}件
-
-                            </strong>
-
-                            {% else %}
-
-                            0件
-
-                            {% endif %}
-
-                        </td>
-
-                        <td class="a01-number">
-
-                            {% if row.pending %}
-
-                            <strong class="a01-text-warning">
-
-                                {{ row.pending }}件
-
-                            </strong>
-
-                            {% else %}
-
-                            0件
-
-                            {% endif %}
-
-                        </td>
-
-                        <td>
-
-                            <span class="a01-status a01-status--{{ row.tone }}">
-
-                                {{ row.status_label }}
-
-                            </span>
-
-                        </td>
-
-                        <td>
-
-                            {% if row.finalized %}
-
-                            <span class="a01-status a01-status--success">
-
-                                確定済み
-
-                            </span>
-
-                            {% else %}
-
-                            <span class="a01-status a01-status--neutral">
-
-                                未確定
-
-                            </span>
-
-                            {% endif %}
-
-                        </td>
-
-                        <td>
-
-                            {% if row.detail_url %}
-
-                            <a
-
-                                href="{{ row.detail_url }}?back={{ a01.current_query|urlencode }}"
-
-                                class="a01-detail-link"
-
-                                aria-label="{{ row.employee.employee_number }} の月次勤怠詳細"
-
-                            >
-
-                                月次詳細
-
-                                <i
-
-                                    class="fa-solid fa-chevron-right"
-
-                                    aria-hidden="true"
-
-                                ></i>
-
-                            </a>
-
-                            {% else %}
-
-                            <span class="a01-link-unavailable">
-
-                                詳細URL未設定
-
-                            </span>
-
-                            {% endif %}
-
-                        </td>
-
+                        <th scope="row" class="name-cell"><strong>{{ row.employee.display_name|default:"氏名未設定" }}</strong><span class="cell-sub">{{ row.employee.employee_number }}</span></th>
+                        <td>{{ row.department }}</td>
+                        <td>{% if row.employee.is_active %}<span class="badge">利用中</span>{% else %}<span class="badge badge--gray">停止中</span>{% endif %}</td>
+                        <td><strong{% if row.incomplete %} class="text-danger"{% endif %}>{{ row.incomplete }}件</strong></td>
+                        <td>{{ row.pending }}件</td>
+                        <td>{% if row.finalized %}確定済み{% else %}未確定{% endif %}</td>
+                        <td>{% if row.detail_url %}<a href="{{ row.detail_url }}?back={{ a01.current_query|urlencode }}" class="btn btn--sm btn--outline" aria-label="{{ row.employee.display_name }}（{{ row.employee.employee_number }}）の月次詳細">詳細</a>{% else %}—{% endif %}</td>
                     </tr>
-
                     {% empty %}
-
-                    <tr>
-
-                        <td
-
-                            colspan="8"
-
-                            class="a01-table-empty"
-
-                        >
-
-                            検索条件に一致する社員はいません。
-
-                        </td>
-
-                    </tr>
-
+                    <tr><td colspan="7" class="empty-cell">検索条件に一致する社員はいません。</td></tr>
                     {% endfor %}
-
                 </tbody>
-
             </table>
-
         </div>
 
-        <!-- スマートフォン用カード -->
-
-        <div class="a01-mobile-list">
-
+        <div class="mobile-cards">
             {% for row in a01.page_obj %}
-
-            <article class="a01-employee-card">
-
-                <div class="a01-employee-card__header">
-
-                    <div>
-
-                        <h3>
-
-                            {{ row.employee.display_name|default:"氏名未設定" }}
-
-                        </h3>
-
-                        <p>
-
-                            社員番号：
-
-                            {{ row.employee.employee_number }}
-
-                        </p>
-
-                    </div>
-
-                    <span class="a01-status a01-status--{{ row.tone }}">
-
-                        {{ row.status_label }}
-
-                    </span>
-
-                </div>
-
-                <dl class="a01-employee-card__data">
-
-                    <div>
-
-                        <dt>部署</dt>
-
-                        <dd>{{ row.department }}</dd>
-
-                    </div>
-
-                    <div>
-
-                        <dt>完了した勤務</dt>
-
-                        <dd>{{ row.completed }}日</dd>
-
-                    </div>
-
-                    <div>
-
-                        <dt>未完了</dt>
-
-                        <dd>{{ row.incomplete }}件</dd>
-
-                    </div>
-
-                    <div>
-
-                        <dt>審査待ち</dt>
-
-                        <dd>{{ row.pending }}件</dd>
-
-                    </div>
-
-                    <div>
-
-                        <dt>月次確定</dt>
-
-                        <dd>
-
-                            {% if row.finalized %}
-
-                            確定済み
-
-                            {% else %}
-
-                            未確定
-
-                            {% endif %}
-
-                        </dd>
-
-                    </div>
-
-                    <div>
-
-                        <dt>利用状態</dt>
-
-                        <dd>
-
-                            {% if row.employee.is_active %}
-
-                            有効
-
-                            {% else %}
-
-                            無効
-
-                            {% endif %}
-
-                        </dd>
-
-                    </div>
-
+            <article class="record-card">
+                <dl class="record-list">
+                    <dt>氏名・社員番号</dt><dd>{{ row.employee.display_name|default:"氏名未設定" }}（{{ row.employee.employee_number }}）</dd>
+                    <dt>部署</dt><dd>{{ row.department }}</dd>
+                    <dt>利用状態</dt><dd>{% if row.employee.is_active %}<span class="badge badge--sm">利用中</span>{% else %}<span class="badge badge--sm badge--gray">停止中</span>{% endif %}</dd>
+                    <dt>未完了</dt><dd>{{ row.incomplete }}件</dd>
+                    <dt>申請待ち</dt><dd>{{ row.pending }}件</dd>
+                    <dt>月次</dt><dd>{% if row.finalized %}確定済み{% else %}未確定{% endif %}</dd>
                 </dl>
-
-                {% if row.detail_url %}
-
-                <a
-
-                    href="{{ row.detail_url }}?back={{ a01.current_query|urlencode }}"
-
-                    class="a01-detail-link a01-detail-link--mobile"
-
-                >
-
-                    月次勤怠詳細を見る
-
-                    <i
-
-                        class="fa-solid fa-arrow-right"
-
-                        aria-hidden="true"
-
-                    ></i>
-
-                </a>
-
-                {% else %}
-
-                <p class="a01-link-unavailable">
-
-                    詳細URLが見つかりません。
-
-                </p>
-
-                {% endif %}
-
+                {% if row.detail_url %}<div class="record-card__actions"><a href="{{ row.detail_url }}?back={{ a01.current_query|urlencode }}" class="btn btn--outline btn--block" aria-label="{{ row.employee.display_name }}（{{ row.employee.employee_number }}）の月次詳細">詳細</a></div>{% endif %}
             </article>
-
             {% empty %}
-
-            <div class="a01-empty">
-
-                <i
-
-                    class="fa-solid fa-magnifying-glass"
-
-                    aria-hidden="true"
-
-                ></i>
-
-                <p>
-
-                    検索条件に一致する社員はいません。
-
-                </p>
-
-            </div>
-
+            <p class="muted">検索条件に一致する社員はいません。</p>
             {% endfor %}
-
         </div>
 
-        <!-- ページネーション -->
-
-        <nav
-
-            class="a01-pagination"
-
-            aria-label="勤怠一覧のページ切替"
-
-        >
-
-            {% if a01.page_obj.has_previous %}
-
-            <a href="?{{ a01.previous_query }}">
-
-                <i
-
-                    class="fa-solid fa-chevron-left"
-
-                    aria-hidden="true"
-
-                ></i>
-
-                前へ
-
-            </a>
-
-            {% endif %}
-
-            <span aria-current="page">
-
-                {{ a01.page_obj.number }}
-
-                /
-
-                {{ a01.page_obj.paginator.num_pages }}
-
-            </span>
-
-            {% if a01.page_obj.has_next %}
-
-            <a href="?{{ a01.next_query }}">
-
-                次へ
-
-                <i
-
-                    class="fa-solid fa-chevron-right"
-
-                    aria-hidden="true"
-
-                ></i>
-
-            </a>
-
-            {% endif %}
-
+        <nav class="pagination" aria-label="勤怠一覧のページ切替">
+            {% if a01.page_obj.has_previous %}<a href="?{{ a01.previous_query }}"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i> 前へ</a>{% endif %}
+            <span aria-current="page">{{ a01.page_obj.number }} / {{ a01.page_obj.paginator.num_pages }}（該当 {{ a01.employee_count }} 人）</span>
+            {% if a01.page_obj.has_next %}<a href="?{{ a01.next_query }}">次へ <i class="fa-solid fa-chevron-right" aria-hidden="true"></i></a>{% endif %}
         </nav>
 
+        <details class="link-details">
+            <summary class="chev-link"><i class="fa-regular fa-calendar" aria-hidden="true"></i> <span>勤務日別の未完了件数</span> <i class="fa-solid fa-chevron-right link-details__chevron" aria-hidden="true"></i></summary>
+            <div class="mt-16">
+                {% include "components/attendance_chart.html" with chart=a01.incomplete_chart only %}
+            </div>
+        </details>
+        <p class="small muted mt-16">「未完了」は退勤または休憩終了が未記録の勤務です。記録のない日を欠勤とは判定しません。初期版では一括承認・一括確定は行いません。</p>
     </section>
-
-    <!-- 説明・注意事項 -->
-
-    <aside
-
-        class="a01-info"
-
-        aria-label="勤怠一覧の見方"
-
-    >
-
-        <i
-
-            class="fa-solid fa-circle-info"
-
-            aria-hidden="true"
-
-        ></i>
-
-        <div>
-
-            <p>
-
-                「未完了」は、勤務中または休憩中のままの
-
-                記録を指します。
-
-                打刻記録のない日を、自動的に欠勤とは
-
-                判定しません。
-
-            </p>
-
-            <p>
-
-                修正申請の審査と月次確定は、
-
-                社員別の詳細画面などから行います。
-
-                この一覧では一括承認・一括確定を
-
-                行いません。
-
-            </p>
-
-        </div>
-
-    </aside>
-
 </div>
-
 <script src="{% static 'vendor/chartjs/chart.umd.min.js' %}" defer></script>
-
 {% else %}
-
-<div class="a01-access-denied" role="alert">
-
-    この画面を表示する権限がありません。
-
-</div>
-
+<div class="notice-box notice-box--error" role="alert"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i><p>この画面を表示する権限がありません。</p></div>
 {% endif %}
-
 {% endblock %}

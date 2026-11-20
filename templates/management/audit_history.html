@@ -1,456 +1,79 @@
-
 {% extends "base.html" %}
-{% load static a05_audit %}
+{% load a05_audit %}
 
-{% block title %}
-操作履歴 | 勤怠管理
-{% endblock %}
-
-{% block screen_label %}
-管理者｜操作履歴
-{% endblock %}
-
-{% block extra_css %}
-<link
-    rel="stylesheet"
-    href="{% static 'css/manager-audit-export.css' %}"
->
-{% endblock %}
+{% block title %}操作履歴 | 勤怠管理{% endblock %}
 
 {% block content %}
-
 {% a05_audit as audit %}
-
 {% if audit.allowed %}
+<div class="page">
+    <header class="page-head"><h1>操作履歴</h1></header>
 
-<div class="a05-page">
-
-    <!-- ページ見出し -->
-    <header class="a05-heading">
-
-        <div>
-            <p class="a05-eyebrow">
-                MANAGEMENT / AUDIT LOG
-            </p>
-
-            <h1>
-                <i
-                    class="fa-solid fa-clock-rotate-left"
-                    aria-hidden="true"
-                ></i>
-                操作履歴
-            </h1>
-
-            <p>
-                操作日時・実行者・対象社員・
-                操作の種類を確認できます。
-            </p>
-        </div>
-
-        <span class="a05-readonly">
-            <i
-                class="fa-solid fa-lock"
-                aria-hidden="true"
-            ></i>
-            閲覧専用
-        </span>
-
-    </header>
-
-
-    <!-- 検索 -->
-    <section
-        class="a05-panel"
-        aria-labelledby="a05-filter-title"
-    >
-
-        <h2 id="a05-filter-title">
-            <i
-                class="fa-solid fa-filter"
-                aria-hidden="true"
-            ></i>
-            履歴を検索
-        </h2>
-
+    <section class="card search-card" aria-label="履歴を検索">
         {% if audit.errors %}
-        <div
-            class="a05-error"
-            role="alert"
-        >
-            {% for error in audit.errors %}
-                <p>{{ error }}</p>
-            {% endfor %}
-        </div>
+        <div class="notice-box notice-box--error" role="alert"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i><div>{% for error in audit.errors %}<p>{{ error }}</p>{% endfor %}</div></div>
         {% endif %}
-
-        <form
-            method="get"
-            action="/management/audit/"
-            class="a05-filter-form"
-            role="search"
-        >
-
-            <div class="a05-field">
-                <label for="a05-from">
-                    開始日
-                </label>
-
-                <input
-                    type="date"
-                    name="from_date"
-                    id="a05-from"
-                    value="{{ audit.filters.from_date }}"
-                >
+        <form method="get" action="{% url 'management:audit_history' %}" class="search-grid" role="search">
+            <div class="field">
+                <label for="a05-from">期間（開始日）</label>
+                <input type="date" name="from_date" id="a05-from" value="{{ audit.filters.from_date }}">
             </div>
-
-            <div class="a05-field">
-                <label for="a05-to">
-                    終了日
-                </label>
-
-                <input
-                    type="date"
-                    name="to_date"
-                    id="a05-to"
-                    value="{{ audit.filters.to_date }}"
-                >
+            <div class="field">
+                <label for="a05-to">期間（終了日）</label>
+                <input type="date" name="to_date" id="a05-to" value="{{ audit.filters.to_date }}">
             </div>
-
-            <div class="a05-field">
-                <label for="a05-action">
-                    操作の種類
-                </label>
-
-                <select
-                    name="action"
-                    id="a05-action"
-                >
-                    <option value="">
-                        すべての操作
-                    </option>
-
-                    {% for value, label in audit.action_choices %}
-
-                    <option
-                        value="{{ value }}"
-                        {% if audit.filters.action == value %}
-                        selected
-                        {% endif %}
-                    >
-                        {{ label }}
-                    </option>
-
-                    {% endfor %}
+            <div class="field">
+                <label for="a05-q">対象（社員番号）</label>
+                <input type="search" name="q" id="a05-q" value="{{ audit.filters.q }}" maxlength="100" placeholder="すべての社員">
+            </div>
+            <div class="field">
+                <label for="a05-action">操作</label>
+                <select name="action" id="a05-action">
+                    <option value="">すべての操作</option>
+                    {% for value, label in audit.action_choices %}<option value="{{ value }}" {% if audit.filters.action == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
                 </select>
             </div>
-
-            <div class="a05-field">
-                <label for="a05-q">
-                    社員番号
-                </label>
-
-                <input
-                    type="search"
-                    name="q"
-                    id="a05-q"
-                    value="{{ audit.filters.q }}"
-                    maxlength="100"
-                    placeholder="実行者または対象社員"
-                >
-            </div>
-
-            <div class="a05-filter-actions">
-
-                <button
-                    type="submit"
-                    class="a05-button a05-button--primary"
-                >
-                    <i
-                        class="fa-solid fa-magnifying-glass"
-                        aria-hidden="true"
-                    ></i>
-                    検索する
-                </button>
-
-                <a
-                    href="/management/audit/"
-                    class="a05-button a05-button--outline"
-                >
-                    条件をクリア
-                </a>
-
-            </div>
-
+            <button type="submit" class="btn"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i> 検索</button>
         </form>
-
     </section>
 
-
-    <!-- 操作履歴一覧 -->
-    <section
-        class="a05-panel"
-        aria-labelledby="a05-list-title"
-    >
-
-        <div class="a05-section-heading">
-
-            <div>
-                <h2 id="a05-list-title">
-                    操作履歴一覧
-                </h2>
-
-                <p>
-                    検索結果：
-                    {{ audit.total_count }}件
-                </p>
-            </div>
-
-            <span>
-                {{ audit.page_obj.number }}
-                /
-                {{ audit.page_obj.paginator.num_pages }}
-                ページ
-            </span>
-
-        </div>
-
-
-        <!-- PC：テーブル -->
-        <div
-            class="a05-table-scroll"
-            role="region"
-            aria-label="操作履歴の一覧表"
-            tabindex="0"
-        >
-
-            <table class="a05-table">
-
-                <thead>
-                    <tr>
-                        <th scope="col">操作日時</th>
-                        <th scope="col">操作種別</th>
-                        <th scope="col">実行者</th>
-                        <th scope="col">対象社員</th>
-                        <th scope="col">理由</th>
-                        <th scope="col">詳細</th>
-                    </tr>
-                </thead>
-
-                <tbody>
-
-                    {% for row in audit.rows %}
-
-                    <tr>
-
-                        <td>
-                            <time
-                                datetime="{{ row.occurred_at|date:'c' }}"
-                            >
-                                {{ row.occurred_at|date:"Y/m/d H:i:s" }}
-                            </time>
-                        </td>
-
-                        <td>
-                            <strong>
-                                {{ row.action_label }}
-                            </strong>
-                        </td>
-
-                        <td>
-                            {{ row.actor_name }}<br><small>{{ row.actor_number }}</small>
-                        </td>
-
-                        <td>
-                            {{ row.target_name }}<br><small>{{ row.target_number }}</small>
-                        </td>
-
-                        <td>
-                            {{ row.reason|default:"—"|truncatechars:80 }}
-                        </td>
-
-                        <td>
-                            {% if row.detail_url %}
-
-                            <a
-                                class="a05-detail-link"
-                                href="{{ row.detail_url }}"
-                            >
-                                詳細
-                                <i
-                                    class="fa-solid fa-chevron-right"
-                                    aria-hidden="true"
-                                ></i>
-                            </a>
-
-                            {% else %}
-                                —
-                            {% endif %}
-                        </td>
-
-                    </tr>
-
-                    {% empty %}
-
-                    <tr>
-                        <td
-                            colspan="6"
-                            class="a05-empty-cell"
-                        >
-                            条件に一致する操作履歴がありません。
-                        </td>
-                    </tr>
-
-                    {% endfor %}
-
-                </tbody>
-
-            </table>
-
-        </div>
-
-
-        <!-- スマートフォン：カード -->
-        <div class="a05-mobile-list">
-
-            {% for row in audit.rows %}
-
-            <article class="a05-log-card">
-
-                <div class="a05-log-card__heading">
-
-                    <h3>
-                        {{ row.action_label }}
-                    </h3>
-
-                    <time
-                        datetime="{{ row.occurred_at|date:'c' }}"
-                    >
-                        {{ row.occurred_at|date:"Y/m/d H:i:s" }}
-                    </time>
-
-                </div>
-
-                <dl class="a05-data-list">
-
-                    <div>
-                        <dt>実行者</dt>
-                        <dd>{{ row.actor_number }}</dd>
-                    </div>
-
-                    <div>
-                        <dt>対象社員</dt>
-                        <dd>{{ row.target_number }}</dd>
-                    </div>
-
-                    <div>
-                        <dt>理由</dt>
-                        <dd>
-                            {{ row.reason|default:"—"|truncatechars:80 }}
-                        </dd>
-                    </div>
-
+    <section class="a05-table-scroll" aria-labelledby="a05-list-title">
+        <h2 class="visually-hidden" id="a05-list-title">操作履歴一覧（{{ audit.total_count }}件）</h2>
+        <p class="small muted">検索結果：{{ audit.total_count }}件（閲覧専用）</p>
+        {% for row in audit.rows %}
+        <details class="card audit-card" {% if audit.selected_log and audit.selected_log.pk == row.id %}open id="audit-selected"{% endif %}>
+            <summary>
+                <time class="audit-card__time" datetime="{{ row.occurred_at|date:'c' }}">{{ row.occurred_at|date:"n月j日 H:i" }}</time>
+                <dl class="audit-card__meta">
+                    <div><dt>実行者</dt><dd>{{ row.actor_name }}</dd></div>
+                    <div><dt>対象</dt><dd>{{ row.target_name }}</dd></div>
+                    <div><dt>操作</dt><dd>{{ row.action_label }}</dd></div>
                 </dl>
+            </summary>
+            <div class="audit-card__body">
+                <dl class="kv-table">
+                    <dt>変更前</dt>
+                    <dd>{% with items=row.before_data|audit_rows %}{% for label, value in items %}{{ label }}：{{ value }}{% if not forloop.last %}／{% endif %}{% empty %}—{% endfor %}{% endwith %}</dd>
+                    <dt>変更後</dt>
+                    <dd>{% with items=row.after_data|audit_rows %}{% for label, value in items %}{{ label }}：{{ value }}{% if not forloop.last %}／{% endif %}{% empty %}—{% endfor %}{% endwith %}</dd>
+                    <dt>理由</dt>
+                    <dd>{{ row.reason|default:"—" }}</dd>
+                </dl>
+                <p class="text-right"><a class="chev-link" href="{{ row.full_detail_url }}"><span>操作履歴詳細を開く</span> <i class="fa-solid fa-chevron-right" aria-hidden="true"></i></a></p>
+            </div>
+        </details>
+        {% empty %}
+        <p class="card text-center muted">条件に一致する操作履歴がありません。</p>
+        {% endfor %}
 
-                {% if row.detail_url %}
-
-                <a
-                    class="a05-detail-link"
-                    href="{{ row.detail_url }}"
-                >
-                    操作の詳細を見る
-                </a>
-
-                {% endif %}
-
-            </article>
-
-            {% empty %}
-
-            <p class="a05-empty">
-                条件に一致する操作履歴がありません。
-            </p>
-
-            {% endfor %}
-
-        </div>
-
-
-        <!-- ページ切替 -->
-        <nav
-            class="a05-pagination"
-            aria-label="操作履歴のページ切替"
-        >
-
-            {% if audit.page_obj.has_previous %}
-
-            <a href="?{{ audit.previous_query }}">
-                <i
-                    class="fa-solid fa-chevron-left"
-                    aria-hidden="true"
-                ></i>
-                前へ
-            </a>
-
-            {% endif %}
-
-            <span aria-current="page">
-                {{ audit.page_obj.number }}
-                /
-                {{ audit.page_obj.paginator.num_pages }}
-            </span>
-
-            {% if audit.page_obj.has_next %}
-
-            <a href="?{{ audit.next_query }}">
-                次へ
-                <i
-                    class="fa-solid fa-chevron-right"
-                    aria-hidden="true"
-                ></i>
-            </a>
-
-            {% endif %}
-
+        <nav class="pagination" aria-label="操作履歴のページ切替">
+            {% if audit.page_obj.has_previous %}<a href="?{{ audit.previous_query }}"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i> 前へ</a>{% endif %}
+            <span aria-current="page">{{ audit.page_obj.number }} / {{ audit.page_obj.paginator.num_pages }}</span>
+            {% if audit.page_obj.has_next %}<a href="?{{ audit.next_query }}">次へ <i class="fa-solid fa-chevron-right" aria-hidden="true"></i></a>{% endif %}
         </nav>
-
     </section>
-
-
-    {% if audit.selected_log %}
-    <section class="a05-panel reference-audit-selected" id="audit-selected" aria-labelledby="audit-selected-title">
-      <h2 id="audit-selected-title" class="reference-section-bar"><i class="fa-solid fa-arrow-down" aria-hidden="true"></i> 選択した操作の詳細</h2>
-      <dl class="v2-data-list"><div><dt>操作日時</dt><dd>{{ audit.selected_log.occurred_at|date:"Y/m/d H:i" }}</dd></div><div><dt>操作</dt><dd>{{ audit.selected_log.get_action_display }}</dd></div><div><dt>実行者</dt><dd>{{ audit.selected_log.actor.display_name|default:"システム" }}（{{ audit.selected_log.actor.employee_number|default:"—" }}）</dd></div><div><dt>対象・ID</dt><dd>{{ audit.selected_log.target_model }}・{{ audit.selected_log.target_id }}</dd></div><div><dt>理由</dt><dd>{{ audit.selected_log.reason|default:"—" }}</dd></div></dl>
-      <details><summary>変更前後・補足情報を確認</summary><h3>変更前</h3><pre class="admin-audit-data">{{ audit.selected_log.before_data }}</pre><h3>変更後</h3><pre class="admin-audit-data">{{ audit.selected_log.after_data }}</pre><h3>補足情報</h3><pre class="admin-audit-data">{{ audit.selected_log.details }}</pre></details>
-      <p><a href="{% url 'management:audit_detail' audit.selected_log.pk %}">操作履歴詳細を開く <span aria-hidden="true">›</span></a></p>
-    </section>
-    {% endif %}
-    <!-- 注意事項 -->
-    <aside
-        class="a05-information"
-        aria-label="監査ログの取り扱い"
-    >
-
-        <i
-            class="fa-solid fa-circle-info"
-            aria-hidden="true"
-        ></i>
-
-        <p>
-            操作履歴は閲覧専用です。
-            変更前後の情報は、閲覧権限のある管理者が
-            詳細画面で確認します。
-        </p>
-
-    </aside>
-
 </div>
-
 {% else %}
-
-<div role="alert">
-    操作履歴を表示する権限がありません。
-</div>
-
+<div class="notice-box notice-box--error" role="alert"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i><p>操作履歴を表示する権限がありません。</p></div>
 {% endif %}
-
 {% endblock %}

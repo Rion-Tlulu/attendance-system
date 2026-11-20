@@ -1,21 +1,91 @@
 {% extends "base.html" %}
-{% load static %}
-{% block title %}修正申請の管理 | 勤怠管理{% endblock %}
-{% block screen_label %}管理者｜修正申請{% endblock %}
-{% block extra_css %}<link rel="stylesheet" href="{% static 'css/manager-pages.css' %}">{% endblock %}
+{% block title %}申請一覧 | 勤怠管理{% endblock %}
+
 {% block content %}
-<div class="admin-page">
-  <header class="admin-heading"><h1>申請一覧（審査）</h1></header>
-  <form method="get" class="admin-search reference-filter-bar">
-    <div><label for="review-status">申請状態</label><select id="review-status" name="status"><option value="all" {% if status_filter == 'all' %}selected{% endif %}>すべて</option><option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>審査中</option><option value="approved" {% if status_filter == 'approved' %}selected{% endif %}>承認済み</option><option value="returned" {% if status_filter == 'returned' %}selected{% endif %}>差戻し</option><option value="withdrawn" {% if status_filter == 'withdrawn' %}selected{% endif %}>取下げ済み</option></select></div>
-    <div><label for="review-kind">申請区分</label><select id="review-kind" name="kind"><option value="all" {% if kind_filter == 'all' %}selected{% endif %}>通常・代理すべて</option><option value="normal" {% if kind_filter == 'normal' %}selected{% endif %}>通常</option><option value="proxy" {% if kind_filter == 'proxy' %}selected{% endif %}>代理</option></select></div>
-    <div><label for="review-query">社員番号・氏名</label><input id="review-query" name="q" value="{{ keyword }}" maxlength="100"></div><button type="submit" class="ui-button ui-button--primary"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i> 検索</button>
-  </form>
-  <div class="reference-review-grid">
-    <section class="v2-panel"><h2>申請一覧（{{ page_obj.paginator.count }}件）</h2><div class="reference-request-list">
-      {% for item in page_obj %}<a class="reference-request" href="?{{ filter_query }}&amp;page={{ page_obj.number }}&amp;selected={{ item.pk }}" {% if item.pk == correction.pk %}aria-current="true"{% endif %}><strong><i class="fa-regular fa-file-lines" aria-hidden="true"></i> 申請 #R-{{ item.pk }}</strong><span>{{ item.employee.display_name }}（{{ item.employee.employee_number }}）</span><span>{{ item.work_date|date:"Y年n月j日" }}</span><small>{% if item.is_proxy %}代理{% else %}通常{% endif %}｜{{ item.get_status_display }}</small></a>{% empty %}<p>該当する申請はありません。</p>{% endfor %}
-    </div><nav class="admin-pagination" aria-label="申請のページ切替">{% if page_obj.has_previous %}<a href="?{{ filter_query }}&amp;page={{ page_obj.previous_page_number }}">前へ</a>{% endif %}<span>{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>{% if page_obj.has_next %}<a href="?{{ filter_query }}&amp;page={{ page_obj.next_page_number }}">次へ</a>{% endif %}</nav></section>
-    {% if correction %}{% include "components/correction_review_card.html" %}{% else %}<section class="v2-panel"><h2>申請の詳細</h2><p>検索条件に合う申請はありません。</p></section>{% endif %}
-  </div>
+<div class="page">
+    <header class="page-head"><h1>申請一覧</h1></header>
+
+    <section class="card search-card" aria-label="申請の絞り込み">
+        <form method="get" class="search-grid" role="search">
+            <div class="field">
+                <label for="review-status">申請状態</label>
+                <select id="review-status" name="status">
+                    <option value="all" {% if status_filter == 'all' %}selected{% endif %}>すべて</option>
+                    <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>審査中</option>
+                    <option value="approved" {% if status_filter == 'approved' %}selected{% endif %}>承認済み</option>
+                    <option value="returned" {% if status_filter == 'returned' %}selected{% endif %}>差戻し</option>
+                    <option value="withdrawn" {% if status_filter == 'withdrawn' %}selected{% endif %}>取下げ済み</option>
+                </select>
+            </div>
+            <div class="field">
+                <label for="review-kind">申請種別</label>
+                <select id="review-kind" name="kind">
+                    <option value="all" {% if kind_filter == 'all' %}selected{% endif %}>すべて</option>
+                    <option value="normal" {% if kind_filter == 'normal' %}selected{% endif %}>通常</option>
+                    <option value="proxy" {% if kind_filter == 'proxy' %}selected{% endif %}>代理</option>
+                </select>
+            </div>
+            <div class="field">
+                <label for="review-query">社員番号・氏名</label>
+                <input id="review-query" type="search" name="q" value="{{ keyword }}" maxlength="100">
+            </div>
+            <button type="submit" class="btn btn--cream"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i> 検索</button>
+        </form>
+    </section>
+
+    <section class="card" aria-label="申請一覧（{{ page_obj.paginator.count }}件）">
+        <div class="table-wrap desktop-only" role="region" aria-label="申請の一覧表" tabindex="0">
+            <table class="data-table">
+                <caption class="visually-hidden">申請一覧（{{ page_obj.paginator.count }}件）</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">対象社員</th>
+                        <th scope="col">勤務日</th>
+                        <th scope="col">申請者</th>
+                        <th scope="col">種別</th>
+                        <th scope="col">状態</th>
+                        <th scope="col"><span class="visually-hidden">操作</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in page_obj %}
+                    <tr>
+                        <th scope="row">{{ item.employee.display_name }}<span class="cell-sub">{{ item.employee.employee_number }}</span></th>
+                        <td>{{ item.work_date|date:"n月j日" }}</td>
+                        <td>{{ item.requested_by.display_name }}</td>
+                        <td>{% if item.is_proxy %}代理{% else %}通常{% endif %}</td>
+                        <td><span class="badge badge--sm{% if item.status == 'pending' %} badge--yellow{% elif item.status != 'approved' %} badge--gray{% endif %}">{{ item.get_status_display }}</span></td>
+                        <td><a class="text-link" href="{% url 'management:correction_detail' item.pk %}" aria-label="{{ item.employee.display_name }} {{ item.work_date|date:'n月j日' }}の申請 #R-{{ item.pk }} の詳細">詳細</a></td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="6" class="empty-cell">該当する申請はありません。</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="mobile-cards">
+            {% for item in page_obj %}
+            <article class="record-card">
+                <dl class="record-list">
+                    <dt>対象社員</dt><dd>{{ item.employee.display_name }}</dd>
+                    <dt>勤務日</dt><dd>{{ item.work_date|date:"n月j日" }}</dd>
+                    <dt>申請者</dt><dd>{{ item.requested_by.display_name }}</dd>
+                    <dt>種別</dt><dd>{% if item.is_proxy %}代理{% else %}通常{% endif %}</dd>
+                    <dt>状態</dt><dd><span class="badge badge--sm{% if item.status == 'pending' %} badge--yellow{% elif item.status != 'approved' %} badge--gray{% endif %}">{{ item.get_status_display }}</span></dd>
+                </dl>
+                <div class="record-card__actions"><a class="btn btn--outline btn--block" href="{% url 'management:correction_detail' item.pk %}" aria-label="{{ item.employee.display_name }} {{ item.work_date|date:'n月j日' }}の申請の詳細">詳細</a></div>
+            </article>
+            {% empty %}
+            <p class="muted">該当する申請はありません。</p>
+            {% endfor %}
+        </div>
+
+        <nav class="pagination" aria-label="申請のページ切替">
+            {% if page_obj.has_previous %}<a href="?{{ filter_query }}&amp;page={{ page_obj.previous_page_number }}">前へ</a>{% endif %}
+            <span>{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+            {% if page_obj.has_next %}<a href="?{{ filter_query }}&amp;page={{ page_obj.next_page_number }}">次へ</a>{% endif %}
+        </nav>
+    </section>
 </div>
 {% endblock %}

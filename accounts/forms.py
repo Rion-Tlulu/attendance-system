@@ -23,7 +23,7 @@ class EmployeeAuthenticationForm(AuthenticationForm):
             attrs={
                 "autocomplete": "username",
                 "inputmode": "text",
-                "placeholder": "例：00124",
+                "aria-describedby": "username-help",
                 "autofocus": True,
             }
         ),
@@ -35,7 +35,6 @@ class EmployeeAuthenticationForm(AuthenticationForm):
         widget=forms.PasswordInput(
             attrs={
                 "autocomplete": "current-password",
-                "placeholder": "パスワードを入力",
             }
         ),
     )

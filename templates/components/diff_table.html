@@ -1,0 +1,46 @@
+{% load attendance_ui %}
+{% comment %}
+修正前後の比較表（修正申請の確認・申請の審査で共通）。
+day: 勤務日（同じ日付なら時刻だけを表示）
+before_in / after_in / before_out / after_out: 表示用の日時文字列
+break_rows: break_pairs / raw_break_pairs フィルターの結果
+{% endcomment %}
+<div class="diff-table" role="table" aria-label="{{ before_label }}と{{ after_label }}の比較">
+    <div class="diff-table__head" role="row">
+        <span role="columnheader">項目</span>
+        <span role="columnheader">{{ before_label }}</span>
+        <span aria-hidden="true"></span>
+        <span role="columnheader">{{ after_label }}</span>
+    </div>
+
+    <div class="diff-table__row{% if before_in != after_in %} is-changed{% endif %}" role="row">
+        <span class="diff-table__item" role="rowheader">出勤{% if before_in != after_in %} <span class="badge badge--sm badge--solid">変更</span>{% endif %}</span>
+        <span class="diff-table__before" role="cell"><span class="diff-table__cell-label">変更前</span>{{ before_in|short_dt:day }}</span>
+        <span class="diff-table__arrow" aria-hidden="true"><i class="fa-solid fa-arrow-right"></i></span>
+        <span class="diff-table__after" role="cell"><span class="diff-table__cell-label">変更後</span>{% if before_in != after_in %}{{ after_in|short_dt:day }}{% else %}<span class="diff-table__same">変更なし</span>{% endif %}</span>
+    </div>
+
+    <div class="diff-table__row{% if before_out != after_out %} is-changed{% endif %}" role="row">
+        <span class="diff-table__item" role="rowheader">退勤{% if before_out != after_out %} <span class="badge badge--sm badge--solid">変更</span>{% endif %}</span>
+        <span class="diff-table__before" role="cell"><span class="diff-table__cell-label">変更前</span>{{ before_out|short_dt:day }}</span>
+        <span class="diff-table__arrow" aria-hidden="true"><i class="fa-solid fa-arrow-right"></i></span>
+        <span class="diff-table__after" role="cell"><span class="diff-table__cell-label">変更後</span>{% if before_out != after_out %}{{ after_out|short_dt:day }}{% else %}<span class="diff-table__same">変更なし</span>{% endif %}</span>
+    </div>
+
+    {% for row in break_rows %}
+    <div class="diff-table__row{% if row.changed %} is-changed{% endif %}" role="row">
+        <span class="diff-table__item" role="rowheader">休憩{{ row.number }}{% if row.changed %} <span class="badge badge--sm badge--solid">{% if not row.before %}追加{% elif not row.after %}取消{% else %}変更{% endif %}</span>{% endif %}</span>
+        <span class="diff-table__before" role="cell"><span class="diff-table__cell-label">変更前</span>{% if row.before %}{{ row.before.start|short_dt:day }} 〜 {{ row.before.end|short_dt:day }}{% else %}<span class="diff-table__same">なし</span>{% endif %}</span>
+        <span class="diff-table__arrow" aria-hidden="true"><i class="fa-solid fa-arrow-right"></i></span>
+        <span class="diff-table__after" role="cell"><span class="diff-table__cell-label">変更後</span>{% if not row.changed %}<span class="diff-table__same">変更なし</span>{% elif row.after %}{{ row.after.start|short_dt:day }} 〜 {{ row.after.end|short_dt:day }}{% else %}取消{% endif %}</span>
+    </div>
+    {% empty %}
+    <div class="diff-table__row" role="row">
+        <span class="diff-table__item" role="rowheader">休憩</span>
+        <span class="diff-table__before" role="cell"><span class="diff-table__cell-label">変更前</span><span class="diff-table__same">なし</span></span>
+        <span class="diff-table__arrow" aria-hidden="true"><i class="fa-solid fa-arrow-right"></i></span>
+        <span class="diff-table__after" role="cell"><span class="diff-table__cell-label">変更後</span><span class="diff-table__same">変更なし</span></span>
+    </div>
+    {% endfor %}
+</div>
+<p class="small muted diff-table__note">時刻は勤務日（{{ day|date:"n月j日" }}）のものです。別の日付になる場合は日付も表示しています。</p>

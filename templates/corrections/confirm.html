@@ -1,21 +1,42 @@
 {% extends "base.html" %}
-{% load static %}
-{% block title %}修正申請の内容確認 | 勤怠管理{% endblock %}
-{% block screen_label %}社員画面｜修正申請{% endblock %}
-{% block extra_css %}<link rel="stylesheet" href="{% static 'css/daily-record-correction.css' %}">{% endblock %}
+{% load attendance_ui %}
+{% block title %}修正申請の確認（申請内容の確認） | 勤怠管理{% endblock %}
+
 {% block content %}
-<div class="v2-page e03-page">
-  <header class="e03-heading"><div><h1>申請内容の確認</h1><p class="e03-date">{{ work_day|date:"Y年n月j日（D）" }}</p>{% if target_day != work_day %}<p>移動先の勤務日：{{ target_day|date:"Y年n月j日（D）" }}</p>{% endif %}</div></header>
-  <ol class="e03-steps" aria-label="修正申請の進行状況"><li>1. 入力</li><li aria-current="step">2. 内容確認</li><li>3. 提出完了</li></ol>
-  <section class="e03-card"><h2>確認ステップ：変更前 → 変更後</h2>
-    <div class="reference-comparison"><table><thead><tr><th scope="col">項目</th><th scope="col">修正前の有効値</th><th scope="col">変更後（申請内容）</th></tr></thead><tbody>
-      <tr><th scope="row">出勤</th><td>{{ current_display.clock_in }}</td><td>{{ proposal_display.clock_in }}</td></tr>
-      <tr><th scope="row">退勤</th><td>{{ current_display.clock_out }}</td><td>{{ proposal_display.clock_out }}</td></tr>
-      <tr><th scope="row">休憩</th><td>{% for rest in current_display.breaks %}<p>{{ rest.start }} 〜 {{ rest.end }}</p>{% empty %}休憩の設定はありません。{% endfor %}</td><td>{% for rest in proposal_display.breaks %}<p>休憩 {{ rest.number }}：{{ rest.start }} 〜 {{ rest.end }}</p>{% empty %}休憩の設定はありません。{% endfor %}</td></tr>
-    </tbody></table></div>
-    <h3 class="spacing-top-16">修正理由</h3><p>{{ reason|linebreaksbr }}</p>
-    <p class="e03-notice"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> これは申請内容の確認です。まだ申請は完了していません。提出後は管理者の審査待ちになります。</p>
-    <form method="post" action="{% url 'corrections:create' work_day.year work_day.month work_day.day %}" class="e03-form-actions">{% csrf_token %}<input type="hidden" name="confirm_token" value="{{ confirm_token }}"><button type="submit" name="back" value="1" class="v2-button v2-button--outline"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> 入力へ戻る</button><button type="submit" class="v2-button"><i class="fa-solid fa-paper-plane" aria-hidden="true"></i> この内容で申請する</button></form>
-  </section>
+<div class="page">
+    <header class="page-head"><h1>修正申請の確認</h1></header>
+
+    <section class="card" aria-label="申請内容の確認">
+        <div class="confirm-head">
+            <div>
+                <span class="confirm-head__label">勤務日</span>
+                <span class="confirm-head__value">{{ work_day|date:"Y年n月j日（D）" }}</span>
+            </div>
+            {% if target_day != work_day %}
+            <div>
+                <span class="confirm-head__label">移動先の勤務日</span>
+                <span class="confirm-head__value">{{ target_day|date:"Y年n月j日（D）" }}</span>
+            </div>
+            {% endif %}
+        </div>
+
+        <h2 class="section-bar">変更内容</h2>
+        {% include "components/diff_table.html" with day=work_day before_in=current_display.clock_in after_in=proposal_display.clock_in before_out=current_display.clock_out after_out=proposal_display.clock_out break_rows=current_display.breaks|break_pairs:proposal_display.breaks before_label="修正前の有効値" after_label="修正後（申請内容）" %}
+
+        <h2 class="section-bar">修正理由</h2>
+        <p class="reason-box">{{ reason|linebreaksbr }}</p>
+
+        <div class="notice-box notice-box--plain" role="note">
+            <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+            <p>まだ申請は完了していません。「申請する」を押すと、管理者の審査待ちになります。承認されるまで現在の値は変わりません。</p>
+        </div>
+
+        <form method="post" action="{% url 'corrections:create' work_day.year work_day.month work_day.day %}" class="btn-row btn-row--split">
+            {% csrf_token %}
+            <input type="hidden" name="confirm_token" value="{{ confirm_token }}">
+            <button type="submit" name="back" value="1" class="btn btn--md btn--outline">入力に戻る</button>
+            <button type="submit" class="btn btn--md">申請する</button>
+        </form>
+    </section>
 </div>
 {% endblock %}

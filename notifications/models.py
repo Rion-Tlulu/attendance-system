@@ -181,5 +181,29 @@ class Notification(models.Model):
     def kind_label(self):
         return self.KIND_LABELS.get(self.kind, "お知らせ")
 
+    # 移動先の画面名（通知パネル・一覧のリンク文言）。
+    TARGET_LABELS = {
+        "attendance:daily": "日別詳細へ",
+        "attendance:monthly": "自分の勤怠へ",
+        "attendance:home": "打刻ホームへ",
+        "corrections:detail": "申請詳細へ",
+        "corrections:list": "申請履歴へ",
+        "management:corrections": "申請一覧へ",
+        "management:correction_detail": "申請詳細へ",
+        "management:employee_month": "月次詳細へ",
+        "management:attendance_list": "勤怠一覧へ",
+    }
+
+    @property
+    def target_label(self):
+        from django.urls import Resolver404, resolve
+        from urllib.parse import urlsplit
+
+        try:
+            view_name = resolve(urlsplit(self.target_path or "").path).view_name
+        except Resolver404:
+            return "対象画面へ"
+        return self.TARGET_LABELS.get(view_name, "対象画面へ")
+
     def __str__(self):
         return self.title

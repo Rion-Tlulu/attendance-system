@@ -1,51 +1,62 @@
-/* ---- static/js/auth.js ---- */
 "use strict";
 
+/* ==============================================
+   スマートフォン：ヘッダーの「メニュー」で同じ階層を開く
+============================================== */
 document.addEventListener("DOMContentLoaded", () => {
-  document.querySelectorAll('[role="tablist"]').forEach((list) => {
-    const tabs = [...list.querySelectorAll("[data-reference-tab]")];
-    function select(tab) {
-      tabs.forEach((item) => {
-        const selected = item === tab;
-        item.setAttribute("aria-selected", String(selected));
-        item.tabIndex = selected ? 0 : -1;
-        const panel = document.getElementById(item.getAttribute("aria-controls"));
-        if (panel) panel.hidden = !selected;
-      });
-    }
-    tabs.forEach((tab, index) => {
-      tab.addEventListener("click", () => select(tab));
-      tab.addEventListener("keydown", (event) => {
-        let next;
-        if (event.key === "ArrowRight") next = (index + 1) % tabs.length;
-        else if (event.key === "ArrowLeft") next = (index + tabs.length - 1) % tabs.length;
-        else if (event.key === "Home") next = 0;
-        else if (event.key === "End") next = tabs.length - 1;
-        else return;
-        event.preventDefault(); select(tabs[next]); tabs[next].focus();
-      });
-    });
+  const toggle = document.querySelector(".app-menu-toggle");
+  const side = document.getElementById("app-side");
+  const backdrop = document.querySelector(".app-side-backdrop");
+  if (!toggle || !side) return;
+  const mobile = window.matchMedia("(max-width: 860px)");
+  const background = [...document.querySelectorAll(".app-content, .app-topbar")];
+
+  function setInert(value) {
+    background.forEach((node) => { node.inert = value; });
+  }
+
+  function close(returnFocus = true) {
+    if (!side.classList.contains("is-open")) return;
+    side.classList.remove("is-open");
+    if (backdrop) backdrop.hidden = true;
+    toggle.setAttribute("aria-expanded", "false");
+    document.body.classList.remove("menu-is-open");
+    setInert(false);
+    if (returnFocus) toggle.focus();
+  }
+
+  function open() {
+    side.classList.add("is-open");
+    if (backdrop) backdrop.hidden = false;
+    toggle.setAttribute("aria-expanded", "true");
+    document.body.classList.add("menu-is-open");
+    setInert(true);
+    (side.querySelector("[aria-current='page']") || side.querySelector("summary, a"))?.focus();
+  }
+
+  toggle.addEventListener("click", () => {
+    if (side.classList.contains("is-open")) close();
+    else open();
   });
-  const form = document.getElementById("reference-role-form");
-  if (!form) return;
-  const preview = document.querySelector("[data-role-preview]");
-  const submit = document.querySelector("[data-role-submit]");
-  const result = document.querySelector("[data-role-result]");
-  const status = document.querySelector("[data-role-preview-status]");
-  preview?.addEventListener("click", () => {
-    if (!form.reportValidity()) return;
-    const granting = new FormData(form).get("desired_role") === "admin";
-    result.textContent = granting ? "管理権限を付与する" : "管理権限を取り消す";
-    submit.textContent = result.textContent;
-    submit.hidden = false;
-    status.textContent = "対象社員と変更理由を確認してから確定してください。";
-    submit.focus();
+  document.querySelectorAll("[data-side-close]").forEach((node) => node.addEventListener("click", () => close()));
+  side.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") { close(); return; }
+    if (event.key !== "Tab" || !side.classList.contains("is-open")) return;
+    const nodes = [...side.querySelectorAll("button, summary, a[href]")].filter((node) => node.offsetParent !== null);
+    if (!nodes.length) return;
+    const first = nodes[0];
+    const last = nodes[nodes.length - 1];
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
   });
-  form.addEventListener("input", () => {
-    submit.hidden = true; status.textContent = "入力が変わりました。変更内容を再確認してください。";
-  });
+  mobile.addEventListener("change", () => close(false));
+  // 通知パネルを開く前にメニューを閉じ、同時に二つのパネルを操作対象にしない。
+  document.addEventListener("app:close-menu", () => close(false));
 });
 
+/* ==============================================
+   入力エラーの要約（エラー項目へのリンク）
+============================================== */
 document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll("form").forEach((form) => {
     const errors = [...form.querySelectorAll("ul.errorlist")];
@@ -62,12 +73,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const message = error.textContent.trim();
       if (!message) return;
       error.id ||= `form-error-${index}-${Math.random().toString(36).slice(2, 8)}`;
-      const wrapper = error.closest(
-        ".admin-field, .v2-field, .field, .form-group, fieldset"
-      ) || error.parentElement;
-      const field = wrapper.querySelector(
-        "input:not([type=hidden]), select, textarea"
-      );
+      const wrapper = error.closest(".field, .form-row, .break-form, fieldset") || error.parentElement;
+      const field = wrapper.querySelector("input:not([type=hidden]), select, textarea");
       const item = document.createElement("li");
       if (field && field.form === form) {
         field.id ||= `form-field-${index}-${Math.random().toString(36).slice(2, 8)}`;
@@ -89,53 +96,16 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
+/* ==============================================
+   パスワードの「表示する／隠す」
+============================================== */
 document.addEventListener("DOMContentLoaded", () => {
-  const menu = document.querySelector(".mobile-more");
-  if (!menu) return;
-  const headerButton = document.querySelector(".app-menu-toggle");
-  const summary = menu.querySelector("summary");
-  let origin = summary;
-  summary?.addEventListener("click", () => { origin = summary; });
-  headerButton?.addEventListener("click", () => {
-    origin = headerButton;
-    menu.open = !menu.open;
-    if (menu.open) menu.querySelector(".mobile-more-panel button, .mobile-more-panel a")?.focus();
-  });
-  menu.addEventListener("toggle", () => {
-    headerButton?.setAttribute("aria-expanded", String(menu.open));
-  });
-  menu.addEventListener("keydown", (event) => {
-    if (event.key !== "Escape" || !menu.open) return;
-    menu.open = false;
-    origin?.focus();
-  });
-  menu.querySelectorAll("[data-mobile-section]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const section = document.getElementById(button.getAttribute("aria-controls"));
-      if (!section) return;
-      section.hidden = !section.hidden;
-      button.setAttribute("aria-expanded", String(!section.hidden));
-    });
-  });
-});
-
-document.addEventListener("DOMContentLoaded", () => {
-  const toggleButtons = document.querySelectorAll("[data-toggle-password]");
-
-  toggleButtons.forEach((button) => {
-    const inputId = button.dataset.togglePassword;
-    const input = document.getElementById(inputId);
-
-    if (!input) {
-      return;
-    }
-
+  document.querySelectorAll("[data-toggle-password]").forEach((button) => {
+    const input = document.getElementById(button.dataset.togglePassword);
+    if (!input) return;
     button.addEventListener("click", () => {
       const isVisible = input.type === "text";
-
       input.type = isVisible ? "password" : "text";
-
-      // 画面設計（C01・C02）に合わせ「表示する／隠す」とし、目のアイコンを保持する。
       const icon = button.querySelector("i");
       button.textContent = "";
       if (icon) {
@@ -143,41 +113,66 @@ document.addEventListener("DOMContentLoaded", () => {
         button.append(icon, " ");
       }
       button.append(isVisible ? "表示する" : "隠す");
-
       button.setAttribute("aria-pressed", String(!isVisible));
+    });
+  });
+
+  // 初回変更画面のチェックボックス型「表示する」
+  document.querySelectorAll("[data-show-password]").forEach((checkbox) => {
+    const input = document.getElementById(checkbox.dataset.showPassword);
+    if (!input) return;
+    checkbox.addEventListener("change", () => {
+      input.type = checkbox.checked ? "text" : "password";
     });
   });
 });
 
-/* ---- static/js/clock.js ---- */
-("use strict");
-
+/* ==============================================
+   E06 業務管理者の権限管理：変更内容の確認
+============================================== */
 document.addEventListener("DOMContentLoaded", () => {
-  // 日付と時刻は表示用。打刻時刻はDjangoサーバーで決定する。
-  const dateElement = document.getElementById("current-date");
-  const clockElement = document.getElementById("current-clock");
-  const dateFormatter = new Intl.DateTimeFormat("ja-JP", {
-    timeZone: "Asia/Tokyo",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    weekday: "short",
+  const form = document.getElementById("reference-role-form");
+  if (!form) return;
+  const preview = document.querySelector("[data-role-preview]");
+  const submit = document.querySelector("[data-role-submit]");
+  const result = document.querySelector("[data-role-result]");
+  const status = document.querySelector("[data-role-preview-status]");
+  preview?.addEventListener("click", () => {
+    if (!form.reportValidity()) return;
+    const granting = new FormData(form).get("desired_role") === "admin";
+    if (result) result.textContent = granting ? `${result.dataset.current} → 業務管理者` : `${result.dataset.current} → 一般社員`;
+    submit.textContent = granting ? "管理権限を付与する" : "管理権限を取り消す";
+    submit.hidden = false;
+    preview.hidden = true;
+    if (status) status.textContent = "対象社員と変更理由を確認してから確定してください。";
+    submit.focus();
   });
-  const timeFormatter = new Intl.DateTimeFormat("ja-JP", {
-    timeZone: "Asia/Tokyo",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
+  form.addEventListener("input", () => {
+    if (!submit) return;
+    submit.hidden = true;
+    if (preview) preview.hidden = false;
+    if (status) status.textContent = "入力が変わりました。変更内容を再確認してください。";
   });
+});
 
-  const renderClock = () => {
-    const now = new Date();
-    if (dateElement) dateElement.textContent = dateFormatter.format(now);
-    if (clockElement) clockElement.textContent = timeFormatter.format(now);
-  };
-  renderClock();
-  if (dateElement || clockElement) window.setInterval(renderClock, 1000);
+/* ==============================================
+   E01 打刻：時計表示と二重送信防止
+============================================== */
+document.addEventListener("DOMContentLoaded", () => {
+  const element = document.getElementById("e01-current-time");
+  if (element) {
+    const initialTime = Date.parse(element.dataset.serverTime);
+    if (Number.isFinite(initialTime)) {
+      const startedAt = performance.now();
+      const formatter = new Intl.DateTimeFormat("ja-JP", {
+        timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+      });
+      const update = () => { element.textContent = formatter.format(new Date(initialTime + performance.now() - startedAt)); };
+      update();
+      const interval = setInterval(update, 1000);
+      window.addEventListener("pagehide", () => clearInterval(interval), { once: true });
+    }
+  }
 
   let submitting = false;
   const forms = [...document.querySelectorAll(".clock-form")];
@@ -188,216 +183,73 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
       submitting = true;
-      // 同じページの他の打刻操作も押せないようにする。
       forms.forEach((otherForm) => {
         const button = otherForm.querySelector('button[type="submit"]');
         if (!button) return;
         button.disabled = true;
-        if (otherForm === form) {
-          button.textContent = "記録中…";
-        }
+        if (otherForm === form) button.textContent = "記録中…";
       });
     });
   });
 
   // ブラウザの戻る操作等で無効状態が残った際は画面を再取得する。
-  window.addEventListener("pageshow", (event) => {
-    if (event.persisted) window.location.reload();
-  });
+  if (forms.length) {
+    window.addEventListener("pageshow", (event) => {
+      if (event.persisted) window.location.reload();
+    });
+  }
 });
 
-/* ---- static/js/e01-clock-display.js ---- */
-("use strict");
-
-/**
- * E01 打刻ホーム
- * 表示用の日本時間時計
- *
- * サーバーから渡された表示時刻を基準にする。
- * 実際の打刻時刻はDjango側で決定する。
- */
-
-document.addEventListener("DOMContentLoaded", () => {
-  const element = document.getElementById("e01-current-time");
-
-  if (!element) {
-    return;
-  }
-
-  const rawTime = element.dataset.serverTime;
-  const initialTime = Date.parse(rawTime);
-
-  if (!Number.isFinite(initialTime)) {
-    return;
-  }
-
-  const startedAt = performance.now();
-
-  const formatter = new Intl.DateTimeFormat("ja-JP", {
-    timeZone: "Asia/Tokyo",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  });
-
-  const update = () => {
-    const elapsed = performance.now() - startedAt;
-
-    const current = new Date(initialTime + elapsed);
-
-    element.textContent = formatter.format(current);
-  };
-
-  update();
-
-  const interval = setInterval(update, 1000);
-
-  window.addEventListener(
-    "pagehide",
-    () => {
-      clearInterval(interval);
-    },
-    { once: true },
-  );
-});
-
-/* ---- static/js/e03-breaks.js ---- */
-("use strict");
-
+/* ==============================================
+   E03・代理申請：休憩の追加
+============================================== */
 document.addEventListener("DOMContentLoaded", () => {
   const addButton = document.querySelector("[data-e03-add-break]");
-
   const list = document.getElementById("e03-break-form-list");
-
   const template = document.getElementById("e03-empty-break-template");
-
   const totalForms = document.querySelector('input[name="breaks-TOTAL_FORMS"]');
-
   const maxForms = document.querySelector('input[name="breaks-MAX_NUM_FORMS"]');
-
-  if (!addButton || !list || !template || !totalForms) {
-    return;
-  }
+  if (!addButton || !list || !template || !totalForms) return;
 
   const configuredMax = Number.parseInt(maxForms?.value || "20", 10);
-
-  const maximum = Math.min(
-    Number.isFinite(configuredMax) ? configuredMax : 20,
-    20,
-  );
-
+  const maximum = Math.min(Number.isFinite(configuredMax) ? configuredMax : 20, 20);
   const updateButton = () => {
-    const total = Number.parseInt(totalForms.value, 10);
-
-    addButton.disabled = total >= maximum;
+    addButton.disabled = Number.parseInt(totalForms.value, 10) >= maximum;
   };
 
   addButton.addEventListener("click", () => {
     const current = Number.parseInt(totalForms.value, 10);
-
-    if (!Number.isFinite(current) || current >= maximum) {
-      return;
-    }
-
-    const html = template.innerHTML.replaceAll("__prefix__", String(current));
-
+    if (!Number.isFinite(current) || current >= maximum) return;
     const wrapper = document.createElement("div");
-    wrapper.innerHTML = html.trim();
-
+    wrapper.innerHTML = template.innerHTML.replaceAll("__prefix__", String(current)).trim();
     const newRow = wrapper.firstElementChild;
-
-    if (!newRow) {
-      return;
-    }
-
+    if (!newRow) return;
     const heading = newRow.querySelector("h3");
-
-    if (heading) {
-      heading.textContent = `休憩 ${current + 1}`;
-    }
-
+    if (heading) heading.textContent = `休憩 ${current + 1}`;
     list.appendChild(newRow);
     totalForms.value = String(current + 1);
-
     updateButton();
-
-    const firstInput = newRow.querySelector(
-      "input:not([type='hidden']):not([type='checkbox'])",
-    );
-
-    firstInput?.focus();
+    newRow.querySelector("input:not([type='hidden']):not([type='checkbox'])")?.focus();
   });
 
   updateButton();
 });
 
-/* ---- static/js/step4-password.js ---- */
-("use strict");
-
-/*
- * STEP 4
- * パスワード表示・非表示
- *
- * 既存の認証処理には関与しない。
- */
-
-document.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-v2-password-toggle]");
-
-  if (!button) {
-    return;
-  }
-
-  const targetId = button.getAttribute("aria-controls");
-
-  if (!targetId) {
-    return;
-  }
-
-  const field = document.getElementById(targetId);
-
-  if (!field || !["password", "text"].includes(field.type)) {
-    return;
-  }
-
-  const shouldShow = field.type === "password";
-
-  field.type = shouldShow ? "text" : "password";
-
-  button.setAttribute("aria-pressed", String(shouldShow));
-
-  const label = button.querySelector("[data-v2-password-label]");
-
-  if (label) {
-    label.textContent = shouldShow ? "非表示" : "表示";
-  }
-});
-
 /* ==============================================
-   F11_CHARTS_V14
-   E02 / A01 / A04 共通グラフ
+   F11 勤怠グラフ（E02 / A01 / A04 共通）
 ============================================== */
-
 (() => {
-  "use strict";
-
   function initF11Chart(root) {
-    const toggle = root.querySelector("[data-f11-toggle]");
-
+    const showButton = root.querySelector("[data-f11-show]");
+    const hideButton = root.querySelector("[data-f11-hide]");
     const table = root.querySelector("[data-f11-table]");
-
     const panel = root.querySelector("[data-f11-panel]");
-
     const canvas = root.querySelector("[data-f11-canvas]");
-
     const message = root.querySelector("[data-f11-message]");
-
+    const heading = panel?.querySelector("h2");
     const jsonElement = root.querySelector('script[type="application/json"]');
     const linkedTable = document.getElementById(root.dataset.f11LinkedTable || "");
-
-    if (!toggle || !table || !panel || !canvas || !message || !jsonElement) {
-      return;
-    }
+    if (!showButton || !panel || !canvas || !message || !jsonElement) return;
 
     let instance = null;
     let graphData = null;
@@ -412,113 +264,66 @@ document.addEventListener("click", (event) => {
       message.hidden = true;
     }
 
-    function displayTable() {
-      table.hidden = Boolean(linkedTable);
+    function displayTable(moveFocus = false) {
+      if (table && !linkedTable) table.hidden = false;
       if (linkedTable) linkedTable.hidden = false;
       panel.hidden = true;
-
-      toggle.textContent = "グラフを表示";
-      toggle.setAttribute("aria-expanded", "false");
+      showButton.hidden = false;
+      showButton.setAttribute("aria-expanded", "false");
+      if (moveFocus) showButton.focus();
     }
 
     function parseData() {
       try {
         const parsed = JSON.parse(jsonElement.textContent);
-
-        if (!parsed || !Array.isArray(parsed.rows)) {
-          return null;
-        }
-
-        const valid = parsed.rows.every(
-          (row) =>
-            row.value === null ||
-            (typeof row.value === "number" &&
-              Number.isFinite(row.value) &&
-              row.value >= 0),
-        );
-
+        if (!parsed || !Array.isArray(parsed.rows)) return null;
+        const valid = parsed.rows.every((row) => row.value === null
+          || (typeof row.value === "number" && Number.isFinite(row.value) && row.value >= 0));
         return valid ? parsed : null;
-      } catch (error) {
+      } catch (_error) {
         return null;
       }
     }
 
     function reducedMotion() {
-      return (
-        typeof window.matchMedia === "function" &&
-        window.matchMedia("(prefers-reduced-motion: reduce)").matches
-      );
+      return typeof window.matchMedia === "function"
+        && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     }
 
     function createChart(data) {
-      const color = "#1769c2";
-
       return new window.Chart(canvas, {
         type: "bar",
-
         data: {
           labels: data.rows.map((row) => row.label),
-
-          datasets: [
-            {
-              label: data.title,
-
-              data: data.rows.map((row) => row.value),
-
-              backgroundColor: color,
-              borderColor: "#124f91",
-              borderWidth: 1,
-              maxBarThickness: 26,
-            },
-          ],
+          datasets: [{
+            label: data.title,
+            data: data.rows.map((row) => row.value),
+            backgroundColor: "#1f5a3f",
+            borderColor: "#123f2b",
+            borderWidth: 1,
+            maxBarThickness: 22,
+          }],
         },
-
         options: {
           responsive: true,
           maintainAspectRatio: false,
-
-          animation: reducedMotion()
-            ? false
-            : {
-                duration: 250,
-              },
-
+          animation: reducedMotion() ? false : { duration: 250 },
           plugins: {
-            legend: {
-              display: false,
-            },
-
+            legend: { display: false },
             tooltip: {
               callbacks: {
                 label(context) {
                   const row = data.rows[context.dataIndex];
-
-                  if (!row) {
-                    return "";
-                  }
-
-                  return row.display;
+                  return row ? row.display : "";
                 },
               },
             },
           },
-
           scales: {
-            x: {
-              ticks: {
-                autoSkip: true,
-                maxTicksLimit: 11,
-              },
-            },
-
+            x: { grid: { display: false }, ticks: { autoSkip: true, maxTicksLimit: 8 } },
             y: {
               beginAtZero: true,
-
-              title: {
-                display: true,
-                text: data.unit,
-              },
-
+              grid: { color: "#e2e2dc" },
               ticks: data.kind === "incomplete_count" ? { precision: 0 } : {},
             },
           },
@@ -526,83 +331,47 @@ document.addEventListener("click", (event) => {
       });
     }
 
-    function displayGraph() {
+    function displayGraph(moveFocus = false) {
       clearNotice();
-
       if (typeof window.Chart !== "function") {
         displayTable();
-
-        notify(
-          "グラフを読み込めませんでした。" + "数値表は引き続き利用できます。",
-        );
-
+        notify("グラフを読み込めませんでした。数値表は引き続き利用できます。");
         return;
       }
-
-      if (graphData === null) {
-        graphData = parseData();
-      }
-
+      if (graphData === null) graphData = parseData();
       if (graphData === null) {
         displayTable();
-
-        notify(
-          "グラフ用データの読み込みに失敗しました。" +
-            "数値表をご確認ください。",
-        );
-
+        notify("グラフ用データの読み込みに失敗しました。数値表をご確認ください。");
         return;
       }
-
-      const hasValue = graphData.rows.some((row) => row.value !== null);
-
-      if (!hasValue) {
+      if (!graphData.rows.some((row) => row.value !== null)) {
         displayTable();
-
-        notify(
-          "対象期間にグラフで表示できる" +
-            "完了記録がありません。" +
-            "勤務状態は数値表で確認できます。",
-        );
-
+        notify("対象期間にグラフで表示できる完了記録がありません。勤務状態は数値表で確認できます。");
         return;
       }
-
       panel.hidden = false;
-
       try {
-        if (instance === null) {
-          instance = createChart(graphData);
-        } else {
-          instance.resize();
-        }
-
-        table.hidden = true;
+        if (instance === null) instance = createChart(graphData);
+        else instance.resize();
+        if (table) table.hidden = true;
         if (linkedTable) linkedTable.hidden = true;
-
-        toggle.textContent = "表を表示";
-        toggle.setAttribute("aria-expanded", "true");
-      } catch (error) {
+        showButton.hidden = true;
+        showButton.setAttribute("aria-expanded", "true");
+        if (moveFocus) heading?.focus();
+      } catch (_error) {
         if (instance !== null) {
           instance.destroy();
           instance = null;
         }
-
         displayTable();
-
-        notify(
-          "グラフの描画に失敗しました。" + "数値表は引き続き確認できます。",
-        );
+        notify("グラフの描画に失敗しました。数値表は引き続き確認できます。");
       }
     }
 
-    toggle.addEventListener("click", () => {
-      if (panel.hidden) {
-        displayGraph();
-      } else {
-        clearNotice();
-        displayTable();
-      }
+    showButton.addEventListener("click", () => displayGraph(true));
+    hideButton?.addEventListener("click", () => {
+      clearNotice();
+      displayTable(true);
     });
 
     if (root.dataset.f11Default === "graph") displayGraph();
@@ -619,3 +388,35 @@ document.addEventListener("click", (event) => {
     initialize();
   }
 })();
+
+/* ==============================================
+   ページ内リンクの移動先が閉じた details なら開く
+============================================== */
+(() => {
+  function openTarget(hash) {
+    if (!hash || hash.length < 2) return;
+    const target = document.getElementById(decodeURIComponent(hash.slice(1)));
+    const details = target?.closest("details");
+    if (details && !details.open) details.open = true;
+  }
+  document.addEventListener("click", (event) => {
+    const link = event.target.closest('a[href^="#"]');
+    if (link) openTarget(link.getAttribute("href"));
+  });
+  window.addEventListener("hashchange", () => openTarget(window.location.hash));
+  document.addEventListener("DOMContentLoaded", () => openTarget(window.location.hash));
+})();
+
+/* ==============================================
+   A07 部署登録：最初の社員番号の例
+============================================== */
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll("[data-code-example-for]").forEach((box) => {
+    const select = document.getElementById(box.dataset.codeExampleFor);
+    const output = box.querySelector("output");
+    if (!select || !output) return;
+    const update = () => { output.textContent = select.value ? `${select.value}0001` : "—"; };
+    select.addEventListener("change", update);
+    update();
+  });
+});

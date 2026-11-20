@@ -1,29 +1,29 @@
 {% extends "base.html" %}
-{% load static %}
-
 {% block title %}初期パスワード再発行の確認 | 勤怠管理{% endblock %}
-{% block screen_label %}管理者画面・社員管理{% endblock %}
-{% block extra_css %}<link rel="stylesheet" href="{% static 'css/manager-pages.css' %}">{% endblock %}
 
 {% block content %}
-<div class="admin-page">
-    <header class="admin-heading">
-        <h1>初期パスワードの再発行を確認</h1>
-        <p>対象の社員と本人確認の結果を確かめてください。</p>
+<div class="page">
+    <header class="page-head">
+        <div>
+            <a class="back-link" href="{% url 'management:employee_edit' employee.pk %}"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> 社員詳細へ</a>
+            <h1>初期パスワードの再発行</h1>
+        </div>
     </header>
-    <section class="ui-card admin-section" aria-labelledby="reset-target-title">
-        <h2 id="reset-target-title">再発行の対象</h2>
-        <p>社員番号：{{ employee.employee_number }}／氏名：{{ employee.display_name }}</p>
-        <p>再発行すると現在のパスワードと既存のログインセッションは無効になります。新しい初期パスワードは72時間有効です。</p>
+    <section class="card card--pad-lg" aria-label="再発行の対象">
+        <dl class="kv-table kv-table--strong kv-table--lg">
+            <dt>社員名</dt><dd>{{ employee.display_name }}</dd>
+            <dt>社員番号</dt><dd>{{ employee.employee_number }}</dd>
+        </dl>
+        <div class="notice-box notice-box--warning"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i>
+            <p>再発行すると現在のパスワードと既存のログインは無効になります。新しい初期パスワードは72時間有効です。</p>
+        </div>
         <form method="post">
             {% csrf_token %}
             <input type="hidden" name="ticket" value="{{ ticket }}">
-            <div class="admin-field">
-                <label><input type="checkbox" name="confirm" value="yes" required> 本人確認を行い、再発行による影響を確認しました</label>
-            </div>
-            <div class="admin-actions">
-                <a class="ui-button ui-button--secondary" href="{% url 'management:employee_edit' employee.pk %}">戻る</a>
-                <button type="submit" class="ui-button ui-button--primary">初期パスワードを再発行する</button>
+            <label class="check-line check-line--panel"><input type="checkbox" name="confirm" value="yes" required> 本人確認を行い、再発行による影響を確認しました</label>
+            <div class="btn-row btn-row--split">
+                <a class="btn btn--md btn--outline" href="{% url 'management:employee_edit' employee.pk %}">戻る</a>
+                <button type="submit" class="btn btn--md">初期パスワードを再発行する</button>
             </div>
         </form>
     </section>

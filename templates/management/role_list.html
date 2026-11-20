@@ -1,51 +1,75 @@
 {% extends "base.html" %}
-{% load static %}
 {% block title %}業務管理者の権限管理 | 勤怠管理{% endblock %}
-{% block screen_label %}管理者｜権限管理{% endblock %}
-{% block extra_css %}<link rel="stylesheet" href="{% static 'css/manager-pages.css' %}">{% endblock %}
+
 {% block content %}
-<div class="admin-page">
-  <header class="admin-heading">
-    <h1>業務管理者の権限管理</h1>
-    <p>有効な業務管理者 {{ active_manager_count }}人。対象社員の利用状態と権限を確認してください。</p>
-  </header>
-  <section class="ui-card admin-section">
-    <form method="get" class="admin-search" role="search" aria-label="権限管理の対象社員を検索">
-      <div><label for="role-query">社員番号・氏名</label><input id="role-query" name="q" value="{{ keyword }}" maxlength="100"></div>
-      <div><label for="role-status">利用状態</label><select id="role-status" name="status">
-        <option value="all" {% if status_filter == 'all' %}selected{% endif %}>すべて</option>
-        <option value="active" {% if status_filter == 'active' %}selected{% endif %}>利用中</option>
-        <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>利用停止</option>
-      </select></div>
-      <div><label for="role-filter">管理権限</label><select id="role-filter" name="role">
-        <option value="all" {% if role_filter == 'all' %}selected{% endif %}>すべて</option>
-        <option value="admin" {% if role_filter == 'admin' %}selected{% endif %}>付与済み</option>
-        <option value="employee" {% if role_filter == 'employee' %}selected{% endif %}>なし</option>
-      </select></div>
-      <button type="submit" class="ui-button ui-button--primary"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i> 社員を検索する</button>
-    </form>
-  </section>
-  <section class="ui-card admin-section">
-    <div class="table-scroll" role="region" aria-label="権限管理の対象社員" tabindex="0">
-      <table class="ui-table admin-card-table">
-        <thead><tr><th scope="col">社員番号</th><th scope="col">氏名</th><th scope="col">利用状態</th><th scope="col">管理権限</th><th scope="col">操作</th></tr></thead>
-        <tbody>
-          {% for employee in employees %}
-          <tr>
-            <td data-label="社員番号">{{ employee.employee_number }}</td><td data-label="氏名">{{ employee.display_name }}</td>
-            <td data-label="利用状態">{% if employee.is_active %}<span class="v2-state v2-state--success">利用中</span>{% else %}<span class="v2-state">利用停止</span>{% endif %}</td>
-            <td data-label="管理権限">{% if employee.is_business_admin %}<span class="v2-state v2-state--info">付与済み</span>{% else %}<span class="v2-state">なし</span>{% endif %}</td>
-            <td data-label="操作"><a class="admin-row-link" href="{% url 'management:employee_role' employee.pk %}"><i class="fa-solid fa-user-shield" aria-hidden="true"></i> 権限を確認・変更</a></td>
-          </tr>
-          {% empty %}<tr><td colspan="5">対象社員はいません。</td></tr>{% endfor %}
-        </tbody>
-      </table>
-    </div>
-    <nav class="admin-pagination" aria-label="権限管理のページ切替">
-      {% if page_obj.has_previous %}<a href="?{{ filter_query }}&amp;page={{ page_obj.previous_page_number }}">前へ</a>{% endif %}
-      <span>{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
-      {% if page_obj.has_next %}<a href="?{{ filter_query }}&amp;page={{ page_obj.next_page_number }}">次へ</a>{% endif %}
-    </nav>
-  </section>
+<div class="page">
+    <header class="page-head">
+        <h1>業務管理者の権限管理</h1>
+        <p class="page-lead">有効な業務管理者 {{ active_manager_count }}人。対象社員を選び、権限の付与・取消を行います。</p>
+    </header>
+
+    <section class="card search-card" aria-label="対象社員の検索">
+        <form method="get" class="search-grid" role="search" aria-label="権限管理の対象社員を検索">
+            <div class="field"><label for="role-query">社員番号・氏名</label><input id="role-query" type="search" name="q" value="{{ keyword }}" maxlength="100"></div>
+            <div class="field">
+                <label for="role-status">利用状態</label>
+                <select id="role-status" name="status">
+                    <option value="all" {% if status_filter == 'all' %}selected{% endif %}>すべて</option>
+                    <option value="active" {% if status_filter == 'active' %}selected{% endif %}>利用中</option>
+                    <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>停止中</option>
+                </select>
+            </div>
+            <div class="field">
+                <label for="role-filter">管理権限</label>
+                <select id="role-filter" name="role">
+                    <option value="all" {% if role_filter == 'all' %}selected{% endif %}>すべて</option>
+                    <option value="admin" {% if role_filter == 'admin' %}selected{% endif %}>付与済み</option>
+                    <option value="employee" {% if role_filter == 'employee' %}selected{% endif %}>なし</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn--cream"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i> 検索</button>
+        </form>
+    </section>
+
+    <section class="card" aria-label="権限管理の対象社員">
+        <div class="table-wrap desktop-only" role="region" aria-label="権限管理の対象社員の一覧表" tabindex="0">
+            <table class="data-table">
+                <thead><tr><th scope="col">社員名</th><th scope="col">社員番号</th><th scope="col">利用状態</th><th scope="col">管理権限</th><th scope="col"><span class="visually-hidden">操作</span></th></tr></thead>
+                <tbody>
+                    {% for employee in employees %}
+                    <tr>
+                        <th scope="row">{{ employee.display_name }}</th>
+                        <td>{{ employee.employee_number }}</td>
+                        <td>{% if employee.is_active %}<span class="badge badge--sm">利用中</span>{% else %}<span class="badge badge--sm badge--gray">停止中</span>{% endif %}</td>
+                        <td>{% if employee.is_business_admin %}業務管理者{% else %}一般社員{% endif %}</td>
+                        <td><a class="btn btn--sm btn--outline" href="{% url 'management:employee_role' employee.pk %}" aria-label="{{ employee.display_name }}の権限を確認・変更">権限を変更</a></td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="5" class="empty-cell">対象社員はいません。</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="mobile-cards">
+            {% for employee in employees %}
+            <article class="record-card person-card">
+                <dl class="plain-dl">
+                    <dt>社員名</dt><dd>{{ employee.display_name }}</dd>
+                    <dt>社員番号</dt><dd>{{ employee.employee_number }}</dd>
+                    <dt>利用状態</dt><dd>{% if employee.is_active %}利用中{% else %}停止中{% endif %}</dd>
+                    <dt>管理権限</dt><dd>{% if employee.is_business_admin %}業務管理者{% else %}一般社員{% endif %}</dd>
+                </dl>
+                <a class="btn btn--sm btn--outline" href="{% url 'management:employee_role' employee.pk %}" aria-label="{{ employee.display_name }}の権限を確認・変更">変更</a>
+            </article>
+            {% empty %}
+            <p class="muted">対象社員はいません。</p>
+            {% endfor %}
+        </div>
+        <nav class="pagination" aria-label="権限管理のページ切替">
+            {% if page_obj.has_previous %}<a href="?{{ filter_query }}&amp;page={{ page_obj.previous_page_number }}">前へ</a>{% endif %}
+            <span>{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+            {% if page_obj.has_next %}<a href="?{{ filter_query }}&amp;page={{ page_obj.next_page_number }}">次へ</a>{% endif %}
+        </nav>
+    </section>
 </div>
 {% endblock %}
